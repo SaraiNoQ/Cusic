@@ -1,0 +1,11 @@
+{
+  "name": "@music-ai/config",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./eslint/base": "./eslint/base.cjs",
+    "./prettier/base": "./prettier/base.cjs",
+    "./tsconfig/base": "./tsconfig/base.json"
+  }
+}
+

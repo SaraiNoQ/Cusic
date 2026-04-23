@@ -1,0 +1,402 @@
+openapi: 3.1.0
+info:
+  title: Music AI App API
+  version: 0.1.0
+  description: Static OpenAPI draft aligned with docs/specs/api-design.md
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ApiSuccessEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+        meta:
+          type: object
+          additionalProperties: true
+    ApiErrorEnvelope:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+        meta:
+          type: object
+          additionalProperties: true
+    PaginationMeta:
+      type: object
+      required: [page, pageSize, total, hasMore]
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        hasMore:
+          type: boolean
+    ContentItemDto:
+      type: object
+      required: [id, type, title, artists]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [track, podcast, radio, album]
+        title:
+          type: string
+        artists:
+          type: array
+          items:
+            type: string
+        album:
+          type: string
+          nullable: true
+        durationMs:
+          type: integer
+          nullable: true
+        language:
+          type: string
+          nullable: true
+        coverUrl:
+          type: string
+          nullable: true
+        playable:
+          type: boolean
+    TasteProfileDto:
+      type: object
+      required: [summary, explorationLevel, tags]
+      properties:
+        summary:
+          type: string
+        explorationLevel:
+          type: string
+        tags:
+          type: array
+          items:
+            type: object
+            required: [type, value, weight, isNegative]
+            properties:
+              type:
+                type: string
+              value:
+                type: string
+              weight:
+                type: number
+              isNegative:
+                type: boolean
+    RecommendationCardDto:
+      type: object
+      required: [contentId, title, reason]
+      properties:
+        contentId:
+          type: string
+        title:
+          type: string
+        reason:
+          type: string
+    ChatTurnRequestDto:
+      type: object
+      required: [message, responseMode]
+      properties:
+        sessionId:
+          type: string
+        message:
+          type: string
+        responseMode:
+          type: string
+          enum: [sync, stream]
+    ChatTurnResponseDto:
+      type: object
+      required: [sessionId, messageId, replyText, actions]
+      properties:
+        sessionId:
+          type: string
+        messageId:
+          type: string
+        replyText:
+          type: string
+        actions:
+          type: array
+          items:
+            type: object
+            required: [type, payload]
+            properties:
+              type:
+                type: string
+              payload:
+                type: object
+                additionalProperties: true
+paths:
+  /system/health:
+    get:
+      summary: API health check
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessEnvelope'
+  /auth/email/request-code:
+    post:
+      summary: Request email code
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Code requested
+  /auth/login:
+    post:
+      summary: Login with email code
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code]
+              properties:
+                email:
+                  type: string
+                code:
+                  type: string
+      responses:
+        '200':
+          description: Login success
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      security: []
+      responses:
+        '200':
+          description: Tokens refreshed
+  /auth/logout:
+    post:
+      summary: Logout current session
+      responses:
+        '200':
+          description: Session revoked
+  /auth/me:
+    get:
+      summary: Get current user
+      responses:
+        '200':
+          description: Current user
+  /search:
+    get:
+      summary: Unified content search
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+        - in: query
+          name: type
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Search results
+  /content/{id}:
+    get:
+      summary: Get content detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Content item
+  /content/{id}/related:
+    get:
+      summary: Get related content
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Related items
+  /player/queue:
+    post:
+      summary: Replace or append player queue
+      responses:
+        '200':
+          description: Queue updated
+  /player/events:
+    post:
+      summary: Ingest playback events
+      responses:
+        '200':
+          description: Event recorded
+  /library/playlists:
+    get:
+      summary: List playlists
+      responses:
+        '200':
+          description: Playlist list
+    post:
+      summary: Create playlist
+      responses:
+        '200':
+          description: Playlist created
+  /library/playlists/{id}/items:
+    post:
+      summary: Add playlist items
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Items added
+  /library/favorites:
+    post:
+      summary: Create favorite
+      responses:
+        '200':
+          description: Favorite created
+  /library/favorites/{contentId}:
+    delete:
+      summary: Remove favorite
+      parameters:
+        - in: path
+          name: contentId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Favorite removed
+  /profile/taste-report:
+    get:
+      summary: Get taste profile
+      responses:
+        '200':
+          description: Taste profile
+  /profile/tags:
+    patch:
+      summary: Update profile tags
+      responses:
+        '200':
+          description: Tags updated
+  /recommend/now:
+    get:
+      summary: Get contextual recommendations
+      responses:
+        '200':
+          description: Recommendation result
+  /playlist/daily:
+    get:
+      summary: Get daily playlist
+      responses:
+        '200':
+          description: Daily playlist
+  /feedback:
+    post:
+      summary: Submit feedback
+      responses:
+        '200':
+          description: Feedback recorded
+  /dj/chat:
+    post:
+      summary: Submit a DJ chat turn
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatTurnRequestDto'
+      responses:
+        '200':
+          description: Chat turn response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatTurnResponseDto'
+  /dj/chat/stream:
+    get:
+      summary: Stream DJ response over SSE
+      responses:
+        '200':
+          description: text/event-stream response
+  /dj/voice/asr:
+    post:
+      summary: Speech to text
+      responses:
+        '200':
+          description: ASR result
+  /dj/voice/tts:
+    post:
+      summary: Text to speech
+      responses:
+        '200':
+          description: TTS result
+  /imports/playlists:
+    post:
+      summary: Create import job
+      responses:
+        '200':
+          description: Import accepted
+  /imports/{jobId}:
+    get:
+      summary: Get import job status
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Import status
+

@@ -1,0 +1,26 @@
+FROM node:22-alpine AS base
+WORKDIR /app
+RUN npm config set registry https://registry.npmmirror.com \
+  && npm install -g pnpm@9.15.0
+
+FROM base AS deps
+COPY package.json pnpm-workspace.yaml turbo.json tsconfig.base.json .npmrc ./
+COPY packages ./packages
+COPY apps/web/package.json ./apps/web/package.json
+RUN pnpm install --frozen-lockfile=false
+
+FROM deps AS build
+COPY apps/web ./apps/web
+RUN pnpm --filter @music-ai/web build
+
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json ./package.json
+COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=deps /app/.npmrc ./.npmrc
+COPY --from=deps /app/packages ./packages
+COPY --from=build /app/apps/web ./apps/web
+EXPOSE 3000
+CMD ["pnpm", "--filter", "@music-ai/web", "start"]
