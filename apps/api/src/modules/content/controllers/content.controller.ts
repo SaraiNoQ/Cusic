@@ -1,42 +1,19 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import {
-  ApiBearerAuth,
   ApiOperation,
   ApiParam,
   ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
-
-class SearchQueryDto {
-  @IsString()
-  @IsOptional()
-  q?: string;
-
-  @IsString()
-  @IsOptional()
-  type?: string;
-
-  @IsString()
-  @IsOptional()
-  language?: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  pageSize?: number;
-}
+import { SearchContentDto } from '../dto/search-content.dto';
+import { ContentService } from '../services/content.service';
 
 @ApiTags('content')
-@ApiBearerAuth()
 @Controller()
 export class ContentController {
+  constructor(private readonly contentService: ContentService) {}
+
   @Get('search')
   @ApiOperation({ summary: 'Unified search across music, podcasts, and radio' })
   @ApiQuery({ name: 'q', required: false })
@@ -45,30 +22,15 @@ export class ContentController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'pageSize', required: false, type: Number })
   @ApiResponse({ status: 200, description: 'Search results' })
-  search(@Query() query: SearchQueryDto) {
+  search(@Query() query: SearchContentDto) {
+    const result = this.contentService.search(query);
+
     return {
       success: true,
       data: {
-        items: [
-          {
-            id: 'cnt_stub_1',
-            type: query.type ?? 'track',
-            title: query.q ?? 'Stub Search Result',
-            artists: ['Stub Artist'],
-            album: 'Stub Album',
-            durationMs: 210000,
-            language: query.language ?? 'zh',
-            coverUrl: null,
-            playable: true,
-          },
-        ],
+        items: result.items,
       },
-      meta: {
-        page: query.page ?? 1,
-        pageSize: query.pageSize ?? 20,
-        total: 1,
-        hasMore: false,
-      },
+      meta: result.meta,
     };
   }
 
@@ -77,19 +39,21 @@ export class ContentController {
   @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 200, description: 'Content detail' })
   getContent(@Param('id') id: string) {
+    const item = this.contentService.getById(id);
+
     return {
       success: true,
-      data: {
+      data: item ?? {
         id,
         type: 'track',
-        title: 'Stub Content',
-        artists: ['Stub Artist'],
-        album: 'Stub Album',
-        durationMs: 210000,
-        language: 'zh',
+        title: 'Unknown Content',
+        artists: ['Unavailable'],
+        album: null,
+        durationMs: null,
+        language: null,
         coverUrl: null,
-        playable: true,
-        providers: ['stub-provider'],
+        audioUrl: null,
+        playable: false,
       },
       meta: {},
     };
@@ -100,21 +64,15 @@ export class ContentController {
   @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 200, description: 'Related content list' })
   getRelated(@Param('id') id: string) {
+    const items = this.contentService.getRelated(id);
+
     return {
       success: true,
       data: {
         sourceContentId: id,
-        items: [
-          {
-            id: 'cnt_related_1',
-            type: 'track',
-            title: 'Related Stub Track',
-            artists: ['Related Artist'],
-          },
-        ],
+        items,
       },
       meta: {},
     };
   }
 }
-

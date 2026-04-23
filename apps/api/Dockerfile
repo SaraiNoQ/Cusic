@@ -12,7 +12,7 @@ RUN pnpm install --frozen-lockfile=false
 
 FROM deps AS build
 COPY apps/api ./apps/api
-RUN pnpm --filter @music-ai/api build
+RUN rm -rf apps/api/dist && pnpm --filter @music-ai/api build
 
 FROM base AS runner
 WORKDIR /app
@@ -24,4 +24,4 @@ COPY --from=deps /app/.npmrc ./.npmrc
 COPY --from=deps /app/packages ./packages
 COPY --from=build /app/apps/api ./apps/api
 EXPOSE 3001
-CMD ["node", "apps/api/dist/main.js"]
+CMD ["node", "apps/api/dist/apps/api/src/main.js"]

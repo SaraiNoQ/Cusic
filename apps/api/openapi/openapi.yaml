@@ -83,6 +83,9 @@ components:
         coverUrl:
           type: string
           nullable: true
+        audioUrl:
+          type: string
+          nullable: true
         playable:
           type: boolean
     TasteProfileDto:
@@ -220,6 +223,7 @@ paths:
   /search:
     get:
       summary: Unified content search
+      security: []
       parameters:
         - in: query
           name: q
@@ -243,6 +247,7 @@ paths:
   /content/{id}:
     get:
       summary: Get content detail
+      security: []
       parameters:
         - in: path
           name: id
@@ -255,6 +260,7 @@ paths:
   /content/{id}/related:
     get:
       summary: Get related content
+      security: []
       parameters:
         - in: path
           name: id
@@ -267,29 +273,34 @@ paths:
   /player/queue:
     post:
       summary: Replace or append player queue
+      security: []
       responses:
         '200':
           description: Queue updated
   /player/events:
     post:
       summary: Ingest playback events
+      security: []
       responses:
         '200':
           description: Event recorded
   /library/playlists:
     get:
       summary: List playlists
+      security: []
       responses:
         '200':
           description: Playlist list
     post:
       summary: Create playlist
+      security: []
       responses:
         '200':
           description: Playlist created
   /library/playlists/{id}/items:
     post:
       summary: Add playlist items
+      security: []
       parameters:
         - in: path
           name: id
@@ -302,12 +313,14 @@ paths:
   /library/favorites:
     post:
       summary: Create favorite
+      security: []
       responses:
         '200':
           description: Favorite created
   /library/favorites/{contentId}:
     delete:
       summary: Remove favorite
+      security: []
       parameters:
         - in: path
           name: contentId
@@ -399,4 +412,3 @@ paths:
       responses:
         '200':
           description: Import status
-

@@ -20,16 +20,54 @@ export interface PaginationMeta {
   hasMore: boolean;
 }
 
+export type ContentType = 'track' | 'podcast' | 'radio' | 'album';
+
 export interface ContentItemDto {
   id: string;
-  type: 'track' | 'podcast' | 'radio' | 'album';
+  type: ContentType;
   title: string;
   artists: string[];
   album?: string | null;
   durationMs?: number | null;
   language?: string | null;
   coverUrl?: string | null;
+  audioUrl?: string | null;
   playable?: boolean;
+}
+
+export interface SearchResultDto {
+  items: ContentItemDto[];
+}
+
+export type QueueMode = 'replace' | 'append';
+
+export interface QueueItemDto {
+  contentId: string;
+}
+
+export interface QueueUpdateDto {
+  mode: QueueMode;
+  items: QueueItemDto[];
+}
+
+export interface PlaybackEventPayloadDto {
+  contentId: string;
+  eventType: 'PLAY_STARTED' | 'PLAY_PAUSED' | 'PLAY_COMPLETED' | 'SKIPPED';
+  positionMs?: number;
+  occurredAt: string;
+}
+
+export interface PlaylistSummaryDto {
+  id: string;
+  title: string;
+  description: string;
+  playlistType: 'user_created' | 'ai_generated' | 'daily' | 'imported';
+  itemCount: number;
+}
+
+export interface FavoriteDto {
+  contentId: string;
+  favoriteType: 'track' | 'podcast' | 'radio' | 'album';
 }
 
 export interface RecommendationCardDto {
@@ -67,3 +105,38 @@ export interface ChatTurnResponseDto {
   }>;
 }
 
+export interface AiDjActionDto {
+  type: string;
+  payload: {
+    contentIds?: string[];
+    [key: string]: unknown;
+  };
+}
+
+export interface ChatMessageVm {
+  id: string;
+  role: 'assistant' | 'user';
+  text: string;
+}
+
+export interface PlayerSurfaceState {
+  queue: ContentItemDto[];
+  currentTrack: ContentItemDto | null;
+  activeIndex: number;
+  isPlaying: boolean;
+  progressSeconds: number;
+  durationSeconds: number;
+  statusText: string;
+}
+
+export interface ChatPanelState {
+  sessionId?: string;
+  input: string;
+  isPending: boolean;
+  messages: ChatMessageVm[];
+}
+
+export interface SearchOverlayState {
+  isOpen: boolean;
+  query: string;
+}

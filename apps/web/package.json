@@ -14,9 +14,11 @@
   "dependencies": {
     "@music-ai/shared": "workspace:*",
     "@music-ai/ui": "workspace:*",
+    "@tanstack/react-query": "^5.75.5",
     "next": "^15.2.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@types/react": "^19.0.10",
