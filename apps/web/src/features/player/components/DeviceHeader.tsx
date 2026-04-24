@@ -2,8 +2,14 @@ import styles from '../PlayerScreen.module.css';
 
 export function DeviceHeader({
   onOpenSearch,
+  onOpenAuth,
+  onLogout,
+  userLabel,
 }: Readonly<{
   onOpenSearch: () => void;
+  onOpenAuth: () => void;
+  onLogout: () => void;
+  userLabel?: string | null;
   isPlaying: boolean;
   statusText: string;
 }>) {
@@ -20,9 +26,16 @@ export function DeviceHeader({
       </button>
 
       <div className={styles.headerActions}>
-        <button type="button" className={styles.loginButton}>
-          LOGIN
+        <button
+          type="button"
+          className={styles.loginButton}
+          onClick={userLabel ? onLogout : onOpenAuth}
+        >
+          {userLabel ? 'LOGOUT' : 'LOGIN'}
         </button>
+        {userLabel ? (
+          <span className={styles.userCallsign}>{userLabel}</span>
+        ) : null}
         <button
           type="button"
           className={styles.searchButton}

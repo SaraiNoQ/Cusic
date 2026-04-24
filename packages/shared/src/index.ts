@@ -20,6 +20,41 @@ export interface PaginationMeta {
   hasMore: boolean;
 }
 
+export interface RequestEmailCodeDto {
+  email: string;
+}
+
+export interface RequestEmailCodeResponseDto {
+  cooldownSeconds: number;
+}
+
+export interface LoginRequestDto {
+  email: string;
+  code: string;
+}
+
+export interface AuthUserDto {
+  id: string;
+  email: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+export interface AuthTokenPairDto {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  user?: AuthUserDto;
+}
+
+export interface RefreshTokenRequestDto {
+  refreshToken: string;
+}
+
+export interface LogoutResponseDto {
+  loggedOut: boolean;
+}
+
 export type ContentType = 'track' | 'podcast' | 'radio' | 'album';
 
 export interface ContentItemDto {

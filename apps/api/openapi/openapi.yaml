@@ -166,7 +166,7 @@ paths:
                 $ref: '#/components/schemas/ApiSuccessEnvelope'
   /auth/email/request-code:
     post:
-      summary: Request email code
+      summary: Request SMTP email verification code
       security: []
       requestBody:
         required: true
@@ -181,7 +181,9 @@ paths:
                   format: email
       responses:
         '200':
-          description: Code requested
+          description: Code requested. The clear text code is never returned.
+        '503':
+          description: SMTP or JWT configuration is missing
   /auth/login:
     post:
       summary: Login with email code
@@ -201,16 +203,40 @@ paths:
       responses:
         '200':
           description: Login success
+        '400':
+          description: Verification code is invalid or expired
   /auth/refresh:
     post:
       summary: Refresh access token
       security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
       responses:
         '200':
-          description: Tokens refreshed
+          description: Tokens refreshed and refresh token rotated
+        '401':
+          description: Refresh token is invalid or revoked
   /auth/logout:
     post:
       summary: Logout current session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
       responses:
         '200':
           description: Session revoked
@@ -220,6 +246,8 @@ paths:
       responses:
         '200':
           description: Current user
+        '401':
+          description: Access token is invalid or expired
   /search:
     get:
       summary: Unified content search

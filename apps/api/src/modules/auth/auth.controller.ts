@@ -1,99 +1,82 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsEmail, IsOptional, IsString, Length, ValidateNested } from 'class-validator';
+import {
+  AuthTokenPairDto,
+  LoginDto,
+  RefreshDto,
+  RequestEmailCodeDto,
+  UserProfileDto,
+} from './dto/auth.dto';
+import { JwtAuthGuard, RequestWithUser } from './guards/jwt-auth.guard';
+import { AuthService } from './services/auth.service';
 
-class RequestEmailCodeDto {
-  @IsEmail()
-  email!: string;
-}
-
-class LoginDto {
-  @IsEmail()
-  email!: string;
-
-  @IsString()
-  @Length(4, 12)
-  code!: string;
-}
-
-class RefreshDto {
-  @IsString()
-  refreshToken!: string;
-}
-
-class UserProfileDto {
-  id!: string;
-  email!: string;
-  displayName!: string;
-  avatarUrl!: string | null;
-}
-
-class AuthTokenPairDto {
-  accessToken!: string;
-  refreshToken!: string;
-  expiresIn!: number;
-
-  @ValidateNested()
-  @Type(() => UserProfileDto)
-  @IsOptional()
-  user?: UserProfileDto;
+interface RequestContext extends RequestWithUser {
+  ip?: string;
+  headers: RequestWithUser['headers'] & {
+    'user-agent'?: string | string[];
+    'x-forwarded-for'?: string | string[];
+  };
 }
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
   @Post('email/request-code')
   @ApiOperation({ summary: 'Request email verification code' })
   @ApiResponse({ status: 200, description: 'Verification code requested' })
-  requestCode(@Body() body: RequestEmailCodeDto) {
+  async requestCode(
+    @Body() body: RequestEmailCodeDto,
+    @Req() request: RequestContext,
+  ) {
     return {
       success: true,
-      data: {
-        email: body.email,
-        cooldownSeconds: 60,
-      },
+      data: await this.authService.requestEmailCode(
+        body.email,
+        this.getClientIp(request),
+        this.getHeaderValue(request.headers['user-agent']),
+      ),
       meta: {},
     };
   }
 
   @Post('login')
   @ApiOperation({ summary: 'Login with email verification code' })
-  @ApiResponse({ status: 200, description: 'Login success', type: AuthTokenPairDto })
-  login(@Body() body: LoginDto) {
+  @ApiResponse({
+    status: 200,
+    description: 'Login success',
+    type: AuthTokenPairDto,
+  })
+  async login(@Body() body: LoginDto, @Req() request: RequestContext) {
     return {
       success: true,
-      data: {
-        accessToken: 'stub-access-token',
-        refreshToken: 'stub-refresh-token',
-        expiresIn: 1800,
-        user: {
-          id: 'usr_stub',
-          email: body.email,
-          displayName: 'Cusic User',
-          avatarUrl: null,
-        },
-      },
+      data: await this.authService.login(
+        body.email,
+        body.code,
+        this.getClientIp(request),
+        this.getHeaderValue(request.headers['user-agent']),
+      ),
       meta: {},
     };
   }
 
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token' })
-  @ApiResponse({ status: 200, description: 'Refresh success', type: AuthTokenPairDto })
-  refresh(@Body() body: RefreshDto) {
+  @ApiResponse({
+    status: 200,
+    description: 'Refresh success',
+    type: AuthTokenPairDto,
+  })
+  async refresh(@Body() body: RefreshDto) {
     return {
       success: true,
-      data: {
-        accessToken: 'stub-access-token-refreshed',
-        refreshToken: body.refreshToken,
-        expiresIn: 1800,
-      },
+      data: await this.authService.refresh(body.refreshToken),
       meta: {},
     };
   }
@@ -102,31 +85,39 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout current session' })
   @ApiResponse({ status: 200, description: 'Logout success' })
-  logout(@Body() body: RefreshDto) {
+  async logout(@Body() body: RefreshDto) {
     return {
       success: true,
-      data: {
-        loggedOut: true,
-        refreshToken: body.refreshToken,
-      },
+      data: await this.authService.logout(body.refreshToken),
       meta: {},
     };
   }
 
   @Get('me')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
-  @ApiResponse({ status: 200, description: 'Current user profile', type: UserProfileDto })
-  me() {
+  @ApiResponse({
+    status: 200,
+    description: 'Current user profile',
+    type: UserProfileDto,
+  })
+  async me(@Req() request: RequestContext) {
     return {
       success: true,
-      data: {
-        id: 'usr_stub',
-        email: 'user@example.com',
-        displayName: 'Cusic User',
-        avatarUrl: null,
-      },
+      data: await this.authService.getCurrentUser(request.user!.id),
       meta: {},
     };
+  }
+
+  private getClientIp(request: RequestContext) {
+    return (
+      this.getHeaderValue(request.headers['x-forwarded-for'])?.split(',')[0] ??
+      request.ip
+    );
+  }
+
+  private getHeaderValue(value?: string | string[]) {
+    return Array.isArray(value) ? value[0] : value;
   }
 }

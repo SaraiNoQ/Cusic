@@ -8,6 +8,7 @@ import { ImportsModule } from './imports/imports.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { LibraryModule } from './library/library.module';
 import { ProfileModule } from './profile/profile.module';
+import { PrismaModule } from './prisma/prisma.module';
 import { RecommendationModule } from './recommendation/recommendation.module';
 import { SystemModule } from './system/system.module';
 import { VoiceModule } from './voice/voice.module';
@@ -15,6 +16,7 @@ import { VoiceModule } from './voice/voice.module';
 @Module({
   imports: [
     SystemModule,
+    PrismaModule,
     AuthModule,
     ContentModule,
     LibraryModule,
@@ -29,4 +31,3 @@ import { VoiceModule } from './voice/voice.module';
   ],
 })
 export class AppModule {}
-

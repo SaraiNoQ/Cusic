@@ -16,13 +16,13 @@
 3. Monorepo、Prisma baseline、Swagger 骨架、Docker Compose 运行环境。
 4. Web/API/Worker 基础骨架。
 5. 第一轮播放器 Demo 闭环。
+6. Phase 2 产品级播放器视觉基线。
 
 当前未完成重点：
 
-1. 移动端优先的产品级 UI。
-2. 真实用户体系与真实持久化。
-3. AI DJ 的真实对话与工具编排。
-4. 画像、推荐、导入、语音与知识系统。
+1. 真实用户体系与真实持久化。
+2. AI DJ 的真实对话与工具编排。
+3. 画像、推荐、导入、语音与知识系统。
 
 ## 2. 阶段规划总览
 
@@ -93,6 +93,8 @@
 ### Phase 3：Auth + Persistence
 
 目标：从 demo user 过渡到真实用户和真实数据。
+
+当前状态：已启动。首个交付项为邮箱验证码登录、JWT access token、refresh token 轮换、session 持久化与前端登录入口。
 
 核心工作：
 

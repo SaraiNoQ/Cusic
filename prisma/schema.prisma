@@ -110,34 +110,54 @@ enum JobType {
 }
 
 model User {
-  id                String                @id @default(cuid())
-  email             String                @unique
-  displayName       String?               @map("display_name")
-  avatarUrl         String?               @map("avatar_url")
-  status            UserStatus            @default(PENDING)
-  lastLoginAt       DateTime?             @map("last_login_at") @db.Timestamptz(6)
-  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt         DateTime?             @map("deleted_at") @db.Timestamptz(6)
-  authIdentities    AuthIdentity[]
-  sessions          UserSession[]
-  refreshTokens     RefreshToken[]
-  authorizations    UserAuthorization[]
-  playlists         Playlist[]
-  favorites         Favorite[]
-  playbackEvents    PlaybackEvent[]
-  preferenceFeedback PreferenceFeedback[]
-  tasteProfile      TasteProfile?
-  tasteSnapshots    TasteProfileSnapshot[]
-  contextSnapshots  ContextSnapshot[]
-  recommendationResults RecommendationResult[]
-  chatSessions      ChatSession[]
-  knowledgeTraces   KnowledgeTrace[]
-  importJobs        ImportJob[]
-  dailyPlaylistJobs DailyPlaylistJob[]
+  id                     String                  @id @default(cuid())
+  email                  String                  @unique
+  displayName            String?                 @map("display_name")
+  avatarUrl              String?                 @map("avatar_url")
+  status                 UserStatus              @default(PENDING)
+  lastLoginAt            DateTime?               @map("last_login_at") @db.Timestamptz(6)
+  createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt              DateTime?               @map("deleted_at") @db.Timestamptz(6)
+  authIdentities         AuthIdentity[]
+  sessions               UserSession[]
+  refreshTokens          RefreshToken[]
+  authorizations         UserAuthorization[]
+  playlists              Playlist[]
+  favorites              Favorite[]
+  playbackEvents         PlaybackEvent[]
+  preferenceFeedback     PreferenceFeedback[]
+  tasteProfile           TasteProfile?
+  tasteSnapshots         TasteProfileSnapshot[]
+  contextSnapshots       ContextSnapshot[]
+  recommendationResults  RecommendationResult[]
+  chatSessions           ChatSession[]
+  knowledgeTraces        KnowledgeTrace[]
+  importJobs             ImportJob[]
+  dailyPlaylistJobs      DailyPlaylistJob[]
+  emailVerificationCodes EmailVerificationCode[]
 
   @@index([status, createdAt])
   @@map("users")
+}
+
+model EmailVerificationCode {
+  id           String    @id @default(cuid())
+  email        String
+  userId       String?   @map("user_id")
+  codeHash     String    @map("code_hash")
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt       DateTime? @map("used_at") @db.Timestamptz(6)
+  requestIp    String?   @map("request_ip")
+  userAgent    String?   @map("user_agent")
+  attemptCount Int       @default(0) @map("attempt_count")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user         User?     @relation(fields: [userId], references: [id])
+
+  @@index([email, expiresAt])
+  @@index([userId])
+  @@map("email_verification_codes")
 }
 
 model AuthIdentity {
@@ -157,17 +177,17 @@ model AuthIdentity {
 }
 
 model UserSession {
-  id           String         @id @default(cuid())
-  userId       String         @map("user_id")
-  deviceLabel  String?        @map("device_label")
-  clientIp     String?        @map("client_ip")
-  userAgent    String?        @map("user_agent")
-  lastActiveAt DateTime?      @map("last_active_at") @db.Timestamptz(6)
-  expiresAt    DateTime       @map("expires_at") @db.Timestamptz(6)
-  revokedAt    DateTime?      @map("revoked_at") @db.Timestamptz(6)
-  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
-  user         User           @relation(fields: [userId], references: [id])
+  id            String         @id @default(cuid())
+  userId        String         @map("user_id")
+  deviceLabel   String?        @map("device_label")
+  clientIp      String?        @map("client_ip")
+  userAgent     String?        @map("user_agent")
+  lastActiveAt  DateTime?      @map("last_active_at") @db.Timestamptz(6)
+  expiresAt     DateTime       @map("expires_at") @db.Timestamptz(6)
+  revokedAt     DateTime?      @map("revoked_at") @db.Timestamptz(6)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user          User           @relation(fields: [userId], references: [id])
   refreshTokens RefreshToken[]
 
   @@index([userId, expiresAt])
@@ -176,16 +196,16 @@ model UserSession {
 }
 
 model RefreshToken {
-  id            String       @id @default(cuid())
-  sessionId     String       @map("session_id")
-  userId        String       @map("user_id")
-  tokenHash     String       @unique @map("token_hash")
-  expiresAt     DateTime     @map("expires_at") @db.Timestamptz(6)
-  revokedAt     DateTime?    @map("revoked_at") @db.Timestamptz(6)
-  rotatedFromId String?      @map("rotated_from_id")
-  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  session       UserSession  @relation(fields: [sessionId], references: [id])
-  user          User         @relation(fields: [userId], references: [id])
+  id            String      @id @default(cuid())
+  sessionId     String      @map("session_id")
+  userId        String      @map("user_id")
+  tokenHash     String      @unique @map("token_hash")
+  expiresAt     DateTime    @map("expires_at") @db.Timestamptz(6)
+  revokedAt     DateTime?   @map("revoked_at") @db.Timestamptz(6)
+  rotatedFromId String?     @map("rotated_from_id")
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  session       UserSession @relation(fields: [sessionId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
 
   @@index([userId, expiresAt])
   @@index([sessionId])
@@ -214,26 +234,26 @@ model UserAuthorization {
 }
 
 model ContentItem {
-  id                    String                   @id @default(cuid())
-  contentType           ContentType              @map("content_type")
-  canonicalTitle        String                   @map("canonical_title")
-  subtitle              String?
-  albumName             String?                  @map("album_name")
-  primaryArtistNames    String[]                 @default([]) @map("primary_artist_names")
-  durationMs            Int?                     @map("duration_ms")
-  language              String?
-  coverUrl              String?                  @map("cover_url")
-  playable              Boolean                  @default(true)
-  releaseDate           DateTime?                @map("release_date") @db.Date
-  metadataJson          Json?                    @map("metadata_json")
-  embedding             Unsupported("vector")?   @map("embedding")
-  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
-  providerMappings      ContentProviderMapping[]
-  playlistItems         PlaylistItem[]
-  favorites             Favorite[]
-  playbackEvents        PlaybackEvent[]
-  recommendationItems   RecommendationItem[]
+  id                  String                   @id @default(cuid())
+  contentType         ContentType              @map("content_type")
+  canonicalTitle      String                   @map("canonical_title")
+  subtitle            String?
+  albumName           String?                  @map("album_name")
+  primaryArtistNames  String[]                 @default([]) @map("primary_artist_names")
+  durationMs          Int?                     @map("duration_ms")
+  language            String?
+  coverUrl            String?                  @map("cover_url")
+  playable            Boolean                  @default(true)
+  releaseDate         DateTime?                @map("release_date") @db.Date
+  metadataJson        Json?                    @map("metadata_json")
+  embedding           Unsupported("vector")?   @map("embedding")
+  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  providerMappings    ContentProviderMapping[]
+  playlistItems       PlaylistItem[]
+  favorites           Favorite[]
+  playbackEvents      PlaybackEvent[]
+  recommendationItems RecommendationItem[]
 
   @@index([contentType, playable])
   @@index([language, releaseDate])
@@ -260,19 +280,19 @@ model ContentProviderMapping {
 }
 
 model Playlist {
-  id                   String         @id @default(cuid())
-  userId               String         @map("user_id")
+  id                   String             @id @default(cuid())
+  userId               String             @map("user_id")
   title                String
   description          String?
-  playlistType         PlaylistType   @map("playlist_type")
-  sourceType           SourceType     @map("source_type")
-  coverUrl             String?        @map("cover_url")
-  isPinned             Boolean        @default(false) @map("is_pinned")
-  generatedContextJson Json?          @map("generated_context_json")
-  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt            DateTime?      @map("deleted_at") @db.Timestamptz(6)
-  user                 User           @relation(fields: [userId], references: [id])
+  playlistType         PlaylistType       @map("playlist_type")
+  sourceType           SourceType         @map("source_type")
+  coverUrl             String?            @map("cover_url")
+  isPinned             Boolean            @default(false) @map("is_pinned")
+  generatedContextJson Json?              @map("generated_context_json")
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt            DateTime?          @map("deleted_at") @db.Timestamptz(6)
+  user                 User               @relation(fields: [userId], references: [id])
   items                PlaylistItem[]
   dailyJobs            DailyPlaylistJob[]
 
@@ -332,15 +352,15 @@ model PlaybackEvent {
 }
 
 model PreferenceFeedback {
-  id                     String        @id @default(cuid())
-  userId                 String        @map("user_id")
-  targetType             String        @map("target_type")
-  targetId               String        @map("target_id")
-  feedbackType           FeedbackType  @map("feedback_type")
-  reasonText             String?       @map("reason_text")
-  recommendationResultId String?       @map("recommendation_result_id")
-  createdAt              DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  user                   User          @relation(fields: [userId], references: [id])
+  id                     String                @id @default(cuid())
+  userId                 String                @map("user_id")
+  targetType             String                @map("target_type")
+  targetId               String                @map("target_id")
+  feedbackType           FeedbackType          @map("feedback_type")
+  reasonText             String?               @map("reason_text")
+  recommendationResultId String?               @map("recommendation_result_id")
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  user                   User                  @relation(fields: [userId], references: [id])
   recommendationResult   RecommendationResult? @relation(fields: [recommendationResultId], references: [id])
 
   @@index([userId, createdAt(sort: Desc)])
@@ -349,19 +369,19 @@ model PreferenceFeedback {
 }
 
 model TasteProfile {
-  id               String                @id @default(cuid())
-  userId           String                @unique @map("user_id")
-  summaryText      String                @map("summary_text")
-  explorationLevel String                @map("exploration_level")
-  familiarityLevel String                @map("familiarity_level")
-  embedding        Unsupported("vector")? @map("embedding")
-  version          Int                   @default(1)
-  generatedAt      DateTime              @map("generated_at") @db.Timestamptz(6)
-  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
-  user             User                  @relation(fields: [userId], references: [id])
-  tags             TasteProfileTag[]
-  snapshots        TasteProfileSnapshot[]
+  id                    String                 @id @default(cuid())
+  userId                String                 @unique @map("user_id")
+  summaryText           String                 @map("summary_text")
+  explorationLevel      String                 @map("exploration_level")
+  familiarityLevel      String                 @map("familiarity_level")
+  embedding             Unsupported("vector")? @map("embedding")
+  version               Int                    @default(1)
+  generatedAt           DateTime               @map("generated_at") @db.Timestamptz(6)
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                  User                   @relation(fields: [userId], references: [id])
+  tags                  TasteProfileTag[]
+  snapshots             TasteProfileSnapshot[]
   recommendationResults RecommendationResult[]
 
   @@map("taste_profiles")
@@ -385,52 +405,52 @@ model TasteProfileTag {
 }
 
 model TasteProfileSnapshot {
-  id            String       @id @default(cuid())
-  userId        String       @map("user_id")
-  tasteProfileId String      @map("taste_profile_id")
-  snapshotJson  Json         @map("snapshot_json")
-  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  user          User         @relation(fields: [userId], references: [id])
-  tasteProfile  TasteProfile @relation(fields: [tasteProfileId], references: [id])
+  id             String       @id @default(cuid())
+  userId         String       @map("user_id")
+  tasteProfileId String       @map("taste_profile_id")
+  snapshotJson   Json         @map("snapshot_json")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  user           User         @relation(fields: [userId], references: [id])
+  tasteProfile   TasteProfile @relation(fields: [tasteProfileId], references: [id])
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("taste_profile_snapshots")
 }
 
 model ContextSnapshot {
-  id                  String                 @id @default(cuid())
-  userId              String                 @map("user_id")
-  timezone            String
-  localTime           DateTime               @map("local_time") @db.Timestamptz(6)
-  locationText        String?                @map("location_text")
-  weatherJson         Json?                  @map("weather_json")
-  calendarSummaryJson Json?                  @map("calendar_summary_json")
-  taskLabel           String?                @map("task_label")
-  moodLabel           String?                @map("mood_label")
-  createdAt           DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  user                User                   @relation(fields: [userId], references: [id])
-  playbackEvents      PlaybackEvent[]
+  id                    String                 @id @default(cuid())
+  userId                String                 @map("user_id")
+  timezone              String
+  localTime             DateTime               @map("local_time") @db.Timestamptz(6)
+  locationText          String?                @map("location_text")
+  weatherJson           Json?                  @map("weather_json")
+  calendarSummaryJson   Json?                  @map("calendar_summary_json")
+  taskLabel             String?                @map("task_label")
+  moodLabel             String?                @map("mood_label")
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  user                  User                   @relation(fields: [userId], references: [id])
+  playbackEvents        PlaybackEvent[]
   recommendationResults RecommendationResult[]
-  chatSessions        ChatSession[]
+  chatSessions          ChatSession[]
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("context_snapshots")
 }
 
 model RecommendationResult {
-  id                String                 @id @default(cuid())
-  userId            String                 @map("user_id")
-  recommendationType RecommendationType    @map("recommendation_type")
-  contextSnapshotId String?                @map("context_snapshot_id")
-  tasteProfileId    String?                @map("taste_profile_id")
-  explanationText   String                 @map("explanation_text")
-  traceJson         Json?                  @map("trace_json")
-  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
-  user              User                   @relation(fields: [userId], references: [id])
-  contextSnapshot   ContextSnapshot?       @relation(fields: [contextSnapshotId], references: [id])
-  tasteProfile      TasteProfile?          @relation(fields: [tasteProfileId], references: [id])
-  items             RecommendationItem[]
-  feedback          PreferenceFeedback[]
+  id                 String               @id @default(cuid())
+  userId             String               @map("user_id")
+  recommendationType RecommendationType   @map("recommendation_type")
+  contextSnapshotId  String?              @map("context_snapshot_id")
+  tasteProfileId     String?              @map("taste_profile_id")
+  explanationText    String               @map("explanation_text")
+  traceJson          Json?                @map("trace_json")
+  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  user               User                 @relation(fields: [userId], references: [id])
+  contextSnapshot    ContextSnapshot?     @relation(fields: [contextSnapshotId], references: [id])
+  tasteProfile       TasteProfile?        @relation(fields: [tasteProfileId], references: [id])
+  items              RecommendationItem[]
+  feedback           PreferenceFeedback[]
 
   @@index([userId, recommendationType, createdAt(sort: Desc)])
   @@index([contextSnapshotId])
@@ -488,15 +508,15 @@ model ChatMessage {
 }
 
 model KnowledgeTrace {
-  id            String          @id @default(cuid())
-  userId        String          @map("user_id")
-  chatSessionId String?         @map("chat_session_id")
-  queryText     String          @map("query_text")
-  summaryText   String          @map("summary_text")
-  sourceCount   Int             @default(0) @map("source_count")
-  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  user          User            @relation(fields: [userId], references: [id])
-  chatSession   ChatSession?    @relation(fields: [chatSessionId], references: [id])
+  id            String            @id @default(cuid())
+  userId        String            @map("user_id")
+  chatSessionId String?           @map("chat_session_id")
+  queryText     String            @map("query_text")
+  summaryText   String            @map("summary_text")
+  sourceCount   Int               @default(0) @map("source_count")
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  user          User              @relation(fields: [userId], references: [id])
+  chatSession   ChatSession?      @relation(fields: [chatSessionId], references: [id])
   sources       KnowledgeSource[]
 
   @@index([userId, createdAt(sort: Desc)])
@@ -505,33 +525,33 @@ model KnowledgeTrace {
 }
 
 model KnowledgeSource {
-  id               String         @id @default(cuid())
-  knowledgeTraceId String         @map("knowledge_trace_id")
-  sourceUrl        String         @map("source_url")
-  sourceTitle      String         @map("source_title")
-  snippetText      String?        @map("snippet_text")
+  id               String                 @id @default(cuid())
+  knowledgeTraceId String                 @map("knowledge_trace_id")
+  sourceUrl        String                 @map("source_url")
+  sourceTitle      String                 @map("source_title")
+  snippetText      String?                @map("snippet_text")
   embedding        Unsupported("vector")? @map("embedding")
-  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  knowledgeTrace   KnowledgeTrace @relation(fields: [knowledgeTraceId], references: [id])
+  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  knowledgeTrace   KnowledgeTrace         @relation(fields: [knowledgeTraceId], references: [id])
 
   @@index([knowledgeTraceId])
   @@map("knowledge_sources")
 }
 
 model ImportJob {
-  id                String      @id @default(cuid())
-  userId            String      @map("user_id")
-  providerName      String      @map("provider_name")
-  jobStatus         JobStatus   @map("job_status")
-  jobType           JobType     @map("job_type")
-  inputPayloadJson  Json?       @map("input_payload_json")
-  resultSummaryJson Json?       @map("result_summary_json")
-  errorText         String?     @map("error_text")
-  startedAt         DateTime?   @map("started_at") @db.Timestamptz(6)
-  finishedAt        DateTime?   @map("finished_at") @db.Timestamptz(6)
-  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
-  user              User        @relation(fields: [userId], references: [id])
+  id                String    @id @default(cuid())
+  userId            String    @map("user_id")
+  providerName      String    @map("provider_name")
+  jobStatus         JobStatus @map("job_status")
+  jobType           JobType   @map("job_type")
+  inputPayloadJson  Json?     @map("input_payload_json")
+  resultSummaryJson Json?     @map("result_summary_json")
+  errorText         String?   @map("error_text")
+  startedAt         DateTime? @map("started_at") @db.Timestamptz(6)
+  finishedAt        DateTime? @map("finished_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user              User      @relation(fields: [userId], references: [id])
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([jobStatus, createdAt])
@@ -539,16 +559,16 @@ model ImportJob {
 }
 
 model DailyPlaylistJob {
-  id         String      @id @default(cuid())
-  userId     String      @map("user_id")
-  forDate    DateTime    @map("for_date") @db.Date
-  jobStatus  JobStatus   @map("job_status")
-  playlistId String?     @map("playlist_id")
-  errorText  String?     @map("error_text")
-  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
-  user       User        @relation(fields: [userId], references: [id])
-  playlist   Playlist?   @relation(fields: [playlistId], references: [id])
+  id         String    @id @default(cuid())
+  userId     String    @map("user_id")
+  forDate    DateTime  @map("for_date") @db.Date
+  jobStatus  JobStatus @map("job_status")
+  playlistId String?   @map("playlist_id")
+  errorText  String?   @map("error_text")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user       User      @relation(fields: [userId], references: [id])
+  playlist   Playlist? @relation(fields: [playlistId], references: [id])
 
   @@unique([userId, forDate])
   @@index([jobStatus])

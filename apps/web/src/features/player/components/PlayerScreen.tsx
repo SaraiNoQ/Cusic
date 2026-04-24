@@ -2,10 +2,12 @@
 
 import { useEffect, useRef } from 'react';
 import { AtmosphereCanvas } from '../../atmosphere/components/AtmosphereCanvas';
+import { AuthPanel } from '../../auth/components/AuthPanel';
 import { ChatPanel } from '../../chat/components/ChatPanel';
 import { useChatController } from '../../chat/hooks/useChatController';
 import { SearchOverlay } from '../../search/components/SearchOverlay';
 import { useSearchController } from '../../search/hooks/useSearchController';
+import { useAuthStore } from '../../../store/auth-store';
 import styles from '../PlayerScreen.module.css';
 import { usePlayerController } from '../hooks/usePlayerController';
 import { ControlStrip } from './ControlStrip';
@@ -24,7 +26,22 @@ export function PlayerScreen() {
   const player = usePlayerController();
   const chat = useChatController(player);
   const search = useSearchController();
+  const authUser = useAuthStore((state) => state.user);
+  const isAuthOpen = useAuthStore((state) => state.isAuthOpen);
+  const isAuthPending = useAuthStore((state) => state.isPending);
+  const authError = useAuthStore((state) => state.error);
+  const authCooldownSeconds = useAuthStore((state) => state.cooldownSeconds);
+  const hydrateAuth = useAuthStore((state) => state.hydrate);
+  const openAuth = useAuthStore((state) => state.openAuth);
+  const closeAuth = useAuthStore((state) => state.closeAuth);
+  const requestAuthCode = useAuthStore((state) => state.requestCode);
+  const login = useAuthStore((state) => state.login);
+  const logout = useAuthStore((state) => state.logout);
   const shellRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void hydrateAuth();
+  }, [hydrateAuth]);
 
   useEffect(() => {
     if (!search.isSearchOpen) {
@@ -96,6 +113,9 @@ export function PlayerScreen() {
         >
           <DeviceHeader
             onOpenSearch={search.openSearch}
+            onOpenAuth={openAuth}
+            onLogout={() => void logout()}
+            userLabel={authUser?.displayName ?? authUser?.email ?? null}
             isPlaying={player.isPlaying}
             statusText={player.statusText}
           />
@@ -197,6 +217,16 @@ export function PlayerScreen() {
           );
           search.closeSearch();
         }}
+      />
+
+      <AuthPanel
+        isOpen={isAuthOpen}
+        isPending={isAuthPending}
+        error={authError}
+        cooldownSeconds={authCooldownSeconds}
+        onClose={closeAuth}
+        onRequestCode={requestAuthCode}
+        onLogin={login}
       />
     </main>
   );

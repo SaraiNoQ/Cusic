@@ -146,6 +146,35 @@
 2. `index(user_id, expires_at)`
 3. `index(session_id)`
 
+#### 3.1.5 `email_verification_codes`
+
+用途：保存邮箱验证码登录过程中的验证码 hash 与尝试状态。
+
+核心字段：
+
+1. `id`
+2. `email`
+3. `user_id`
+4. `code_hash`
+5. `expires_at`
+6. `used_at`
+7. `request_ip`
+8. `user_agent`
+9. `attempt_count`
+10. `created_at`
+11. `updated_at`
+
+索引建议：
+
+1. `index(email, expires_at)`
+2. `index(user_id)`
+
+实现约束：
+
+1. 不存储明文验证码。
+2. 验证码成功使用后写入 `used_at`。
+3. 首次登录前 `user_id` 可以为空，登录成功后回填。
+
 ### 3.2 授权与外部接入域
 
 #### 3.2.1 `user_authorizations`

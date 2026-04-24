@@ -76,6 +76,13 @@ Content-Type: application/json
 
 用途：请求邮箱验证码。
 
+首版实现约束：
+
+1. 验证码为 6 位数字，通过 SMTP 发送到用户邮箱。
+2. 服务端只保存验证码 hash，不在响应中返回明文验证码。
+3. 验证码有效期为 10 分钟，重复请求返回 `cooldownSeconds` 供前端控制重发节奏。
+4. SMTP 未配置时返回 `AUTH_SMTP_NOT_CONFIGURED`。
+
 请求 DTO：
 
 ```json
@@ -99,10 +106,17 @@ Content-Type: application/json
 
 1. `AUTH_EMAIL_INVALID`
 2. `AUTH_CODE_RATE_LIMITED`
+3. `AUTH_SMTP_NOT_CONFIGURED`
 
 ### 3.2 `POST /auth/login`
 
 用途：通过邮箱验证码登录。
+
+首版实现约束：
+
+1. 首次登录自动创建用户，`displayName` 默认使用邮箱前缀。
+2. 登录成功后创建 `user_sessions` 和可撤销 `refresh_tokens` 记录。
+3. 同一验证码最多允许 5 次尝试，成功后立即标记为已使用。
 
 请求 DTO：
 
@@ -140,6 +154,12 @@ Content-Type: application/json
 
 用途：刷新 access token。
 
+首版实现约束：
+
+1. Refresh token 只在服务端保存 hash。
+2. 每次刷新都会轮换 refresh token，旧 refresh token 立即撤销。
+3. session 被撤销或过期时刷新失败，返回 `AUTH_REFRESH_INVALID`。
+
 请求 DTO：
 
 ```json
@@ -170,6 +190,11 @@ Content-Type: application/json
 
 用途：注销当前会话。
 
+首版实现约束：
+
+1. 登出会撤销当前 refresh token 与对应 session。
+2. 重复登出已失效 token 时仍返回幂等成功。
+
 请求 DTO：
 
 ```json
@@ -192,6 +217,11 @@ Content-Type: application/json
 ### 3.5 `GET /auth/me`
 
 用途：获取当前用户信息。
+
+首版实现约束：
+
+1. 必须携带 `Authorization: Bearer <access_token>`。
+2. Access token 失效或 session 被撤销时返回 `AUTH_INVALID_TOKEN`。
 
 响应 DTO：
 
