@@ -107,94 +107,96 @@ export function PlayerScreen() {
       />
 
       <div className={styles.viewport}>
-        <div
-          ref={shellRef}
-          className={`${styles.deviceShell} ${player.isPlaying ? styles.deviceShellLive : ''}`}
-        >
-          <DeviceHeader
-            onOpenSearch={search.openSearch}
-            onOpenAuth={openAuth}
-            onLogout={() => void logout()}
-            userLabel={authUser?.displayName ?? authUser?.email ?? null}
-            isPlaying={player.isPlaying}
-            statusText={player.statusText}
-          />
+        <div className={styles.deviceFrame}>
+          <div
+            ref={shellRef}
+            className={`${styles.deviceShell} ${player.isPlaying ? styles.deviceShellLive : ''}`}
+          >
+            <DeviceHeader
+              onOpenSearch={search.openSearch}
+              onOpenAuth={openAuth}
+              onLogout={() => void logout()}
+              userLabel={authUser?.displayName ?? authUser?.email ?? null}
+              isPlaying={player.isPlaying}
+              statusText={player.statusText}
+            />
 
-          <section className={styles.heroPanel}>
-            <div className={styles.heroGlow} />
-            <div className={styles.heroSun} />
-            <div className={styles.heroEarth}>
-              <span />
-              <span />
-            </div>
-            <FlipClock />
-          </section>
+            <section className={styles.heroPanel}>
+              <div className={styles.heroGlow} />
+              <div className={styles.heroSun} />
+              <div className={styles.heroEarth}>
+                <span />
+                <span />
+              </div>
+              <FlipClock />
+            </section>
 
-          <ControlStrip
-            track={player.currentTrack}
-            isPlaying={player.isPlaying}
-            isFavorite={
-              player.currentTrack
-                ? player.favoriteIds.includes(player.currentTrack.id)
-                : false
-            }
-            progressSeconds={player.progressSeconds}
-            durationSeconds={player.durationSeconds}
-            statusText={player.statusText}
-            queueDepth={player.queue.length}
-            onPrevious={() => void player.playPrevious()}
-            onTogglePlayPause={() => void player.togglePlayPause()}
-            onNext={() => void player.playNext()}
-            onToggleFavorite={() => {
-              if (player.currentTrack) {
-                void player.toggleFavorite(player.currentTrack);
+            <ControlStrip
+              track={player.currentTrack}
+              isPlaying={player.isPlaying}
+              isFavorite={
+                player.currentTrack
+                  ? player.favoriteIds.includes(player.currentTrack.id)
+                  : false
               }
-            }}
-            onAddToPlaylist={() => {
-              if (player.currentTrack) {
-                void player.addCurrentTrackToPlaylist(player.currentTrack);
+              progressSeconds={player.progressSeconds}
+              durationSeconds={player.durationSeconds}
+              statusText={player.statusText}
+              queueDepth={player.queue.length}
+              onPrevious={() => void player.playPrevious()}
+              onTogglePlayPause={() => void player.togglePlayPause()}
+              onNext={() => void player.playNext()}
+              onToggleFavorite={() => {
+                if (player.currentTrack) {
+                  void player.toggleFavorite(player.currentTrack);
+                }
+              }}
+              onAddToPlaylist={() => {
+                if (player.currentTrack) {
+                  void player.addCurrentTrackToPlaylist(player.currentTrack);
+                }
+              }}
+            />
+
+            <QueueStrip
+              queue={player.queue}
+              activeIndex={player.activeIndex}
+              onSelectIndex={(index) => void player.playQueueIndex(index)}
+            />
+
+            <ChatPanel
+              messages={chat.messages}
+              input={chat.input}
+              isPending={chat.isPending}
+              prompts={promptSuggestions}
+              statusText={player.statusText}
+              currentTrackTitle={
+                player.currentTrack
+                  ? `${player.currentTrack.title} - ${player.currentTrack.artists[0] ?? 'Cusic'}`
+                  : null
               }
-            }}
-          />
+              onInputChange={chat.setInput}
+              onPromptSelect={(prompt) => void chat.sendMessage(prompt)}
+              onSubmit={() => chat.sendMessage()}
+            />
 
-          <QueueStrip
-            queue={player.queue}
-            activeIndex={player.activeIndex}
-            onSelectIndex={(index) => void player.playQueueIndex(index)}
-          />
-
-          <ChatPanel
-            messages={chat.messages}
-            input={chat.input}
-            isPending={chat.isPending}
-            prompts={promptSuggestions}
-            statusText={player.statusText}
-            currentTrackTitle={
-              player.currentTrack
-                ? `${player.currentTrack.title} - ${player.currentTrack.artists[0] ?? 'Cusic'}`
-                : null
-            }
-            onInputChange={chat.setInput}
-            onPromptSelect={(prompt) => void chat.sendMessage(prompt)}
-            onSubmit={() => chat.sendMessage()}
-          />
-
-          <footer className={styles.deviceFooter}>
-            <span>CUSIC FM</span>
-            <div aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-              <i />
-              <i />
-              <i />
-            </div>
-            <span>
-              CONNECTED
-              <i />
-            </span>
-          </footer>
+            <footer className={styles.deviceFooter}>
+              <span>CUSIC FM</span>
+              <div aria-hidden="true">
+                <i />
+                <i />
+                <i />
+                <i />
+                <i />
+                <i />
+                <i />
+              </div>
+              <span>
+                CONNECTED
+                <i />
+              </span>
+            </footer>
+          </div>
         </div>
       </div>
 

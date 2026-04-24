@@ -95,6 +95,9 @@
 }
 
 .viewport {
+  --device-base-width: 1095px;
+  --device-base-height: 1320px;
+  --device-scale: 0.667;
   position: relative;
   z-index: 1;
   display: flex;
@@ -110,13 +113,31 @@
   }
 }
 
+.deviceFrame {
+  position: relative;
+  width: min(
+    calc(var(--device-base-width) * var(--device-scale)),
+    calc(100vw - 24px)
+  );
+  height: min(
+    calc(var(--device-base-height) * var(--device-scale)),
+    calc((100vw - 24px) * 1.205 * var(--device-scale))
+  );
+}
+
 .deviceShell {
   --mouse-x: 50%;
   --mouse-y: 36%;
   position: relative;
   display: flex;
-  width: min(100%, 1095px);
-  height: min(1320px, calc((100vw - 24px) * 1.2));
+  width: min(
+    var(--device-base-width),
+    calc((100vw - 24px) / var(--device-scale))
+  );
+  height: min(
+    var(--device-base-height),
+    calc((100vw - 24px) * 1.205)
+  );
   min-height: 820px;
   flex-direction: column;
   overflow: hidden;
@@ -143,6 +164,8 @@
     inset 0 0 0 12px rgba(0, 0, 0, 0.17),
     0 34px 90px rgba(0, 0, 0, 0.68),
     0 0 72px rgba(255, 159, 76, 0.08);
+  transform: scale(var(--device-scale));
+  transform-origin: top left;
   transition: box-shadow 200ms ease;
 }
 
@@ -1833,10 +1856,18 @@
 
 @media (max-width: 760px) {
   .viewport {
+    --device-scale: 1;
     padding: 8px;
   }
 
+  .deviceFrame {
+    width: 100%;
+    height: min(1320px, calc(100vw * 1.58));
+    min-height: 760px;
+  }
+
   .deviceShell {
+    width: 100%;
     height: min(1320px, calc(100vw * 1.58));
     min-height: 760px;
     border-radius: 30px;
@@ -1923,6 +1954,11 @@
 @media (max-width: 560px) {
   .viewport {
     align-items: stretch;
+  }
+
+  .deviceFrame {
+    width: 100%;
+    min-height: 720px;
   }
 
   .deviceShell {
