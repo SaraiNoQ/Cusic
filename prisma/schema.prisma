@@ -125,6 +125,7 @@ model User {
   authorizations         UserAuthorization[]
   playlists              Playlist[]
   favorites              Favorite[]
+  playerSession          PlayerSession?
   playbackEvents         PlaybackEvent[]
   preferenceFeedback     PreferenceFeedback[]
   tasteProfile           TasteProfile?
@@ -252,6 +253,8 @@ model ContentItem {
   providerMappings    ContentProviderMapping[]
   playlistItems       PlaylistItem[]
   favorites           Favorite[]
+  playerQueueItems    PlayerQueueItem[]
+  currentPlayerSessions PlayerSession[]           @relation("PlayerSessionCurrentContent")
   playbackEvents      PlaybackEvent[]
   recommendationItems RecommendationItem[]
 
@@ -329,6 +332,37 @@ model Favorite {
 
   @@index([userId, createdAt])
   @@map("favorites")
+}
+
+model PlayerSession {
+  id                   String            @id @default(cuid())
+  userId               String            @unique @map("user_id")
+  currentContentItemId String?           @map("current_content_item_id")
+  activeIndex          Int               @default(0) @map("active_index")
+  positionMs           Int               @default(0) @map("position_ms")
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                 User              @relation(fields: [userId], references: [id])
+  currentContentItem   ContentItem?      @relation("PlayerSessionCurrentContent", fields: [currentContentItemId], references: [id])
+  items                PlayerQueueItem[]
+
+  @@index([updatedAt])
+  @@map("player_sessions")
+}
+
+model PlayerQueueItem {
+  id            String        @id @default(cuid())
+  playerSessionId String      @map("player_session_id")
+  contentItemId String        @map("content_item_id")
+  position      Int
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  playerSession PlayerSession @relation(fields: [playerSessionId], references: [id], onDelete: Cascade)
+  contentItem   ContentItem   @relation(fields: [contentItemId], references: [id])
+
+  @@unique([playerSessionId, position])
+  @@index([playerSessionId])
+  @@index([contentItemId])
+  @@map("player_queue_items")
 }
 
 model PlaybackEvent {

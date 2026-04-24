@@ -88,6 +88,30 @@ components:
           nullable: true
         playable:
           type: boolean
+    PlayerQueueStateDto:
+      type: object
+      required:
+        [queueId, count, items, activeIndex, currentTrack, positionMs]
+      properties:
+        queueId:
+          type: string
+        mode:
+          type: string
+          enum: [replace, append]
+        count:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentItemDto'
+        activeIndex:
+          type: integer
+        currentTrack:
+          anyOf:
+            - $ref: '#/components/schemas/ContentItemDto'
+            - type: 'null'
+        positionMs:
+          type: integer
     TasteProfileDto:
       type: object
       required: [summary, explorationLevel, tags]
@@ -299,9 +323,54 @@ paths:
         '200':
           description: Related items
   /player/queue:
+    get:
+      summary: Get current player queue
+      security:
+        - bearerAuth: []
+        - {}
+      responses:
+        '200':
+          description: Current queue state
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PlayerQueueStateDto'
     post:
       summary: Replace or append player queue
-      security: []
+      security:
+        - bearerAuth: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode, items]
+              properties:
+                mode:
+                  type: string
+                  enum: [replace, append]
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [contentId]
+                    properties:
+                      contentId:
+                        type: string
+                activeIndex:
+                  type: integer
+                currentContentId:
+                  type: string
+                  nullable: true
+                positionMs:
+                  type: integer
       responses:
         '200':
           description: Queue updated

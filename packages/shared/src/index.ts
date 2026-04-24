@@ -83,6 +83,19 @@ export interface QueueItemDto {
 export interface QueueUpdateDto {
   mode: QueueMode;
   items: QueueItemDto[];
+  activeIndex?: number;
+  currentContentId?: string | null;
+  positionMs?: number;
+}
+
+export interface PlayerQueueStateDto {
+  queueId: string;
+  mode?: QueueMode;
+  count: number;
+  items: ContentItemDto[];
+  activeIndex: number;
+  currentTrack: ContentItemDto | null;
+  positionMs: number;
 }
 
 export interface PlaybackEventPayloadDto {

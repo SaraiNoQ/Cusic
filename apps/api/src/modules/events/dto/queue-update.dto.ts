@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 export class QueueItemDto {
   @IsString()
@@ -15,4 +23,18 @@ export class QueueUpdateDto {
   @ValidateNested({ each: true })
   @Type(() => QueueItemDto)
   items!: QueueItemDto[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  activeIndex?: number;
+
+  @IsOptional()
+  @IsString()
+  currentContentId?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  positionMs?: number;
 }

@@ -308,9 +308,39 @@ Content-Type: application/json
 
 ## 5. 播放器与音乐库接口
 
-### 5.1 `POST /player/queue`
+### 5.1 `GET /player/queue`
+
+用途：获取当前播放队列与活跃播放状态。
+
+认证行为：
+
+1. 携带 Bearer token 时读取当前用户的 Prisma player session。
+2. 未登录时返回 demo 内存队列，保持公开播放器演示可用。
+
+响应 DTO：
+
+```json
+{
+  "success": true,
+  "data": {
+    "queueId": "que_01",
+    "count": 1,
+    "items": [],
+    "activeIndex": 0,
+    "currentTrack": null,
+    "positionMs": 42000
+  }
+}
+```
+
+### 5.2 `POST /player/queue`
 
 用途：替换或追加播放队列。
+
+认证行为：
+
+1. 携带 Bearer token 时写入当前用户的 `player_sessions` 与 `player_queue_items`。
+2. 未登录时保留 demo 内存队列。
 
 请求 DTO：
 
@@ -321,7 +351,10 @@ Content-Type: application/json
     {
       "contentId": "cnt_01"
     }
-  ]
+  ],
+  "activeIndex": 0,
+  "currentContentId": "cnt_01",
+  "positionMs": 42000
 }
 ```
 
@@ -332,12 +365,16 @@ Content-Type: application/json
   "success": true,
   "data": {
     "queueId": "que_01",
-    "count": 1
+    "count": 1,
+    "items": [],
+    "activeIndex": 0,
+    "currentTrack": null,
+    "positionMs": 42000
   }
 }
 ```
 
-### 5.2 `POST /player/events`
+### 5.3 `POST /player/events`
 
 用途：上报播放事件。
 
@@ -357,7 +394,7 @@ Content-Type: application/json
 }
 ```
 
-### 5.3 `GET /library/playlists`
+### 5.4 `GET /library/playlists`
 
 用途：获取用户歌单列表。
 
@@ -366,7 +403,7 @@ Content-Type: application/json
 1. 携带 Bearer token 时读取当前用户的 Prisma 歌单；首次访问会创建一个默认 `Cusic` daily playlist。
 2. 未登录时返回 demo playlist，保持公开页面可用。
 
-### 5.4 `POST /library/playlists`
+### 5.5 `POST /library/playlists`
 
 用途：创建歌单。
 
@@ -379,11 +416,11 @@ Content-Type: application/json
 }
 ```
 
-### 5.5 `POST /library/playlists/:id/items`
+### 5.6 `POST /library/playlists/:id/items`
 
 用途：向歌单中追加内容。
 
-### 5.6 `GET /library/favorites`
+### 5.7 `GET /library/favorites`
 
 用途：获取当前用户收藏列表，用于前端刷新后恢复收藏状态。
 
@@ -400,7 +437,7 @@ Content-Type: application/json
 }
 ```
 
-### 5.7 `POST /library/favorites`
+### 5.8 `POST /library/favorites`
 
 用途：收藏内容。
 
@@ -413,7 +450,7 @@ Content-Type: application/json
 }
 ```
 
-### 5.8 `DELETE /library/favorites/:contentId`
+### 5.9 `DELETE /library/favorites/:contentId`
 
 用途：取消收藏。
 

@@ -327,7 +327,49 @@
 
 ### 3.5 行为与反馈域
 
-#### 3.5.1 `playback_events`
+#### 3.5.1 `player_sessions`
+
+用途：保存登录用户当前播放器状态。
+
+核心字段：
+
+1. `id`
+2. `user_id`
+3. `current_content_item_id`
+4. `active_index`
+5. `position_ms`
+6. `created_at`
+7. `updated_at`
+
+索引建议：
+
+1. `unique(user_id)`
+2. `index(updated_at)`
+
+实现记录：
+
+1. Phase 3 首版已将登录用户当前队列、当前曲目、活跃索引和播放位置写入 Prisma。
+2. 未登录用户仍使用 demo 内存队列，保证公开页面无需登录即可演示。
+
+#### 3.5.2 `player_queue_items`
+
+用途：保存播放器会话内的队列顺序。
+
+核心字段：
+
+1. `id`
+2. `player_session_id`
+3. `content_item_id`
+4. `position`
+5. `created_at`
+
+索引建议：
+
+1. `unique(player_session_id, position)`
+2. `index(player_session_id)`
+3. `index(content_item_id)`
+
+#### 3.5.3 `playback_events`
 
 用途：记录播放行为。
 
@@ -354,7 +396,7 @@
 1. Phase 3 首版已将携带 Bearer token 的播放事件写入 Prisma。
 2. 未登录请求仍走 demo 内存 fallback，避免公开播放器演示依赖登录态。
 
-#### 3.5.2 `preference_feedback`
+#### 3.5.4 `preference_feedback`
 
 用途：保存显式反馈。
 

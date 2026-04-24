@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { ContentType as PrismaContentType } from '@prisma/client';
+import {
+  ContentItem as PrismaContentItem,
+  ContentType as PrismaContentType,
+} from '@prisma/client';
+import type { ContentItemDto } from '@music-ai/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MockContentProvider } from '../providers/mock-content.provider';
 import type { ContentCatalogItem } from '../types/content-catalog-item.type';
@@ -113,6 +117,32 @@ export class ContentService {
     });
   }
 
+  toContentItemDto(item: PrismaContentItem): ContentItemDto {
+    const metadata =
+      item.metadataJson &&
+      typeof item.metadataJson === 'object' &&
+      !Array.isArray(item.metadataJson)
+        ? item.metadataJson
+        : {};
+    const audioUrl =
+      'audioUrl' in metadata && typeof metadata.audioUrl === 'string'
+        ? metadata.audioUrl
+        : null;
+
+    return {
+      id: item.id,
+      type: this.fromPrismaContentType(item.contentType),
+      title: item.canonicalTitle,
+      artists: item.primaryArtistNames,
+      album: item.albumName,
+      durationMs: item.durationMs,
+      language: item.language,
+      coverUrl: item.coverUrl,
+      audioUrl,
+      playable: item.playable,
+    };
+  }
+
   private toPrismaContentType(type: ContentCatalogItem['type']) {
     switch (type) {
       case 'podcast':
@@ -124,6 +154,20 @@ export class ContentService {
       case 'track':
       default:
         return PrismaContentType.TRACK;
+    }
+  }
+
+  private fromPrismaContentType(type: PrismaContentType) {
+    switch (type) {
+      case PrismaContentType.PODCAST_EPISODE:
+        return 'podcast';
+      case PrismaContentType.RADIO_STREAM:
+        return 'radio';
+      case PrismaContentType.ALBUM:
+        return 'album';
+      case PrismaContentType.TRACK:
+      default:
+        return 'track';
     }
   }
 }

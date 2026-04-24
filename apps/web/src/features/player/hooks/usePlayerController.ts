@@ -20,14 +20,21 @@ import {
   fetchPlaylists,
   removeFavorite,
 } from '../../../lib/api/library-api';
-import { recordPlaybackEvent, syncQueue } from '../../../lib/api/player-api';
+import {
+  fetchPlayerQueue,
+  recordPlaybackEvent,
+  syncQueue,
+} from '../../../lib/api/player-api';
 import { queryKeys } from '../../../lib/query/query-keys';
+import { useAuthStore } from '../../../store/auth-store';
 import { usePlayerStore } from '../../../store/player-store';
 
 export type PlayerController = ReturnType<typeof usePlayerController>;
 
 export function usePlayerController() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const lastProgressSyncRef = useRef(0);
+  const authUser = useAuthStore((state) => state.user);
   const queue = usePlayerStore((state) => state.queue);
   const currentTrack = usePlayerStore((state) => state.currentTrack);
   const activeIndex = usePlayerStore((state) => state.activeIndex);
@@ -64,6 +71,11 @@ export function usePlayerController() {
   const favoritesQuery = useQuery({
     queryKey: queryKeys.favorites(),
     queryFn: fetchFavorites,
+  });
+
+  const playerQueueQuery = useQuery({
+    queryKey: queryKeys.playerQueue(authUser?.id),
+    queryFn: fetchPlayerQueue,
   });
 
   const relatedQuery = useQuery({
@@ -112,7 +124,29 @@ export function usePlayerController() {
   }, [favoritesQuery.data, setFavoriteIds]);
 
   useEffect(() => {
-    if (currentTrack || queue.length > 0) {
+    const playerQueue = playerQueueQuery.data;
+    if (!playerQueue || playerQueue.count === 0) {
+      return;
+    }
+
+    setQueue(playerQueue.items);
+    setCurrentTrack(
+      playerQueue.currentTrack ?? playerQueue.items[playerQueue.activeIndex] ?? null,
+    );
+    setActiveIndex(playerQueue.activeIndex);
+    setProgressSeconds(Math.floor(playerQueue.positionMs / 1000));
+    setStatusText('Player field restored.');
+  }, [
+    playerQueueQuery.data,
+    setActiveIndex,
+    setCurrentTrack,
+    setProgressSeconds,
+    setQueue,
+    setStatusText,
+  ]);
+
+  useEffect(() => {
+    if (!playerQueueQuery.isFetched || currentTrack || queue.length > 0) {
       return;
     }
 
@@ -127,13 +161,18 @@ export function usePlayerController() {
         setCurrentTrack(first);
         setActiveIndex(0);
         setStatusText('Player field synchronized.');
-        return syncQueueState('replace', [first]);
+        return syncQueueState('replace', [first], {
+          activeIndex: 0,
+          currentContentId: first.id,
+          positionMs: 0,
+        });
       })
       .catch(() => {
         setStatusText('Initial bootstrap failed. Check API connectivity.');
       });
   }, [
     currentTrack,
+    playerQueueQuery.isFetched,
     queue.length,
     setActiveIndex,
     setCurrentTrack,
@@ -160,10 +199,18 @@ export function usePlayerController() {
   const syncQueueState = async (
     mode: 'replace' | 'append',
     items: ContentItemDto[],
+    state: {
+      activeIndex?: number;
+      currentContentId?: string | null;
+      positionMs?: number;
+    } = {},
   ) => {
     await queueMutation.mutateAsync({
       mode,
       items: items.map((item) => ({ contentId: item.id })),
+      activeIndex: state.activeIndex,
+      currentContentId: state.currentContentId,
+      positionMs: state.positionMs,
     });
   };
 
@@ -192,7 +239,11 @@ export function usePlayerController() {
     setActiveIndex(items.length > 0 ? 0 : -1);
     setProgressSeconds(0);
     if (items.length > 0) {
-      await syncQueueState('replace', items);
+      await syncQueueState('replace', items, {
+        activeIndex: 0,
+        currentContentId: items[0]?.id ?? null,
+        positionMs: 0,
+      });
     }
     if (message) {
       setStatusText(message);
@@ -205,6 +256,11 @@ export function usePlayerController() {
       setCurrentTrack(track);
       setActiveIndex(existingIndex);
       setProgressSeconds(0);
+      await syncQueueState('replace', queue, {
+        activeIndex: existingIndex,
+        currentContentId: track.id,
+        positionMs: 0,
+      });
       setStatusText(`Locked on ${track.title}.`);
       return;
     }
@@ -214,7 +270,11 @@ export function usePlayerController() {
     setCurrentTrack(track);
     setActiveIndex(nextQueue.length - 1);
     setProgressSeconds(0);
-    await syncQueueState(queue.length === 0 ? 'replace' : 'append', nextQueue);
+    await syncQueueState('replace', nextQueue, {
+      activeIndex: nextQueue.length - 1,
+      currentContentId: track.id,
+      positionMs: 0,
+    });
     setStatusText(`Queued ${track.title} into the active listening lane.`);
   };
 
@@ -231,7 +291,11 @@ export function usePlayerController() {
       setActiveIndex(0);
       setProgressSeconds(0);
     }
-    await syncQueueState(queue.length === 0 ? 'replace' : 'append', nextQueue);
+    await syncQueueState('replace', nextQueue, {
+      activeIndex: !currentTrack ? 0 : activeIndex,
+      currentContentId: currentTrack?.id ?? track.id,
+      positionMs: Math.floor(progressSeconds * 1000),
+    });
     setStatusText(`Added ${track.title} to the queue ring.`);
   };
 
@@ -244,6 +308,11 @@ export function usePlayerController() {
     setCurrentTrack(target);
     setActiveIndex(index);
     setProgressSeconds(0);
+    await syncQueueState('replace', queue, {
+      activeIndex: index,
+      currentContentId: target.id,
+      positionMs: 0,
+    });
     setStatusText(`Switched to ${target.title}.`);
   };
 
@@ -357,7 +426,20 @@ export function usePlayerController() {
         setDurationSeconds(event.currentTarget.duration || 0);
       },
       onTimeUpdate: (event: SyntheticEvent<HTMLAudioElement>) => {
-        setProgressSeconds(event.currentTarget.currentTime || 0);
+        const nextProgressSeconds = event.currentTarget.currentTime || 0;
+        setProgressSeconds(nextProgressSeconds);
+        if (
+          currentTrack &&
+          queue.length > 0 &&
+          Date.now() - lastProgressSyncRef.current > 15000
+        ) {
+          lastProgressSyncRef.current = Date.now();
+          void syncQueueState('replace', queue, {
+            activeIndex,
+            currentContentId: currentTrack.id,
+            positionMs: Math.floor(nextProgressSeconds * 1000),
+          }).catch(() => undefined);
+        }
       },
       onPlay: () => {
         setIsPlaying(true);
@@ -401,6 +483,7 @@ export function usePlayerController() {
       activeIndex,
       currentTrack,
       progressSeconds,
+      queue,
       queue.length,
       setDurationSeconds,
       setIsPlaying,

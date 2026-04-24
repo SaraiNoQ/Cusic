@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { RequestWithUser } from '../../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../../auth/guards/optional-jwt-auth.guard';
@@ -12,15 +12,35 @@ import { EventsService } from '../services/events.service';
 export class EventsController {
   constructor(private readonly eventsService: EventsService) {}
 
+  @Get('queue')
+  @ApiOperation({ summary: 'Get current player queue' })
+  @ApiResponse({ status: 200, description: 'Current queue state' })
+  async getQueue(@Req() request: RequestWithUser) {
+    return {
+      success: true,
+      data: await this.eventsService.getQueue(request.user?.id),
+      meta: {},
+    };
+  }
+
   @Post('queue')
   @ApiOperation({ summary: 'Replace or append player queue' })
   @ApiResponse({ status: 200, description: 'Queue updated' })
-  updateQueue(@Body() body: QueueUpdateDto) {
+  async updateQueue(
+    @Body() body: QueueUpdateDto,
+    @Req() request: RequestWithUser,
+  ) {
     return {
       success: true,
-      data: this.eventsService.updateQueue(
+      data: await this.eventsService.updateQueue(
         body.mode as 'replace' | 'append',
         body.items ?? [],
+        {
+          activeIndex: body.activeIndex,
+          currentContentId: body.currentContentId,
+          positionMs: body.positionMs,
+        },
+        request.user?.id,
       ),
       meta: {},
     };
