@@ -19,10 +19,10 @@ export class AiDjController {
   @Post('chat')
   @ApiOperation({ summary: 'Submit one AI DJ turn' })
   @ApiResponse({ status: 200, description: 'AI DJ response' })
-  chat(@Body() body: ChatTurnDto) {
+  async chat(@Body() body: ChatTurnDto) {
     return {
       success: true,
-      data: this.aiDjService.reply({
+      data: await this.aiDjService.reply({
         sessionId: body.sessionId,
         message: body.message,
       }),

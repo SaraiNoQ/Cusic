@@ -250,6 +250,13 @@ Content-Type: application/json
 
 用途：统一搜索音乐、播客、电台等内容。
 
+实现记录：
+
+1. Phase 3 起搜索读取 Prisma `content_items`，不再直接从内存 mock catalog 返回。
+2. API 会先将 demo catalog 幂等同步到 `content_items` 与 `content_provider_mappings`，其中 `provider_name` 为 `cusic_demo`。
+3. `q` 会匹配标题、专辑、语言与艺人名；`type` 与 `language` 用于结构化筛选。
+4. 首版仍使用普通字段过滤与应用层艺人匹配，全文搜索和向量检索留到后续推荐阶段。
+
 查询参数：
 
 1. `q`
@@ -295,6 +302,11 @@ Content-Type: application/json
 
 用途：获取统一内容对象详情。
 
+实现记录：
+
+1. 详情读取 Prisma `content_items`。
+2. 当前 demo provider 的可播放 URL 保存在 `metadata_json.audioUrl`，响应时映射为 `audioUrl`。
+
 响应字段建议：
 
 1. 基础信息
@@ -305,6 +317,11 @@ Content-Type: application/json
 ### 4.3 `GET /content/:id/related`
 
 用途：获取相关推荐。
+
+实现记录：
+
+1. 首版从 Prisma 内容库中返回同类型内容，排除当前内容。
+2. 相关性排序暂按内容库稳定顺序返回，后续推荐阶段再升级为画像或向量排序。
 
 ## 5. 播放器与音乐库接口
 

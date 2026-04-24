@@ -179,9 +179,9 @@ export class LibraryService {
       return null;
     }
 
-    const validIds = this.contentService
-      .getByIds(contentIds)
-      .map((item) => item.id);
+    const validIds = (await this.contentService.getByIds(contentIds)).map(
+      (item) => item.id,
+    );
     const nextIds = [...new Set([...playlist.contentIds, ...validIds])];
     playlist.contentIds = nextIds;
     playlist.itemCount = nextIds.length;

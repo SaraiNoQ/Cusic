@@ -274,7 +274,8 @@ paths:
           description: Access token is invalid or expired
   /search:
     get:
-      summary: Unified content search
+      summary: Search the persisted content catalog
+      description: Searches Prisma-backed content_items after syncing the demo catalog into content_provider_mappings.
       security: []
       parameters:
         - in: query
@@ -283,6 +284,11 @@ paths:
             type: string
         - in: query
           name: type
+          schema:
+            type: string
+            enum: [track, podcast, radio, album]
+        - in: query
+          name: language
           schema:
             type: string
         - in: query
@@ -295,10 +301,11 @@ paths:
             type: integer
       responses:
         '200':
-          description: Search results
+          description: Search results from content_items
   /content/{id}:
     get:
       summary: Get content detail
+      description: Reads content detail from the persisted content catalog.
       security: []
       parameters:
         - in: path
@@ -312,6 +319,7 @@ paths:
   /content/{id}/related:
     get:
       summary: Get related content
+      description: Returns same-type related items from the persisted catalog.
       security: []
       parameters:
         - in: path

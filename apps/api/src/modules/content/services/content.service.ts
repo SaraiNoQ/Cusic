@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import {
   ContentItem as PrismaContentItem,
   ContentType as PrismaContentType,
+  Prisma,
 } from '@prisma/client';
 import type { ContentItemDto } from '@music-ai/shared';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -17,35 +18,55 @@ type SearchInput = {
 };
 
 @Injectable()
-export class ContentService {
+export class ContentService implements OnModuleInit {
+  private readonly demoProviderName = 'cusic_demo';
+  private catalogSyncPromise?: Promise<void>;
+
   constructor(
     private readonly mockContentProvider: MockContentProvider,
     private readonly prisma: PrismaService,
   ) {}
 
-  search(input: SearchInput) {
-    const catalog = this.mockContentProvider.listCatalog();
+  async onModuleInit() {
+    await this.ensureDemoCatalogSynced();
+  }
+
+  async search(input: SearchInput) {
+    await this.ensureDemoCatalogSynced();
     const page = input.page ?? 1;
     const pageSize = input.pageSize ?? 20;
     const query = input.q?.trim().toLowerCase();
-    const type = input.type?.trim().toLowerCase();
+    const type = this.toPrismaContentTypeFilter(input.type);
     const language = input.language?.trim().toLowerCase();
 
-    const filtered = catalog.filter((item) => {
+    const candidates = await this.prisma.contentItem.findMany({
+      where: {
+        ...(type ? { contentType: type } : {}),
+        ...(language
+          ? { language: { equals: language, mode: 'insensitive' } }
+          : {}),
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    const filtered = candidates.filter((item) => {
       const matchesQuery =
         !query ||
-        item.title.toLowerCase().includes(query) ||
-        item.artists.some((artist) => artist.toLowerCase().includes(query)) ||
-        item.album?.toLowerCase().includes(query);
-      const matchesType = !type || item.type === type;
-      const matchesLanguage =
-        !language || item.language?.toLowerCase() === language;
+        item.canonicalTitle.toLowerCase().includes(query) ||
+        item.subtitle?.toLowerCase().includes(query) ||
+        item.albumName?.toLowerCase().includes(query) ||
+        item.language?.toLowerCase().includes(query) ||
+        item.primaryArtistNames.some((artist) =>
+          artist.toLowerCase().includes(query),
+        );
 
-      return matchesQuery && matchesType && matchesLanguage;
+      return matchesQuery;
     });
 
     const start = (page - 1) * pageSize;
-    const items = filtered.slice(start, start + pageSize);
+    const items = filtered
+      .slice(start, start + pageSize)
+      .map((item) => this.toContentItemDto(item));
 
     return {
       items,
@@ -58,38 +79,82 @@ export class ContentService {
     };
   }
 
-  getById(id: string) {
-    return (
-      this.mockContentProvider.listCatalog().find((item) => item.id === id) ??
-      null
+  async getById(id: string) {
+    await this.ensureDemoCatalogSynced();
+    const item = await this.prisma.contentItem.findUnique({
+      where: { id },
+    });
+
+    return item ? this.toContentItemDto(item) : null;
+  }
+
+  async getByIds(ids: string[]) {
+    await this.ensureDemoCatalogSynced();
+    const uniqueIds = [...new Set(ids)];
+    const items = await this.prisma.contentItem.findMany({
+      where: { id: { in: uniqueIds } },
+    });
+    const byId = new Map(
+      items.map((item) => [item.id, this.toContentItemDto(item)]),
     );
-  }
 
-  getByIds(ids: string[]) {
     return ids
-      .map((id) => this.getById(id))
-      .filter((item): item is ContentCatalogItem => item !== null);
+      .map((id) => byId.get(id) ?? null)
+      .filter((item): item is ContentItemDto => item !== null);
   }
 
-  getRelated(id: string) {
-    const source = this.getById(id);
+  async getRelated(id: string) {
+    await this.ensureDemoCatalogSynced();
+    const source = await this.prisma.contentItem.findUnique({
+      where: { id },
+    });
     if (!source) {
       return [];
     }
 
-    return this.mockContentProvider
-      .listCatalog()
-      .filter((item) => item.id !== id && item.type === source.type)
-      .slice(0, 4);
+    const items = await this.prisma.contentItem.findMany({
+      where: {
+        id: { not: id },
+        contentType: source.contentType,
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: 4,
+    });
+
+    return items.map((item) => this.toContentItemDto(item));
   }
 
   async ensureContentItem(id: string) {
-    const item = this.getById(id);
+    const existing = await this.prisma.contentItem.findUnique({
+      where: { id },
+    });
+    if (existing) {
+      return existing;
+    }
+
+    const item =
+      this.mockContentProvider.listCatalog().find((entry) => entry.id === id) ??
+      null;
     if (!item) {
       return null;
     }
 
-    return this.prisma.contentItem.upsert({
+    return this.upsertCatalogItem(item);
+  }
+
+  async ensureDemoCatalogSynced() {
+    this.catalogSyncPromise ??= this.syncDemoCatalog();
+    await this.catalogSyncPromise;
+  }
+
+  private async syncDemoCatalog() {
+    for (const item of this.mockContentProvider.listCatalog()) {
+      await this.upsertCatalogItem(item);
+    }
+  }
+
+  private async upsertCatalogItem(item: ContentCatalogItem) {
+    const contentItem = await this.prisma.contentItem.upsert({
       where: { id: item.id },
       create: {
         id: item.id,
@@ -101,7 +166,7 @@ export class ContentService {
         language: item.language,
         coverUrl: item.coverUrl,
         playable: item.playable ?? true,
-        metadataJson: item.audioUrl ? { audioUrl: item.audioUrl } : undefined,
+        metadataJson: this.toMetadataJson(item),
       },
       update: {
         contentType: this.toPrismaContentType(item.type),
@@ -112,9 +177,36 @@ export class ContentService {
         language: item.language,
         coverUrl: item.coverUrl,
         playable: item.playable ?? true,
-        metadataJson: item.audioUrl ? { audioUrl: item.audioUrl } : undefined,
+        metadataJson: this.toMetadataJson(item),
       },
     });
+
+    await this.prisma.contentProviderMapping.upsert({
+      where: {
+        providerName_providerContentId: {
+          providerName: this.demoProviderName,
+          providerContentId: item.id,
+        },
+      },
+      create: {
+        contentItemId: contentItem.id,
+        providerName: this.demoProviderName,
+        providerContentId: item.id,
+        providerContentType: item.type,
+        rawPayloadJson: this.toRawPayloadJson(item),
+        syncStatus: 'READY',
+        lastSyncedAt: new Date(),
+      },
+      update: {
+        contentItemId: contentItem.id,
+        providerContentType: item.type,
+        rawPayloadJson: this.toRawPayloadJson(item),
+        syncStatus: 'READY',
+        lastSyncedAt: new Date(),
+      },
+    });
+
+    return contentItem;
   }
 
   toContentItemDto(item: PrismaContentItem): ContentItemDto {
@@ -143,6 +235,27 @@ export class ContentService {
     };
   }
 
+  private toMetadataJson(item: ContentCatalogItem): Prisma.InputJsonObject {
+    return {
+      audioUrl: item.audioUrl ?? null,
+    };
+  }
+
+  private toRawPayloadJson(item: ContentCatalogItem): Prisma.InputJsonObject {
+    return {
+      id: item.id,
+      type: item.type,
+      title: item.title,
+      artists: item.artists,
+      album: item.album ?? null,
+      durationMs: item.durationMs ?? null,
+      language: item.language ?? null,
+      coverUrl: item.coverUrl ?? null,
+      audioUrl: item.audioUrl ?? null,
+      playable: item.playable ?? true,
+    };
+  }
+
   private toPrismaContentType(type: ContentCatalogItem['type']) {
     switch (type) {
       case 'podcast':
@@ -154,6 +267,21 @@ export class ContentService {
       case 'track':
       default:
         return PrismaContentType.TRACK;
+    }
+  }
+
+  private toPrismaContentTypeFilter(type?: string) {
+    switch (type?.trim().toLowerCase()) {
+      case 'podcast':
+        return PrismaContentType.PODCAST_EPISODE;
+      case 'radio':
+        return PrismaContentType.RADIO_STREAM;
+      case 'album':
+        return PrismaContentType.ALBUM;
+      case 'track':
+        return PrismaContentType.TRACK;
+      default:
+        return null;
     }
   }
 

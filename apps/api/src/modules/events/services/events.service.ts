@@ -148,11 +148,11 @@ export class EventsService {
     return this.getQueue(userId);
   }
 
-  private getDemoQueueState(
+  private async getDemoQueueState(
     mode?: QueueMode,
     state: QueueStateRecord = {},
-  ): PlayerQueueStateDto {
-    const items = this.contentService.getByIds(
+  ): Promise<PlayerQueueStateDto> {
+    const items = await this.contentService.getByIds(
       this.queue.map((item) => item.contentId),
     );
     const activeIndex = this.clampActiveIndex(

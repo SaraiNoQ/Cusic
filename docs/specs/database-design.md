@@ -257,6 +257,12 @@
 1. `unique(provider_name, provider_content_id)`
 2. `index(content_item_id)`
 
+实现记录：
+
+1. Phase 3 起 API 启动或首次内容访问时，会将内置 demo catalog 幂等同步到 `content_items`。
+2. 同步时会写入 `content_provider_mappings`，`provider_name` 使用 `cusic_demo`，`provider_content_id` 使用 catalog 内容 ID。
+3. demo 内容的播放 URL 作为 provider 元数据保存在 `content_items.metadata_json.audioUrl`，后续替换真实 provider 时保持统一内容 ID 与 provider mapping 边界。
+
 ### 3.4 音乐库与歌单域
 
 #### 3.4.1 `playlists`
@@ -323,7 +329,7 @@
 实现记录：
 
 1. Phase 3 首版已将登录用户的收藏写入 Prisma；取消收藏使用 `deleted_at` 软删除。
-2. 收藏或歌单追加 mock catalog 内容时，API 会先将内容 upsert 到 `content_items`，再写入用户关系表。
+2. 收藏或歌单追加内容时，API 会先通过 Prisma 内容库确认 `content_items` 已存在，再写入用户关系表。
 
 ### 3.5 行为与反馈域
 

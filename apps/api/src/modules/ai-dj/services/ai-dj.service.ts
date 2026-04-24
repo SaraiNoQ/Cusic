@@ -5,7 +5,7 @@ import { ContentService } from '../../content/services/content.service';
 export class AiDjService {
   constructor(private readonly contentService: ContentService) {}
 
-  reply(input: { sessionId?: string; message: string }) {
+  async reply(input: { sessionId?: string; message: string }) {
     const message = input.message.trim().toLowerCase();
 
     let replyText =
@@ -47,9 +47,9 @@ export class AiDjService {
       contentIds = ['cnt_podcast_brief', 'cnt_editorial_dusk', 'cnt_focus_fm'];
     }
 
-    const validContentIds = this.contentService
-      .getByIds(contentIds)
-      .map((item) => item.id);
+    const validContentIds = (await this.contentService.getByIds(contentIds)).map(
+      (item) => item.id,
+    );
 
     return {
       sessionId: input.sessionId ?? 'chat_stub',
