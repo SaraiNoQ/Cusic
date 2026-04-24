@@ -320,6 +320,11 @@
 1. `unique(user_id, content_item_id, favorite_type, deleted_at)`
 2. `index(user_id, created_at)`
 
+实现记录：
+
+1. Phase 3 首版已将登录用户的收藏写入 Prisma；取消收藏使用 `deleted_at` 软删除。
+2. 收藏或歌单追加 mock catalog 内容时，API 会先将内容 upsert 到 `content_items`，再写入用户关系表。
+
 ### 3.5 行为与反馈域
 
 #### 3.5.1 `playback_events`
@@ -343,6 +348,11 @@
 1. `index(user_id, occurred_at desc)`
 2. `index(content_item_id, occurred_at desc)`
 3. `index(session_id)`
+
+实现记录：
+
+1. Phase 3 首版已将携带 Bearer token 的播放事件写入 Prisma。
+2. 未登录请求仍走 demo 内存 fallback，避免公开播放器演示依赖登录态。
 
 #### 3.5.2 `preference_feedback`
 

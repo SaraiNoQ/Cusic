@@ -105,6 +105,11 @@ export interface FavoriteDto {
   favoriteType: 'track' | 'podcast' | 'radio' | 'album';
 }
 
+export interface FavoriteSummaryDto {
+  contentId: string;
+  favoriteType: 'track' | 'podcast' | 'radio' | 'album';
+}
+
 export interface RecommendationCardDto {
   contentId: string;
   title: string;

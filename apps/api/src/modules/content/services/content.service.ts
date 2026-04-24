@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { ContentType as PrismaContentType } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 import { MockContentProvider } from '../providers/mock-content.provider';
 import type { ContentCatalogItem } from '../types/content-catalog-item.type';
 
@@ -12,7 +14,10 @@ type SearchInput = {
 
 @Injectable()
 export class ContentService {
-  constructor(private readonly mockContentProvider: MockContentProvider) {}
+  constructor(
+    private readonly mockContentProvider: MockContentProvider,
+    private readonly prisma: PrismaService,
+  ) {}
 
   search(input: SearchInput) {
     const catalog = this.mockContentProvider.listCatalog();
@@ -72,5 +77,53 @@ export class ContentService {
       .listCatalog()
       .filter((item) => item.id !== id && item.type === source.type)
       .slice(0, 4);
+  }
+
+  async ensureContentItem(id: string) {
+    const item = this.getById(id);
+    if (!item) {
+      return null;
+    }
+
+    return this.prisma.contentItem.upsert({
+      where: { id: item.id },
+      create: {
+        id: item.id,
+        contentType: this.toPrismaContentType(item.type),
+        canonicalTitle: item.title,
+        albumName: item.album,
+        primaryArtistNames: item.artists,
+        durationMs: item.durationMs,
+        language: item.language,
+        coverUrl: item.coverUrl,
+        playable: item.playable ?? true,
+        metadataJson: item.audioUrl ? { audioUrl: item.audioUrl } : undefined,
+      },
+      update: {
+        contentType: this.toPrismaContentType(item.type),
+        canonicalTitle: item.title,
+        albumName: item.album,
+        primaryArtistNames: item.artists,
+        durationMs: item.durationMs,
+        language: item.language,
+        coverUrl: item.coverUrl,
+        playable: item.playable ?? true,
+        metadataJson: item.audioUrl ? { audioUrl: item.audioUrl } : undefined,
+      },
+    });
+  }
+
+  private toPrismaContentType(type: ContentCatalogItem['type']) {
+    switch (type) {
+      case 'podcast':
+        return PrismaContentType.PODCAST_EPISODE;
+      case 'radio':
+        return PrismaContentType.RADIO_STREAM;
+      case 'album':
+        return PrismaContentType.ALBUM;
+      case 'track':
+      default:
+        return PrismaContentType.TRACK;
+    }
   }
 }

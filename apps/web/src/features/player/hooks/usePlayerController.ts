@@ -16,6 +16,7 @@ import {
 import {
   addPlaylistItem,
   createFavorite,
+  fetchFavorites,
   fetchPlaylists,
   removeFavorite,
 } from '../../../lib/api/library-api';
@@ -49,6 +50,7 @@ export function usePlayerController() {
     (state) => state.setDurationSeconds,
   );
   const setStatusText = usePlayerStore((state) => state.setStatusText);
+  const setFavoriteIds = usePlayerStore((state) => state.setFavoriteIds);
   const toggleFavoriteId = usePlayerStore((state) => state.toggleFavoriteId);
   const setSelectedPlaylistId = usePlayerStore(
     (state) => state.setSelectedPlaylistId,
@@ -57,6 +59,11 @@ export function usePlayerController() {
   const playlistsQuery = useQuery({
     queryKey: queryKeys.playlists(),
     queryFn: fetchPlaylists,
+  });
+
+  const favoritesQuery = useQuery({
+    queryKey: queryKeys.favorites(),
+    queryFn: fetchFavorites,
   });
 
   const relatedQuery = useQuery({
@@ -97,6 +104,12 @@ export function usePlayerController() {
       setSelectedPlaylistId(playlistsQuery.data[0].id);
     }
   }, [playlistsQuery.data, selectedPlaylistId, setSelectedPlaylistId]);
+
+  useEffect(() => {
+    if (favoritesQuery.data) {
+      setFavoriteIds(favoritesQuery.data.map((item) => item.contentId));
+    }
+  }, [favoritesQuery.data, setFavoriteIds]);
 
   useEffect(() => {
     if (currentTrack || queue.length > 0) {
@@ -266,6 +279,7 @@ export function usePlayerController() {
     if (isFavorite) {
       await favoriteRemoveMutation.mutateAsync(track.id);
       toggleFavoriteId(track.id);
+      void favoritesQuery.refetch();
       setStatusText(`Removed ${track.title} from the vault.`);
       return;
     }
@@ -275,6 +289,7 @@ export function usePlayerController() {
       favoriteType: track.type,
     });
     toggleFavoriteId(track.id);
+    void favoritesQuery.refetch();
     setStatusText(`Saved ${track.title} to the vault.`);
   };
 

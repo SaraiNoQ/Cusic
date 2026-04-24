@@ -341,6 +341,11 @@ Content-Type: application/json
 
 用途：上报播放事件。
 
+认证行为：
+
+1. 携带 Bearer token 时写入当前用户的 `playback_events`。
+2. 未登录时保留 demo telemetry fallback，不影响公开播放器演示。
+
 请求 DTO：
 
 ```json
@@ -355,6 +360,11 @@ Content-Type: application/json
 ### 5.3 `GET /library/playlists`
 
 用途：获取用户歌单列表。
+
+认证行为：
+
+1. 携带 Bearer token 时读取当前用户的 Prisma 歌单；首次访问会创建一个默认 `Cusic` daily playlist。
+2. 未登录时返回 demo playlist，保持公开页面可用。
 
 ### 5.4 `POST /library/playlists`
 
@@ -373,7 +383,24 @@ Content-Type: application/json
 
 用途：向歌单中追加内容。
 
-### 5.6 `POST /library/favorites`
+### 5.6 `GET /library/favorites`
+
+用途：获取当前用户收藏列表，用于前端刷新后恢复收藏状态。
+
+响应数据：
+
+```json
+{
+  "items": [
+    {
+      "contentId": "cnt_01",
+      "favoriteType": "track"
+    }
+  ]
+}
+```
+
+### 5.7 `POST /library/favorites`
 
 用途：收藏内容。
 
@@ -386,7 +413,7 @@ Content-Type: application/json
 }
 ```
 
-### 5.7 `DELETE /library/favorites/:contentId`
+### 5.8 `DELETE /library/favorites/:contentId`
 
 用途：取消收藏。
 

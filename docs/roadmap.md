@@ -94,7 +94,7 @@
 
 目标：从 demo user 过渡到真实用户和真实数据。
 
-当前状态：已启动。首个交付项为邮箱验证码登录、JWT access token、refresh token 轮换、session 持久化与前端登录入口。
+当前状态：已启动。已完成邮箱验证码登录、JWT access token、refresh token 轮换、session 持久化与前端登录入口；正在推进用户歌单、收藏和播放事件的 Prisma 持久化。
 
 核心工作：
 

@@ -1,6 +1,7 @@
 import type {
   ApiSuccessEnvelope,
   FavoriteDto,
+  FavoriteSummaryDto,
   PlaylistSummaryDto,
 } from '@music-ai/shared';
 import { apiFetch } from './client';
@@ -13,6 +14,17 @@ export type PlaylistResponse = ApiSuccessEnvelope<{
 
 export async function fetchPlaylists() {
   const response = await apiFetch<PlaylistResponse>('/library/playlists');
+  return response.data.items;
+}
+
+export type FavoriteResponse = ApiSuccessEnvelope<{
+  items: FavoriteSummaryDto[];
+}> & {
+  meta?: { total?: number };
+};
+
+export async function fetchFavorites() {
+  const response = await apiFetch<FavoriteResponse>('/library/favorites');
   return response.data.items;
 }
 
