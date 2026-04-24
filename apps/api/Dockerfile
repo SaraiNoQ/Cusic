@@ -4,7 +4,7 @@ RUN npm config set registry https://registry.npmmirror.com \
   && npm install -g pnpm@9.15.0
 
 FROM base AS deps
-COPY package.json pnpm-workspace.yaml turbo.json tsconfig.base.json .npmrc ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json .npmrc ./
 COPY packages ./packages
 COPY apps/api/package.json ./apps/api/package.json
 COPY prisma ./prisma
@@ -22,7 +22,7 @@ COPY --from=deps /app/package.json ./package.json
 COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=deps /app/.npmrc ./.npmrc
 COPY --from=deps /app/packages ./packages
-COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api ./apps/api
+COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 EXPOSE 3001
 CMD ["node", "apps/api/dist/apps/api/src/main.js"]
