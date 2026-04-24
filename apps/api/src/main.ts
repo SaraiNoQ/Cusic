@@ -3,10 +3,24 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './modules/app.module';
 
+function getAllowedCorsOrigins() {
+  const configuredOrigins = process.env.API_CORS_ORIGINS;
+  if (configuredOrigins) {
+    return configuredOrigins
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean);
+  }
+
+  return ['http://localhost:3000', 'https://web.sarainoq.cn'];
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const allowedCorsOrigins = getAllowedCorsOrigins();
+
   app.enableCors({
-    origin: true,
+    origin: allowedCorsOrigins,
     credentials: false,
   });
   app.setGlobalPrefix('api/v1');

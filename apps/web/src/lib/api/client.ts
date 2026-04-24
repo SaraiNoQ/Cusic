@@ -11,11 +11,25 @@ type ApiFetchOptions = {
 };
 
 export function getApiBaseUrl() {
-  if (typeof window !== 'undefined') {
-    return `${window.location.protocol}//${window.location.hostname}:3001/api/v1`;
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (configuredBaseUrl) {
+    return configuredBaseUrl.replace(/\/$/, '');
   }
 
-  return process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001/api/v1';
+  if (typeof window !== 'undefined') {
+    const { hostname, protocol } = window.location;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return `${protocol}//${hostname}:3001/api/v1`;
+    }
+
+    const apiHostname = hostname.startsWith('web.')
+      ? hostname.replace(/^web\./, 'api.')
+      : `api.${hostname}`;
+
+    return `${protocol}//${apiHostname}/api/v1`;
+  }
+
+  return 'http://localhost:3001/api/v1';
 }
 
 export async function apiFetch<T>(

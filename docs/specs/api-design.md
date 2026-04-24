@@ -33,6 +33,13 @@ Authorization: Bearer <access_token>
 Content-Type: application/json
 ```
 
+公网部署要求：
+
+1. Web 域名为 `https://web.sarainoq.cn`。
+2. API 域名为 `https://api.sarainoq.cn/api/v1`。
+3. API CORS 通过 `API_CORS_ORIGINS` 配置，生产默认包含 `https://web.sarainoq.cn`。
+4. 浏览器端不得通过 `web.sarainoq.cn:3001` 访问 API。
+
 ### 2.2 成功响应结构
 
 ```json
