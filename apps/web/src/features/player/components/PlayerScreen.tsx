@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { AtmosphereCanvas } from '../../atmosphere/components/AtmosphereCanvas';
 import { ChatPanel } from '../../chat/components/ChatPanel';
 import { useChatController } from '../../chat/hooks/useChatController';
@@ -8,19 +8,23 @@ import { SearchOverlay } from '../../search/components/SearchOverlay';
 import { useSearchController } from '../../search/hooks/useSearchController';
 import styles from '../PlayerScreen.module.css';
 import { usePlayerController } from '../hooks/usePlayerController';
-import { PlayerHero } from './PlayerHero';
+import { ControlStrip } from './ControlStrip';
+import { DeviceHeader } from './DeviceHeader';
+import { FlipClock } from './FlipClock';
+import { QueueStrip } from './QueueStrip';
 
 const promptSuggestions = [
-  '来点适合深夜写方案的粤语歌',
-  '给我一组适合编码的曲目',
-  '切到早晨通勤模式',
-  '推荐一个短播客',
+  '来一组深夜写作的粤语歌',
+  '把当前曲目扩展成一条太空夜航歌单',
+  '讲讲这首歌背后的专辑故事',
+  '切到更冷一点的电子氛围',
 ];
 
 export function PlayerScreen() {
   const player = usePlayerController();
   const chat = useChatController(player);
   const search = useSearchController();
+  const shellRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!search.isSearchOpen) {
@@ -35,10 +39,44 @@ export function PlayerScreen() {
     };
   }, [search.isSearchOpen]);
 
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) {
+      return;
+    }
+
+    const handleMove = (event: MouseEvent) => {
+      const rect = shell.getBoundingClientRect();
+      const px = (event.clientX - rect.left) / rect.width;
+      const py = (event.clientY - rect.top) / rect.height;
+
+      shell.style.setProperty('--mouse-x', `${px * 100}%`);
+      shell.style.setProperty('--mouse-y', `${py * 100}%`);
+    };
+
+    const handleLeave = () => {
+      shell.style.setProperty('--mouse-x', '50%');
+      shell.style.setProperty('--mouse-y', '36%');
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    shell.addEventListener('mouseleave', handleLeave);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      shell.removeEventListener('mouseleave', handleLeave);
+    };
+  }, []);
+
   return (
     <main className={styles.screen}>
-      <AtmosphereCanvas className={styles.canvas} />
+      <AtmosphereCanvas
+        className={styles.canvas}
+        isPlaying={player.isPlaying}
+      />
+      <div className={styles.backgroundBloom} />
       <div className={styles.noise} />
+      <div className={styles.scanlines} />
 
       <audio
         ref={player.audioRef}
@@ -52,45 +90,92 @@ export function PlayerScreen() {
       />
 
       <div className={styles.viewport}>
-        <PlayerHero
-          currentTrack={player.currentTrack}
-          queue={player.queue}
-          activeIndex={player.activeIndex}
-          statusText={player.statusText}
-          isPlaying={player.isPlaying}
-          progressSeconds={player.progressSeconds}
-          durationSeconds={player.durationSeconds}
-          isFavorite={
-            player.currentTrack
-              ? player.favoriteIds.includes(player.currentTrack.id)
-              : false
-          }
-          onOpenSearch={search.openSearch}
-          onPrevious={() => void player.playPrevious()}
-          onTogglePlayPause={() => void player.togglePlayPause()}
-          onNext={() => void player.playNext()}
-          onToggleFavorite={() => {
-            if (player.currentTrack) {
-              void player.toggleFavorite(player.currentTrack);
-            }
-          }}
-          onAddToPlaylist={() => {
-            if (player.currentTrack) {
-              void player.addCurrentTrackToPlaylist(player.currentTrack);
-            }
-          }}
-          onSelectQueueIndex={(index) => void player.playQueueIndex(index)}
-        />
+        <div
+          ref={shellRef}
+          className={`${styles.deviceShell} ${player.isPlaying ? styles.deviceShellLive : ''}`}
+        >
+          <DeviceHeader
+            onOpenSearch={search.openSearch}
+            isPlaying={player.isPlaying}
+            statusText={player.statusText}
+          />
 
-        <ChatPanel
-          messages={chat.messages}
-          input={chat.input}
-          isPending={chat.isPending}
-          prompts={promptSuggestions}
-          onInputChange={chat.setInput}
-          onPromptSelect={(prompt) => void chat.sendMessage(prompt)}
-          onSubmit={() => chat.sendMessage()}
-        />
+          <section className={styles.heroPanel}>
+            <div className={styles.heroGlow} />
+            <div className={styles.heroSun} />
+            <div className={styles.heroEarth}>
+              <span />
+              <span />
+            </div>
+            <FlipClock />
+          </section>
+
+          <ControlStrip
+            track={player.currentTrack}
+            isPlaying={player.isPlaying}
+            isFavorite={
+              player.currentTrack
+                ? player.favoriteIds.includes(player.currentTrack.id)
+                : false
+            }
+            progressSeconds={player.progressSeconds}
+            durationSeconds={player.durationSeconds}
+            statusText={player.statusText}
+            queueDepth={player.queue.length}
+            onPrevious={() => void player.playPrevious()}
+            onTogglePlayPause={() => void player.togglePlayPause()}
+            onNext={() => void player.playNext()}
+            onToggleFavorite={() => {
+              if (player.currentTrack) {
+                void player.toggleFavorite(player.currentTrack);
+              }
+            }}
+            onAddToPlaylist={() => {
+              if (player.currentTrack) {
+                void player.addCurrentTrackToPlaylist(player.currentTrack);
+              }
+            }}
+          />
+
+          <QueueStrip
+            queue={player.queue}
+            activeIndex={player.activeIndex}
+            onSelectIndex={(index) => void player.playQueueIndex(index)}
+          />
+
+          <ChatPanel
+            messages={chat.messages}
+            input={chat.input}
+            isPending={chat.isPending}
+            prompts={promptSuggestions}
+            statusText={player.statusText}
+            currentTrackTitle={
+              player.currentTrack
+                ? `${player.currentTrack.title} - ${player.currentTrack.artists[0] ?? 'Cusic'}`
+                : null
+            }
+            onInputChange={chat.setInput}
+            onPromptSelect={(prompt) => void chat.sendMessage(prompt)}
+            onSubmit={() => chat.sendMessage()}
+          />
+
+          <footer className={styles.deviceFooter}>
+            <span>CUSIC FM</span>
+            <div aria-hidden="true">
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
+            </div>
+            <span>
+              CONNECTED
+              <i />
+            </span>
+          </footer>
+        </div>
       </div>
 
       <SearchOverlay
@@ -108,7 +193,7 @@ export function PlayerScreen() {
         onQueue={(track) => void player.addToQueue(track)}
         onAssist={(track) => {
           void chat.sendMessage(
-            `围绕《${track.title}》给我推荐一组延展曲目，并解释理由`,
+            `围绕《${track.title}》继续扩展一组更有太空电台感的曲目`,
           );
           search.closeSearch();
         }}

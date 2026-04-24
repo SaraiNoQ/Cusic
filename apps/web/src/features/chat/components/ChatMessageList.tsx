@@ -19,18 +19,27 @@ export function ChatMessageList({
               : `${styles.chatBubble} ${styles.chatBubbleUser}`
           }
         >
-          <span className={styles.chatRole}>
-            {message.role === 'assistant' ? 'AI DJ' : 'You'}
-          </span>
+          <div className={styles.chatBubbleTopline}>
+            <span className={styles.chatRole}>
+              {message.role === 'assistant' ? 'AI DJ' : 'COMMAND'}
+            </span>
+            <span className={styles.chatBubbleIndex}>TX</span>
+          </div>
           <p>{message.text}</p>
         </article>
       ))}
+
       {isPending ? (
         <article
           className={`${styles.chatBubble} ${styles.chatBubbleAssistant}`}
         >
-          <span className={styles.chatRole}>AI DJ</span>
-          <p>Retuning the deck…</p>
+          <div className={styles.chatBubbleTopline}>
+            <span className={styles.chatRole}>AI DJ</span>
+            <span className={styles.chatBubbleIndex}>LIVE</span>
+          </div>
+          <p>
+            Calibrating a new transmission path through the current library…
+          </p>
         </article>
       ) : null}
     </div>

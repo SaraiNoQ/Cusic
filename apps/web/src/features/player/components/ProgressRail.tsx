@@ -8,20 +8,20 @@ export function ProgressRail({
   progressSeconds: number;
   durationSeconds: number;
 }>) {
+  const progressPercent =
+    durationSeconds > 0
+      ? Math.min((progressSeconds / durationSeconds) * 100, 100)
+      : 0;
+
   return (
     <div>
-      <div className={styles.timeline}>
+      <div className={styles.progressRail}>
         <div
-          className={styles.timelineFill}
-          style={{
-            width:
-              durationSeconds > 0
-                ? `${Math.min((progressSeconds / durationSeconds) * 100, 100)}%`
-                : '0%',
-          }}
+          className={styles.progressFill}
+          style={{ width: `${progressPercent}%` }}
         />
       </div>
-      <div className={styles.timelineMeta}>
+      <div className={styles.progressTime}>
         <span>{formatClock(progressSeconds)}</span>
         <span>{formatClock(durationSeconds)}</span>
       </div>

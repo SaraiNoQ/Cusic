@@ -17,18 +17,25 @@ export function TransportControls({
         type="button"
         className={styles.transportButton}
         onClick={onPrevious}
+        aria-label="Previous track"
       >
-        ‹
+        ◀◀
       </button>
       <button
         type="button"
-        className={styles.transportButtonMain}
+        className={`${styles.transportButton} ${styles.transportButtonMain}`}
         onClick={onTogglePlayPause}
+        aria-label={isPlaying ? 'Pause' : 'Play'}
       >
-        {isPlaying ? 'Pause' : 'Play'}
+        {isPlaying ? '❚❚' : '▶'}
       </button>
-      <button type="button" className={styles.transportButton} onClick={onNext}>
-        ›
+      <button
+        type="button"
+        className={styles.transportButton}
+        onClick={onNext}
+        aria-label="Next track"
+      >
+        ▶▶
       </button>
     </div>
   );

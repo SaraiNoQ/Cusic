@@ -23,6 +23,37 @@ export function formatClock(seconds: number) {
   return `${minutes}:${remain.toString().padStart(2, '0')}`;
 }
 
+export function formatTime(date: Date = new Date()): string {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+}
+
+export function formatWeekday(date: Date = new Date()): string {
+  const weekdays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  return weekdays[date.getDay()];
+}
+
+export function formatDate(date: Date = new Date()): string {
+  const months = [
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
+  ];
+  const day = date.getDate();
+  const month = months[date.getMonth()];
+  return `${day} ${month}`;
+}
+
 export function initialsOf(track?: ContentItemDto | null) {
   if (!track) {
     return 'CU';

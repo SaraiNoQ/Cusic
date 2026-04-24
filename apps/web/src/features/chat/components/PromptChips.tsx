@@ -9,14 +9,17 @@ export function PromptChips({
 }>) {
   return (
     <div className={styles.promptRow}>
-      {prompts.map((prompt) => (
+      {prompts.map((prompt, index) => (
         <button
           key={prompt}
           type="button"
           className={styles.promptChip}
           onClick={() => onSelect(prompt)}
         >
-          {prompt}
+          <span className={styles.promptIndex}>
+            {`0${index + 1}`.slice(-2)}
+          </span>
+          <span>{prompt}</span>
         </button>
       ))}
     </div>

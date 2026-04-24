@@ -20,17 +20,25 @@ export function ChatComposer({
       }}
     >
       <textarea
-        rows={3}
+        rows={1}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="让 AI DJ 点歌、换风格、讲一段音乐史，或者直接替你重排当前播放队列。"
+        placeholder="Say something to the DJ..."
       />
       <button
-        type="submit"
-        className={styles.composerButton}
-        disabled={isPending}
+        type="button"
+        className={styles.micButton}
+        aria-label="Voice input"
       >
-        {isPending ? 'Sending…' : 'Send to AI DJ'}
+        <span />
+      </button>
+      <button
+        type="submit"
+        className={styles.sendButton}
+        disabled={isPending}
+        aria-label="Send"
+      >
+        <span>{isPending ? '...' : '↑'}</span>
       </button>
     </form>
   );
