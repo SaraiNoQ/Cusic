@@ -19,6 +19,8 @@ type ChatStore = {
   setInput: (input: string) => void;
   setPending: (isPending: boolean) => void;
   appendMessage: (message: ChatMessageVm) => void;
+  upsertMessage: (message: ChatMessageVm) => void;
+  updateMessageText: (messageId: string, text: string) => void;
   setMessages: (messages: ChatMessageVm[]) => void;
   resetConversation: () => void;
   setHydratedSession: (value: boolean) => void;
@@ -35,6 +37,23 @@ export const useChatStore = create<ChatStore>((set) => ({
   setPending: (isPending) => set({ isPending }),
   appendMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
+  upsertMessage: (message) =>
+    set((state) => {
+      const index = state.messages.findIndex((item) => item.id === message.id);
+      if (index === -1) {
+        return { messages: [...state.messages, message] };
+      }
+
+      const messages = [...state.messages];
+      messages[index] = message;
+      return { messages };
+    }),
+  updateMessageText: (messageId, text) =>
+    set((state) => ({
+      messages: state.messages.map((message) =>
+        message.id === messageId ? { ...message, text } : message,
+      ),
+    })),
   setMessages: (messages) => set({ messages }),
   resetConversation: () =>
     set({

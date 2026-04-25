@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Headers,
+  MessageEvent,
   Param,
   Post,
   Query,
@@ -17,7 +18,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Observable, of } from 'rxjs';
+import { Observable } from 'rxjs';
 import { RequestWithUser } from '../../auth/guards/jwt-auth.guard';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../../auth/guards/optional-jwt-auth.guard';
@@ -69,18 +70,19 @@ export class AiDjController {
   }
 
   @Sse('chat/stream')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Stream AI DJ response over SSE' })
-  @ApiQuery({ name: 'sessionId', required: false, type: String })
-  @ApiQuery({ name: 'messageId', required: false, type: String })
+  @ApiQuery({ name: 'sessionId', required: true, type: String })
+  @ApiQuery({ name: 'messageId', required: true, type: String })
   stream(
-    @Query('sessionId') _sessionId?: string,
-    @Query('messageId') _messageId?: string,
-  ): Observable<{ data: { event: string; token: string } }> {
-    return of({
-      data: {
-        event: 'done',
-        token: 'stub-stream-complete',
-      },
+    @Query('sessionId') sessionId: string,
+    @Query('messageId') messageId: string,
+    @Req() request: RequestWithUser,
+  ): Observable<MessageEvent> {
+    return this.aiDjService.streamReply({
+      sessionId,
+      messageId,
+      userId: request.user?.id,
     });
   }
 }

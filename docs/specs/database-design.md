@@ -635,6 +635,7 @@
 2. `content_text` 保存可直接渲染的聊天文本。
 3. `content_json` 在助手消息带动作时保存结构化 `actions`。
 4. `trace_json` 保存意图识别结果、命中的规则和工具编排摘要，作为后续接入 LLM 的调试边界。
+5. Phase 4 的 SSE 首版不新增表；已登录用户直接从已持久化的助手消息回放增量 token，匿名用户只在 API 进程内保留短时流式 payload。
 
 #### 3.8.3 `knowledge_traces`
 

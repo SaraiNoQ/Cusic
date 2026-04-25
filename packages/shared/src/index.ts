@@ -261,6 +261,33 @@ export interface ChatTurnResponseDto {
   actions: AiDjActionDto[];
 }
 
+export interface AiDjStreamChunkEventDto {
+  event: 'chunk';
+  sessionId: string;
+  messageId: string;
+  delta: string;
+}
+
+export interface AiDjStreamActionsEventDto {
+  event: 'actions';
+  sessionId: string;
+  messageId: string;
+  actions: AiDjActionDto[];
+}
+
+export interface AiDjStreamDoneEventDto {
+  event: 'done';
+  sessionId: string;
+  messageId: string;
+  replyText: string;
+  actions: AiDjActionDto[];
+}
+
+export type AiDjStreamEventDto =
+  | AiDjStreamChunkEventDto
+  | AiDjStreamActionsEventDto
+  | AiDjStreamDoneEventDto;
+
 export interface ChatSessionMessageDto {
   id: string;
   role: 'assistant' | 'user';

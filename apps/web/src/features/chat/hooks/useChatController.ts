@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { fetchContentById } from '../../../lib/api/content-api';
 import {
   fetchDjSessionMessages,
+  streamDjMessage,
   submitDjMessage,
 } from '../../../lib/api/dj-api';
 import { useAuthStore } from '../../../store/auth-store';
@@ -80,6 +81,8 @@ export function useChatController(playerController: PlayerController) {
   const setInput = useChatStore((state) => state.setInput);
   const setPending = useChatStore((state) => state.setPending);
   const appendMessage = useChatStore((state) => state.appendMessage);
+  const upsertMessage = useChatStore((state) => state.upsertMessage);
+  const updateMessageText = useChatStore((state) => state.updateMessageText);
   const setMessages = useChatStore((state) => state.setMessages);
   const resetConversation = useChatStore((state) => state.resetConversation);
   const setHydratedSession = useChatStore((state) => state.setHydratedSession);
@@ -90,7 +93,7 @@ export function useChatController(playerController: PlayerController) {
       submitDjMessage({
         sessionId,
         message,
-        responseMode: 'sync',
+        responseMode: 'stream',
         surfaceContext: {
           currentTrackId: playerController.currentTrack?.id ?? null,
           queueContentIds: playerController.queue.map((item) => item.id),
@@ -184,11 +187,43 @@ export function useChatController(playerController: PlayerController) {
     try {
       const response = await chatMutation.mutateAsync(message);
       setSessionId(response.data.sessionId);
-      appendMessage({
+      upsertMessage({
         id: response.data.messageId,
         role: 'assistant',
-        text: response.data.replyText,
+        text: '',
       });
+
+      let streamedReply = '';
+
+      try {
+        await streamDjMessage(
+          {
+            sessionId: response.data.sessionId,
+            messageId: response.data.messageId,
+          },
+          (event) => {
+            if (event.event === 'chunk') {
+              streamedReply += event.delta;
+              updateMessageText(response.data.messageId, streamedReply);
+              return;
+            }
+
+            if (event.event === 'done') {
+              updateMessageText(
+                response.data.messageId,
+                event.replyText || streamedReply || response.data.replyText,
+              );
+            }
+          },
+        );
+      } catch {
+        updateMessageText(response.data.messageId, response.data.replyText);
+      }
+
+      if (!streamedReply) {
+        updateMessageText(response.data.messageId, response.data.replyText);
+      }
+
       await applyActions(response.data.actions);
     } catch {
       appendMessage({

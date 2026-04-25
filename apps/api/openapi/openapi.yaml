@@ -332,6 +332,51 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AiDjActionDto'
+    AiDjStreamChunkEventDto:
+      type: object
+      required: [event, sessionId, messageId, delta]
+      properties:
+        event:
+          type: string
+          enum: [chunk]
+        sessionId:
+          type: string
+        messageId:
+          type: string
+        delta:
+          type: string
+    AiDjStreamActionsEventDto:
+      type: object
+      required: [event, sessionId, messageId, actions]
+      properties:
+        event:
+          type: string
+          enum: [actions]
+        sessionId:
+          type: string
+        messageId:
+          type: string
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AiDjActionDto'
+    AiDjStreamDoneEventDto:
+      type: object
+      required: [event, sessionId, messageId, replyText, actions]
+      properties:
+        event:
+          type: string
+          enum: [done]
+        sessionId:
+          type: string
+        messageId:
+          type: string
+        replyText:
+          type: string
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AiDjActionDto'
     ChatSessionMessageDto:
       type: object
       required: [id, role, messageType, text, createdAt]
@@ -808,6 +853,17 @@ paths:
   /dj/chat/stream:
     get:
       summary: Stream DJ response over SSE
+      parameters:
+        - in: query
+          name: sessionId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: messageId
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: text/event-stream response

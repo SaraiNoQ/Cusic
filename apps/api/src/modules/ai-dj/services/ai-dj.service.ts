@@ -1,10 +1,14 @@
 import {
   BadRequestException,
   Injectable,
+  MessageEvent,
   NotFoundException,
 } from '@nestjs/common';
 import type {
   AiDjActionDto,
+  AiDjStreamActionsEventDto,
+  AiDjStreamChunkEventDto,
+  AiDjStreamDoneEventDto,
   ChatSessionMessageDto,
   ChatSurfaceContextDto,
   ChatTurnRequestDto,
@@ -17,6 +21,7 @@ import {
   SessionMode,
   type ChatMessage,
 } from '@prisma/client';
+import { Observable } from 'rxjs';
 import type { AuthenticatedUser } from '../../auth/services/auth.service';
 import { ContentService } from '../../content/services/content.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -40,8 +45,19 @@ type ReplyPlan = {
   trace: Record<string, unknown>;
 };
 
+type StreamPayload = {
+  sessionId: string;
+  messageId: string;
+  replyText: string;
+  actions: AiDjActionDto[];
+  userId?: string;
+  createdAt: number;
+};
+
 @Injectable()
 export class AiDjService {
+  private readonly streamPayloads = new Map<string, StreamPayload>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly contentService: ContentService,
@@ -53,10 +69,7 @@ export class AiDjService {
     if (!message) {
       throw new BadRequestException('message is required');
     }
-
-    if (input.responseMode !== 'sync') {
-      throw new BadRequestException('Only sync responseMode is supported');
-    }
+    this.pruneAnonymousStreamPayloads();
 
     const plan = await this.composeReplyPlan(
       message,
@@ -66,12 +79,17 @@ export class AiDjService {
     );
 
     if (!input.user?.id) {
-      return {
+      const response = {
         sessionId: input.sessionId ?? this.createAnonymousSessionId(),
         messageId: this.createAnonymousMessageId(),
         replyText: plan.replyText,
         actions: plan.actions,
       };
+      this.registerStreamPayload({
+        ...response,
+        createdAt: Date.now(),
+      });
+      return response;
     }
 
     const persisted = await this.persistTurn({
@@ -87,12 +105,20 @@ export class AiDjService {
       timezoneHeader: input.timezoneHeader,
     });
 
-    return {
+    const response = {
       sessionId: persisted.sessionId,
       messageId: persisted.messageId,
       replyText: plan.replyText,
       actions: plan.actions,
     };
+
+    this.registerStreamPayload({
+      ...response,
+      userId: input.user.id,
+      createdAt: Date.now(),
+    });
+
+    return response;
   }
 
   async getSessionMessages(
@@ -124,6 +150,86 @@ export class AiDjService {
     }
 
     return session.messages.map((message) => this.toSessionMessageDto(message));
+  }
+
+  streamReply(input: {
+    sessionId?: string;
+    messageId: string;
+    userId?: string;
+  }): Observable<MessageEvent> {
+    return new Observable<MessageEvent>((subscriber) => {
+      const timers = new Set<ReturnType<typeof setTimeout>>();
+
+      const queueEvent = (
+        event:
+          | AiDjStreamChunkEventDto
+          | AiDjStreamActionsEventDto
+          | AiDjStreamDoneEventDto,
+        delayMs: number,
+      ) => {
+        const timer = setTimeout(() => {
+          const { event: eventType, ...data } = event;
+          subscriber.next({
+            type: eventType,
+            data,
+          });
+          timers.delete(timer);
+        }, delayMs);
+        timers.add(timer);
+      };
+
+      void this.resolveStreamPayload(input)
+        .then((payload) => {
+          const chunks = this.chunkReplyText(payload.replyText);
+          chunks.forEach((delta, index) => {
+            queueEvent(
+              {
+                event: 'chunk',
+                sessionId: payload.sessionId,
+                messageId: payload.messageId,
+                delta,
+              },
+              index * 60,
+            );
+          });
+
+          const lastDelay = chunks.length * 60;
+          if (payload.actions.length > 0) {
+            queueEvent(
+              {
+                event: 'actions',
+                sessionId: payload.sessionId,
+                messageId: payload.messageId,
+                actions: payload.actions,
+              },
+              lastDelay + 40,
+            );
+          }
+
+          const doneTimer = setTimeout(() => {
+            subscriber.next({
+              type: 'done',
+              data: {
+                sessionId: payload.sessionId,
+                messageId: payload.messageId,
+                replyText: payload.replyText,
+                actions: payload.actions,
+              },
+            });
+            this.streamPayloads.delete(payload.messageId);
+            subscriber.complete();
+            timers.delete(doneTimer);
+          }, lastDelay + 100);
+          timers.add(doneTimer);
+        })
+        .catch((error) => subscriber.error(error));
+
+      return () => {
+        for (const timer of timers) {
+          clearTimeout(timer);
+        }
+      };
+    });
   }
 
   private async persistTurn(input: {
@@ -468,6 +574,105 @@ export class AiDjService {
 
   private buildSessionTitle(message: string) {
     return message.trim().slice(0, 48);
+  }
+
+  private registerStreamPayload(payload: StreamPayload) {
+    this.streamPayloads.set(payload.messageId, payload);
+  }
+
+  private async resolveStreamPayload(input: {
+    sessionId?: string;
+    messageId: string;
+    userId?: string;
+  }): Promise<StreamPayload> {
+    const cached = this.streamPayloads.get(input.messageId);
+    if (cached) {
+      if (input.sessionId && cached.sessionId !== input.sessionId) {
+        throw new NotFoundException('Stream payload was not found');
+      }
+
+      if (cached.userId && cached.userId !== input.userId) {
+        throw new NotFoundException('Stream payload was not found');
+      }
+
+      return cached;
+    }
+
+    if (!input.userId) {
+      throw new NotFoundException('Stream payload was not found');
+    }
+
+    const assistantMessage = await this.prisma.chatMessage.findFirst({
+      where: {
+        id: input.messageId,
+        role: ChatRole.ASSISTANT,
+        chatSession: {
+          userId: input.userId,
+          deletedAt: null,
+          ...(input.sessionId ? { id: input.sessionId } : {}),
+        },
+      },
+      include: {
+        chatSession: true,
+      },
+    });
+
+    if (!assistantMessage) {
+      throw new NotFoundException('Stream payload was not found');
+    }
+
+    const payload: StreamPayload = {
+      sessionId: assistantMessage.chatSessionId,
+      messageId: assistantMessage.id,
+      replyText: assistantMessage.contentText ?? '',
+      actions: this.readActionsFromContentJson(assistantMessage.contentJson),
+      userId: input.userId,
+      createdAt: assistantMessage.createdAt.getTime(),
+    };
+
+    this.registerStreamPayload(payload);
+    return payload;
+  }
+
+  private readActionsFromContentJson(json: Prisma.JsonValue | null) {
+    if (!json || typeof json !== 'object' || Array.isArray(json)) {
+      return [];
+    }
+
+    const actions = (json as { actions?: unknown }).actions;
+    if (!Array.isArray(actions)) {
+      return [];
+    }
+
+    return actions as AiDjActionDto[];
+  }
+
+  private chunkReplyText(replyText: string) {
+    if (!replyText) {
+      return [];
+    }
+
+    const chunks: string[] = [];
+    let cursor = 0;
+
+    while (cursor < replyText.length) {
+      const nextSlice = replyText.slice(cursor, cursor + 4);
+      chunks.push(nextSlice);
+      cursor += nextSlice.length;
+    }
+
+    return chunks;
+  }
+
+  private pruneAnonymousStreamPayloads() {
+    const expiryMs = 5 * 60 * 1000;
+    const now = Date.now();
+
+    for (const [messageId, payload] of this.streamPayloads) {
+      if (now - payload.createdAt > expiryMs) {
+        this.streamPayloads.delete(messageId);
+      }
+    }
   }
 
   private resolveTimezone(timezoneHeader?: string) {

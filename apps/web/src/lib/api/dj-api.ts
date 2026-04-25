@@ -1,10 +1,12 @@
 import type {
+  AiDjStreamEventDto,
   ApiSuccessEnvelope,
   ChatSessionMessageDto,
   ChatTurnRequestDto,
   ChatTurnResponseDto,
 } from '@music-ai/shared';
-import { apiFetch } from './client';
+import { readAuthSession } from './auth-session';
+import { apiFetch, getApiBaseUrl } from './client';
 
 export type ChatResponse = ApiSuccessEnvelope<ChatTurnResponseDto>;
 
@@ -21,4 +23,84 @@ export async function fetchDjSessionMessages(sessionId: string) {
   );
 
   return response.data;
+}
+
+export async function streamDjMessage(
+  input: {
+    sessionId: string;
+    messageId: string;
+  },
+  onEvent: (event: AiDjStreamEventDto) => void,
+) {
+  const session = readAuthSession();
+  const url = new URL(`${getApiBaseUrl()}/dj/chat/stream`);
+  url.searchParams.set('sessionId', input.sessionId);
+  url.searchParams.set('messageId', input.messageId);
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Accept: 'text/event-stream',
+      ...(session?.accessToken
+        ? { Authorization: `Bearer ${session.accessToken}` }
+        : {}),
+    },
+  });
+
+  if (!response.ok || !response.body) {
+    throw new Error(`Stream failed: ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  const flushEvent = (rawEvent: string) => {
+    const lines = rawEvent
+      .replace(/\r\n/g, '\n')
+      .split('\n')
+      .map((line) => line.replace(/\r$/, ''))
+      .filter((line) => line.length > 0);
+
+    if (lines.length === 0) {
+      return;
+    }
+
+    const eventType =
+      lines
+        .find((line) => line.startsWith('event:'))
+        ?.slice(6)
+        .trim() ?? 'message';
+    const dataPayload = lines
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => (line[5] === ' ' ? line.slice(6) : line.slice(5)))
+      .join('\n');
+
+    if (!dataPayload) {
+      return;
+    }
+
+    onEvent({
+      event: eventType,
+      ...JSON.parse(dataPayload),
+    } as AiDjStreamEventDto);
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop() ?? '';
+
+    for (const part of parts) {
+      flushEvent(part);
+    }
+  }
+
+  if (buffer.trim()) {
+    flushEvent(buffer);
+  }
 }

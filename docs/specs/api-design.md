@@ -718,11 +718,12 @@ Content-Type: application/json
 
 首版实现约束：
 
-1. 当前只支持 `responseMode=sync`，`stream` 保留接口但仍为后续阶段。
-2. 已登录用户会创建或续写 `chat_sessions/chat_messages`，匿名用户只返回临时 `sessionId`，不落库。
-3. `surfaceContext` 由前端附带当前曲目和当前队列，用于解释当前播放和编排队列动作。
-4. 首版只做规则型意图识别与内部工具编排，不接外部 LLM 或知识检索。
-5. 当前支持动作：
+1. 当前支持 `responseMode=sync` 与 `responseMode=stream`。
+2. `responseMode=stream` 仍先返回完整 `sessionId/messageId/replyText/actions`，随后前端再通过 `GET /dj/chat/stream` 消费增量 token。
+3. 已登录用户会创建或续写 `chat_sessions/chat_messages`，匿名用户只返回临时 `sessionId`，不落库。
+4. `surfaceContext` 由前端附带当前曲目和当前队列，用于解释当前播放和编排队列动作。
+5. 首版只做规则型意图识别与内部工具编排，不接外部 LLM 或知识检索。
+6. 当前支持动作：
    - `queue_replace`
    - `queue_append`
 
@@ -799,17 +800,67 @@ Content-Type: application/json
 
 用途：以 SSE 接收 AI DJ 流式回复。
 
+首版实现约束：
+
+1. 由 `POST /dj/chat` 成功返回的 `sessionId` 与 `messageId` 驱动。
+2. 已登录用户只能消费自己会话里的消息流；匿名用户只允许消费当前 API 进程里暂存的本轮回复。
+3. 首版事件顺序固定为：
+   - `chunk`
+   - `actions`（仅有动作时发送）
+   - `done`
+4. `done` 事件会回传完整 `replyText` 与 `actions`，前端可用于流式失败后的最终兜底。
+
 请求参数：
 
 1. `sessionId`
 2. `messageId`
 
-事件类型建议：
+事件 payload：
 
-1. `token`
-2. `action`
+1. `chunk`
+
+```json
+{
+  "sessionId": "chat_01",
+  "messageId": "msg_02",
+  "delta": "我先把这个主题"
+}
+```
+
+2. `actions`
+
+```json
+{
+  "sessionId": "chat_01",
+  "messageId": "msg_02",
+  "actions": [
+    {
+      "type": "queue_replace",
+      "payload": {
+        "contentIds": ["cnt_01", "cnt_02", "cnt_03"]
+      }
+    }
+  ]
+}
+```
+
 3. `done`
-4. `error`
+
+```json
+{
+  "sessionId": "chat_01",
+  "messageId": "msg_02",
+  "replyText": "我先把这个主题压成一组可直接上机的预览队列。",
+  "actions": [
+    {
+      "type": "queue_replace",
+      "payload": {
+        "contentIds": ["cnt_01", "cnt_02", "cnt_03"]
+      }
+    }
+  ]
+}
+```
 
 ### 7.4 `POST /dj/voice/asr`
 
