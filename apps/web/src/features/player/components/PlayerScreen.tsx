@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { AtmosphereCanvas } from '../../atmosphere/components/AtmosphereCanvas';
 import { AuthPanel } from '../../auth/components/AuthPanel';
+import { ChatOverlay } from '../../chat/components/ChatOverlay';
 import { ChatPanel } from '../../chat/components/ChatPanel';
 import { useChatController } from '../../chat/hooks/useChatController';
 import { SearchOverlay } from '../../search/components/SearchOverlay';
@@ -31,9 +32,11 @@ export function PlayerScreen() {
   const isRecommendationOpen = useUiStore(
     (state) => state.isRecommendationOpen,
   );
+  const isChatOverlayOpen = useUiStore((state) => state.isChatOverlayOpen);
   const setRecommendationOpen = useUiStore(
     (state) => state.setRecommendationOpen,
   );
+  const setChatOverlayOpen = useUiStore((state) => state.setChatOverlayOpen);
   const authUser = useAuthStore((state) => state.user);
   const isAuthOpen = useAuthStore((state) => state.isAuthOpen);
   const isAuthPending = useAuthStore((state) => state.isPending);
@@ -52,7 +55,12 @@ export function PlayerScreen() {
   }, [hydrateAuth]);
 
   useEffect(() => {
-    if (!search.isSearchOpen && !isRecommendationOpen) {
+    if (
+      !search.isSearchOpen &&
+      !isRecommendationOpen &&
+      !isChatOverlayOpen &&
+      !isAuthOpen
+    ) {
       return;
     }
 
@@ -62,7 +70,12 @@ export function PlayerScreen() {
     return () => {
       document.body.style.overflow = previous;
     };
-  }, [isRecommendationOpen, search.isSearchOpen]);
+  }, [
+    isAuthOpen,
+    isChatOverlayOpen,
+    isRecommendationOpen,
+    search.isSearchOpen,
+  ]);
 
   useEffect(() => {
     const shell = shellRef.current;
@@ -96,6 +109,7 @@ export function PlayerScreen() {
   const openRecommendation = () => {
     search.closeSearch();
     closeAuth();
+    setChatOverlayOpen(false);
     setRecommendationOpen(true);
   };
 
@@ -105,12 +119,28 @@ export function PlayerScreen() {
 
   const openSearch = () => {
     closeRecommendation();
+    setChatOverlayOpen(false);
     search.openSearch();
   };
 
   const openAuthPanel = () => {
     closeRecommendation();
+    setChatOverlayOpen(false);
     openAuth();
+  };
+
+  const openChatOverlay = () => {
+    search.closeSearch();
+    closeRecommendation();
+    closeAuth();
+    setChatOverlayOpen(true);
+    if (!chat.hasHydratedSession) {
+      void chat.hydrateConversation();
+    }
+  };
+
+  const closeChatOverlay = () => {
+    setChatOverlayOpen(false);
   };
 
   return (
@@ -207,6 +237,7 @@ export function PlayerScreen() {
               onInputChange={chat.setInput}
               onPromptSelect={(prompt) => void chat.sendMessage(prompt)}
               onSubmit={() => chat.sendMessage()}
+              onOpenConversation={openChatOverlay}
             />
 
             <footer className={styles.deviceFooter}>
@@ -264,6 +295,18 @@ export function PlayerScreen() {
           void player.loadDailyPlaylist();
           closeRecommendation();
         }}
+      />
+
+      <ChatOverlay
+        isOpen={isChatOverlayOpen}
+        messages={chat.messages}
+        input={chat.input}
+        isPending={chat.isPending}
+        prompts={promptSuggestions}
+        onClose={closeChatOverlay}
+        onInputChange={chat.setInput}
+        onPromptSelect={(prompt) => void chat.sendMessage(prompt)}
+        onSubmit={() => void chat.sendMessage()}
       />
 
       <AuthPanel

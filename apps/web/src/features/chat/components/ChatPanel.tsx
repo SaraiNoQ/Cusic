@@ -31,6 +31,7 @@ export function ChatPanel({
   currentTrackTitle,
   onInputChange,
   onSubmit,
+  onOpenConversation,
 }: Readonly<{
   messages: ChatMessageVm[];
   input: string;
@@ -41,6 +42,7 @@ export function ChatPanel({
   onInputChange: (value: string) => void;
   onPromptSelect: (prompt: string) => void;
   onSubmit: () => void;
+  onOpenConversation: () => void;
 }>) {
   const [time, setTime] = useState('21:09');
   const transmission = isPending
@@ -76,6 +78,9 @@ export function ChatPanel({
             </article>
             <div className={styles.replyRail}>
               <span>{time}</span>
+              <button type="button" onClick={onOpenConversation}>
+                OPEN AI DJ
+              </button>
               <button type="button">▶ REPLAY</button>
             </div>
           </div>

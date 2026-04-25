@@ -278,6 +278,46 @@ components:
         responseMode:
           type: string
           enum: [sync, stream]
+        surfaceContext:
+          type: object
+          properties:
+            currentTrackId:
+              type: string
+              nullable: true
+            queueContentIds:
+              type: array
+              items:
+                type: string
+    AiDjActionDto:
+      oneOf:
+        - type: object
+          required: [type, payload]
+          properties:
+            type:
+              type: string
+              enum: [queue_replace]
+            payload:
+              type: object
+              required: [contentIds]
+              properties:
+                contentIds:
+                  type: array
+                  items:
+                    type: string
+        - type: object
+          required: [type, payload]
+          properties:
+            type:
+              type: string
+              enum: [queue_append]
+            payload:
+              type: object
+              required: [contentIds]
+              properties:
+                contentIds:
+                  type: array
+                  items:
+                    type: string
     ChatTurnResponseDto:
       type: object
       required: [sessionId, messageId, replyText, actions]
@@ -291,14 +331,24 @@ components:
         actions:
           type: array
           items:
-            type: object
-            required: [type, payload]
-            properties:
-              type:
-                type: string
-              payload:
-                type: object
-                additionalProperties: true
+            $ref: '#/components/schemas/AiDjActionDto'
+    ChatSessionMessageDto:
+      type: object
+      required: [id, role, messageType, text, createdAt]
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+          enum: [assistant, user]
+        messageType:
+          type: string
+          enum: [text, action]
+        text:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
 paths:
   /system/health:
     get:
@@ -737,6 +787,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChatTurnResponseDto'
+  /dj/sessions/{sessionId}/messages:
+    get:
+      summary: Get AI DJ session messages
+      parameters:
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatSessionMessageDto'
   /dj/chat/stream:
     get:
       summary: Stream DJ response over SSE

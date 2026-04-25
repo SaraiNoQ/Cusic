@@ -224,28 +224,49 @@ export interface RecommendationFeedbackResponseDto {
   recorded: boolean;
 }
 
+export interface ChatSurfaceContextDto {
+  currentTrackId?: string | null;
+  queueContentIds?: string[];
+}
+
 export interface ChatTurnRequestDto {
   sessionId?: string;
   message: string;
   responseMode: 'sync' | 'stream';
+  surfaceContext?: ChatSurfaceContextDto;
 }
+
+export interface AiDjQueueReplaceActionDto {
+  type: 'queue_replace';
+  payload: {
+    contentIds: string[];
+  };
+}
+
+export interface AiDjQueueAppendActionDto {
+  type: 'queue_append';
+  payload: {
+    contentIds: string[];
+  };
+}
+
+export type AiDjActionDto =
+  | AiDjQueueReplaceActionDto
+  | AiDjQueueAppendActionDto;
 
 export interface ChatTurnResponseDto {
   sessionId: string;
   messageId: string;
   replyText: string;
-  actions: Array<{
-    type: string;
-    payload: Record<string, unknown>;
-  }>;
+  actions: AiDjActionDto[];
 }
 
-export interface AiDjActionDto {
-  type: string;
-  payload: {
-    contentIds?: string[];
-    [key: string]: unknown;
-  };
+export interface ChatSessionMessageDto {
+  id: string;
+  role: 'assistant' | 'user';
+  messageType: 'text' | 'action';
+  text: string;
+  createdAt: string;
 }
 
 export interface ChatMessageVm {

@@ -2,7 +2,7 @@
 
 - 文档版本：v0.1
 - 文档状态：初版
-- 更新时间：2026-04-23
+- 更新时间：2026-04-25
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`、`docs/specs/database-design.md`
 
 ## 1. 设计目标与约束
@@ -716,13 +716,27 @@ Content-Type: application/json
 
 用途：发起一轮 AI DJ 对话。
 
+首版实现约束：
+
+1. 当前只支持 `responseMode=sync`，`stream` 保留接口但仍为后续阶段。
+2. 已登录用户会创建或续写 `chat_sessions/chat_messages`，匿名用户只返回临时 `sessionId`，不落库。
+3. `surfaceContext` 由前端附带当前曲目和当前队列，用于解释当前播放和编排队列动作。
+4. 首版只做规则型意图识别与内部工具编排，不接外部 LLM 或知识检索。
+5. 当前支持动作：
+   - `queue_replace`
+   - `queue_append`
+
 请求 DTO：
 
 ```json
 {
   "sessionId": "chat_01",
   "message": "给我推荐三首适合晚上写代码的粤语歌",
-  "responseMode": "sync"
+  "responseMode": "sync",
+  "surfaceContext": {
+    "currentTrackId": "cnt_focus_fm",
+    "queueContentIds": ["cnt_focus_fm", "cnt_afterhours_loop"]
+  }
 }
 ```
 
@@ -747,7 +761,41 @@ Content-Type: application/json
 }
 ```
 
-### 7.2 `GET /dj/chat/stream`
+### 7.2 `GET /dj/sessions/:sessionId/messages`
+
+用途：读取已持久化的 AI DJ 会话消息，用于完整聊天浮窗恢复历史。
+
+首版实现约束：
+
+1. 必须登录。
+2. 只允许读取当前用户自己的会话。
+3. 仅返回可直接渲染的 `user/assistant` 文本消息。
+
+响应 DTO：
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "msg_01",
+      "role": "user",
+      "messageType": "text",
+      "text": "来一组深夜写作的粤语歌",
+      "createdAt": "2026-04-25T13:20:00.000Z"
+    },
+    {
+      "id": "msg_02",
+      "role": "assistant",
+      "messageType": "action",
+      "text": "收到。我把主频道切到更贴近你这句指令的航线。",
+      "createdAt": "2026-04-25T13:20:01.000Z"
+    }
+  ]
+}
+```
+
+### 7.3 `GET /dj/chat/stream`
 
 用途：以 SSE 接收 AI DJ 流式回复。
 
@@ -763,7 +811,7 @@ Content-Type: application/json
 3. `done`
 4. `error`
 
-### 7.3 `POST /dj/voice/asr`
+### 7.4 `POST /dj/voice/asr`
 
 用途：语音转文本。
 
@@ -783,7 +831,7 @@ Content-Type: application/json
 }
 ```
 
-### 7.4 `POST /dj/voice/tts`
+### 7.5 `POST /dj/voice/tts`
 
 用途：文本转语音。
 

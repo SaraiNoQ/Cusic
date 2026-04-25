@@ -329,6 +329,35 @@ export function usePlayerController() {
     setStatusText(`Added ${track.title} to the queue ring.`);
   };
 
+  const appendTracks = async (tracks: ContentItemDto[], message?: string) => {
+    const existingIds = new Set(queue.map((item) => item.id));
+    const nextTracks = tracks.filter((track) => !existingIds.has(track.id));
+    if (nextTracks.length === 0) {
+      setStatusText(
+        message ?? 'Those tracks are already inside the queue ring.',
+      );
+      return;
+    }
+
+    const nextQueue = [...queue, ...nextTracks];
+    setQueue(nextQueue);
+    if (!currentTrack) {
+      setCurrentTrack(nextTracks[0] ?? null);
+      setActiveIndex(0);
+      setProgressSeconds(0);
+    }
+
+    await syncQueueState('replace', nextQueue, {
+      activeIndex: !currentTrack ? 0 : activeIndex,
+      currentContentId: currentTrack?.id ?? nextTracks[0]?.id ?? null,
+      positionMs: Math.floor(progressSeconds * 1000),
+    });
+    setStatusText(
+      message ??
+        `Extended the queue with ${nextTracks.length.toString()} fresh tracks.`,
+    );
+  };
+
   const playQueueIndex = async (index: number) => {
     const target = queue[index];
     if (!target) {
@@ -545,6 +574,7 @@ export function usePlayerController() {
     setSelectedPlaylistId,
     playTrack,
     addToQueue,
+    appendTracks,
     playQueueIndex,
     playPrevious,
     playNext,

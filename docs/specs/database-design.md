@@ -604,6 +604,12 @@
 
 1. `index(user_id, last_message_at desc)`
 
+实现记录：
+
+1. Phase 4 首版文本 AI DJ 只为已登录用户写入 `chat_sessions`。
+2. 每轮成功回复都会刷新 `last_message_at`，并把最新 `context_snapshot_id` 关联到当前会话。
+3. 匿名用户允许使用 AI DJ，但不创建 `chat_sessions` 记录。
+
 #### 3.8.2 `chat_messages`
 
 用途：对话消息明细表。
@@ -622,6 +628,13 @@
 索引建议：
 
 1. `index(chat_session_id, created_at)`
+
+实现记录：
+
+1. 首版只持久化 `USER` 与 `ASSISTANT` 两类消息。
+2. `content_text` 保存可直接渲染的聊天文本。
+3. `content_json` 在助手消息带动作时保存结构化 `actions`。
+4. `trace_json` 保存意图识别结果、命中的规则和工具编排摘要，作为后续接入 LLM 的调试边界。
 
 #### 3.8.3 `knowledge_traces`
 
