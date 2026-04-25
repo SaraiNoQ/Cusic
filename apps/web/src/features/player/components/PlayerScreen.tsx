@@ -303,9 +303,14 @@ export function PlayerScreen() {
         input={chat.input}
         isPending={chat.isPending}
         prompts={promptSuggestions}
+        canSaveGeneratedPlaylists={chat.canSaveGeneratedPlaylists}
+        savingPlaylistMessageId={chat.savingPlaylistMessageId}
         onClose={closeChatOverlay}
         onInputChange={chat.setInput}
         onPromptSelect={(prompt) => void chat.sendMessage(prompt)}
+        onSavePlaylist={(messageId) =>
+          void chat.savePlaylistFromMessage(messageId)
+        }
         onSubmit={() => void chat.sendMessage()}
       />
 

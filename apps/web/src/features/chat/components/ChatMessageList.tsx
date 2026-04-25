@@ -4,9 +4,15 @@ import styles from '../../player/PlayerScreen.module.css';
 export function ChatMessageList({
   messages,
   isPending,
+  canSaveGeneratedPlaylists,
+  savingPlaylistMessageId,
+  onSavePlaylist,
 }: Readonly<{
   messages: ChatMessageVm[];
   isPending: boolean;
+  canSaveGeneratedPlaylists: boolean;
+  savingPlaylistMessageId?: string;
+  onSavePlaylist: (messageId: string) => void;
 }>) {
   return (
     <div className={styles.messageList}>
@@ -26,6 +32,23 @@ export function ChatMessageList({
             <span className={styles.chatBubbleIndex}>TX</span>
           </div>
           <p>{message.text}</p>
+          {canSaveGeneratedPlaylists &&
+          message.role === 'assistant' &&
+          message.intent === 'theme_playlist_preview' &&
+          (message.actions?.length ?? 0) > 0 ? (
+            <div className={styles.chatBubbleActions}>
+              <button
+                type="button"
+                className={styles.chatActionButton}
+                onClick={() => onSavePlaylist(message.id)}
+                disabled={savingPlaylistMessageId === message.id}
+              >
+                {savingPlaylistMessageId === message.id
+                  ? 'SAVING...'
+                  : 'SAVE PLAYLIST'}
+              </button>
+            </div>
+          ) : null}
         </article>
       ))}
 

@@ -289,6 +289,11 @@
 1. `index(user_id, playlist_type, created_at)`
 2. `index(source_type)`
 
+实现记录：
+
+1. `generated_context_json` 用于记录 AI 生成歌单的来源上下文；Phase 4 第二步会写入 `source=ai_dj`、`source_session_id`、`source_message_id` 和对应 `intent`。
+2. 同一条 AI DJ 主题预览消息保存为歌单时，服务端会优先按 `generated_context_json.source_message_id` 做幂等返回，避免重复创建内容相同的 AI 歌单。
+
 #### 3.4.2 `playlist_items`
 
 用途：歌单与内容项关系表。
@@ -636,6 +641,7 @@
 3. `content_json` 在助手消息带动作时保存结构化 `actions`。
 4. `trace_json` 保存意图识别结果、命中的规则和工具编排摘要，作为后续接入 LLM 的调试边界。
 5. Phase 4 的 SSE 首版不新增表；已登录用户直接从已持久化的助手消息回放增量 token，匿名用户只在 API 进程内保留短时流式 payload。
+6. Phase 4 第二步起，`theme_playlist_preview` 助手消息会在 `trace_json.playlistDraft` 中记录默认标题、描述与候选 `contentIds`，供 `POST /dj/playlists` 直接落库为 `ai_generated` 歌单。
 
 #### 3.8.3 `knowledge_traces`
 

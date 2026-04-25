@@ -8,5 +8,6 @@ import { LibraryService } from './services/library.service';
   imports: [AuthModule, ContentModule],
   controllers: [LibraryController],
   providers: [LibraryService],
+  exports: [LibraryService],
 })
 export class LibraryModule {}

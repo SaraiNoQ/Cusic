@@ -320,18 +320,47 @@ components:
                     type: string
     ChatTurnResponseDto:
       type: object
-      required: [sessionId, messageId, replyText, actions]
+      required: [sessionId, messageId, intent, replyText, actions]
       properties:
         sessionId:
           type: string
         messageId:
           type: string
+        intent:
+          type: string
+          enum:
+            [
+              queue_replace,
+              queue_append,
+              recommend_explain,
+              theme_playlist_preview,
+            ]
         replyText:
           type: string
         actions:
           type: array
           items:
             $ref: '#/components/schemas/AiDjActionDto'
+    SaveAiPlaylistRequestDto:
+      type: object
+      required: [sessionId, messageId]
+      properties:
+        sessionId:
+          type: string
+        messageId:
+          type: string
+        title:
+          type: string
+    SaveAiPlaylistResponseDto:
+      type: object
+      required: [created, playlist]
+      properties:
+        created:
+          type: boolean
+        playlist:
+          anyOf:
+            - $ref: '#/components/schemas/PlaylistSummaryDto'
+            - type: 'null'
     AiDjStreamChunkEventDto:
       type: object
       required: [event, sessionId, messageId, delta]
@@ -391,6 +420,20 @@ components:
           enum: [text, action]
         text:
           type: string
+        intent:
+          type: string
+          nullable: true
+          enum:
+            [
+              queue_replace,
+              queue_append,
+              recommend_explain,
+              theme_playlist_preview,
+            ]
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AiDjActionDto'
         createdAt:
           type: string
           format: date-time
@@ -850,6 +893,24 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ChatSessionMessageDto'
+  /dj/playlists:
+    post:
+      summary: Save an AI DJ theme preview as a playlist
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveAiPlaylistRequestDto'
+      responses:
+        '200':
+          description: AI playlist saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaveAiPlaylistResponseDto'
   /dj/chat/stream:
     get:
       summary: Stream DJ response over SSE

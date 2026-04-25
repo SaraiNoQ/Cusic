@@ -572,6 +572,7 @@ export function usePlayerController() {
     favoriteIds,
     selectedPlaylistId,
     setSelectedPlaylistId,
+    refreshPlaylists: () => playlistsQuery.refetch(),
     playTrack,
     addToQueue,
     appendTracks,

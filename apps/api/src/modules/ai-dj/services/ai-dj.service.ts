@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type {
   AiDjActionDto,
+  AiDjIntent,
   AiDjStreamActionsEventDto,
   AiDjStreamChunkEventDto,
   AiDjStreamDoneEventDto,
@@ -13,10 +14,12 @@ import type {
   ChatSurfaceContextDto,
   ChatTurnRequestDto,
   ChatTurnResponseDto,
+  SaveAiPlaylistResponseDto,
 } from '@music-ai/shared';
 import {
   ChatRole,
   MessageType,
+  PlaylistType,
   Prisma,
   SessionMode,
   type ChatMessage,
@@ -24,6 +27,7 @@ import {
 import { Observable } from 'rxjs';
 import type { AuthenticatedUser } from '../../auth/services/auth.service';
 import { ContentService } from '../../content/services/content.service';
+import { LibraryService } from '../../library/services/library.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RecommendationService } from '../../recommendation/services/recommendation.service';
 
@@ -32,11 +36,7 @@ type ReplyInput = ChatTurnRequestDto & {
   timezoneHeader?: string;
 };
 
-type ResolvedIntent =
-  | 'queue_replace'
-  | 'queue_append'
-  | 'recommend_explain'
-  | 'theme_playlist_preview';
+type ResolvedIntent = AiDjIntent;
 
 type ReplyPlan = {
   intent: ResolvedIntent;
@@ -62,6 +62,7 @@ export class AiDjService {
     private readonly prisma: PrismaService,
     private readonly contentService: ContentService,
     private readonly recommendationService: RecommendationService,
+    private readonly libraryService: LibraryService,
   ) {}
 
   async reply(input: ReplyInput): Promise<ChatTurnResponseDto> {
@@ -82,6 +83,7 @@ export class AiDjService {
       const response = {
         sessionId: input.sessionId ?? this.createAnonymousSessionId(),
         messageId: this.createAnonymousMessageId(),
+        intent: plan.intent,
         replyText: plan.replyText,
         actions: plan.actions,
       };
@@ -108,6 +110,7 @@ export class AiDjService {
     const response = {
       sessionId: persisted.sessionId,
       messageId: persisted.messageId,
+      intent: plan.intent,
       replyText: plan.replyText,
       actions: plan.actions,
     };
@@ -150,6 +153,113 @@ export class AiDjService {
     }
 
     return session.messages.map((message) => this.toSessionMessageDto(message));
+  }
+
+  async saveGeneratedPlaylist(input: {
+    userId: string;
+    sessionId: string;
+    messageId: string;
+    title?: string;
+  }): Promise<SaveAiPlaylistResponseDto> {
+    const assistantMessage = await this.prisma.chatMessage.findFirst({
+      where: {
+        id: input.messageId,
+        role: ChatRole.ASSISTANT,
+        chatSession: {
+          id: input.sessionId,
+          userId: input.userId,
+          deletedAt: null,
+        },
+      },
+      include: {
+        chatSession: true,
+      },
+    });
+
+    if (!assistantMessage) {
+      throw new NotFoundException('AI DJ message was not found');
+    }
+
+    const existingPlaylists = await this.prisma.playlist.findMany({
+      where: {
+        userId: input.userId,
+        playlistType: PlaylistType.AI_GENERATED,
+        deletedAt: null,
+      },
+      include: {
+        _count: {
+          select: { items: true },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 50,
+    });
+
+    const existing = existingPlaylists.find((playlist) => {
+      const metadata = this.readJsonObject(playlist.generatedContextJson);
+      return metadata?.sourceMessageId === input.messageId;
+    });
+
+    if (existing) {
+      return {
+        created: false,
+        playlist: {
+          id: existing.id,
+          title: existing.title,
+          description: existing.description ?? '',
+          playlistType: 'ai_generated',
+          itemCount: existing._count.items,
+        },
+      };
+    }
+
+    const trace = this.readJsonObject(assistantMessage.traceJson);
+    const intent = this.readIntentFromTrace(trace);
+    if (intent !== 'theme_playlist_preview') {
+      throw new BadRequestException(
+        'Only theme playlist preview replies can be saved as playlists',
+      );
+    }
+
+    const draft = this.readPlaylistDraftFromTrace(trace);
+    const actionIds = this.extractActionContentIds(
+      this.readActionsFromContentJson(assistantMessage.contentJson),
+    );
+    const contentIds = draft?.contentIds?.length ? draft.contentIds : actionIds;
+
+    if (contentIds.length === 0) {
+      throw new BadRequestException(
+        'This AI DJ reply does not contain a savable playlist draft',
+      );
+    }
+
+    const playlist = await this.libraryService.createAiGeneratedPlaylist(
+      {
+        title:
+          input.title?.trim() ||
+          draft?.title ||
+          this.buildSavedPlaylistTitle(assistantMessage.chatSession.title),
+        description:
+          draft?.description ||
+          'Generated from an AI DJ theme preview inside the current listening lane.',
+        contentIds,
+        generatedContext: {
+          source: 'ai_dj',
+          sourceSessionId: input.sessionId,
+          sourceMessageId: input.messageId,
+          intent,
+        },
+        reasonText: assistantMessage.contentText ?? undefined,
+      },
+      input.userId,
+    );
+
+    return {
+      created: true,
+      playlist,
+    };
   }
 
   streamReply(input: {
@@ -372,6 +482,7 @@ export class AiDjService {
       }
       case 'theme_playlist_preview': {
         const picks = (await this.resolveContentIds(normalized)).slice(0, 3);
+        const playlistDraft = this.buildPlaylistDraft(message, picks);
         return {
           intent,
           replyText:
@@ -390,6 +501,7 @@ export class AiDjService {
           trace: {
             intent,
             matchedContentIds: picks,
+            playlistDraft,
           },
         };
       }
@@ -562,12 +674,15 @@ export class AiDjService {
   }
 
   private toSessionMessageDto(message: ChatMessage): ChatSessionMessageDto {
+    const trace = this.readJsonObject(message.traceJson);
     return {
       id: message.id,
       role: message.role === ChatRole.USER ? 'user' : 'assistant',
       messageType:
         message.messageType === MessageType.ACTION ? 'action' : 'text',
       text: message.contentText ?? '',
+      intent: this.readIntentFromTrace(trace),
+      actions: this.readActionsFromContentJson(message.contentJson),
       createdAt: message.createdAt.toISOString(),
     };
   }
@@ -578,6 +693,80 @@ export class AiDjService {
 
   private registerStreamPayload(payload: StreamPayload) {
     this.streamPayloads.set(payload.messageId, payload);
+  }
+
+  private buildPlaylistDraft(message: string, contentIds: string[]) {
+    const cleaned = message
+      .replace(/\s+/g, ' ')
+      .replace(/[。！？!?]$/u, '')
+      .trim();
+    const subject = cleaned.slice(0, 32) || 'Current AI DJ signal';
+    return {
+      title: `${subject} - AI DJ`,
+      description:
+        'A reusable playlist captured from an AI DJ theme preview inside the current player lane.',
+      contentIds,
+    };
+  }
+
+  private buildSavedPlaylistTitle(sessionTitle?: string | null) {
+    const base = sessionTitle?.trim();
+    if (!base) {
+      return 'AI DJ Theme Draft';
+    }
+
+    return `${base.slice(0, 32)} - AI DJ`;
+  }
+
+  private readIntentFromTrace(trace: Record<string, unknown> | null) {
+    if (!trace) {
+      return null;
+    }
+
+    const value = trace.intent;
+    if (
+      value === 'queue_replace' ||
+      value === 'queue_append' ||
+      value === 'recommend_explain' ||
+      value === 'theme_playlist_preview'
+    ) {
+      return value;
+    }
+
+    return null;
+  }
+
+  private readPlaylistDraftFromTrace(trace: Record<string, unknown> | null) {
+    const raw = trace?.playlistDraft;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return null;
+    }
+
+    const data = raw as Record<string, unknown>;
+    const contentIds = Array.isArray(data.contentIds)
+      ? data.contentIds.filter(
+          (item): item is string => typeof item === 'string',
+        )
+      : [];
+
+    return {
+      title: typeof data.title === 'string' ? data.title : undefined,
+      description:
+        typeof data.description === 'string' ? data.description : undefined,
+      contentIds,
+    };
+  }
+
+  private readJsonObject(value: Prisma.JsonValue | null | undefined) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+
+    return value as Record<string, unknown>;
+  }
+
+  private extractActionContentIds(actions: AiDjActionDto[]) {
+    return [...new Set(actions.flatMap((action) => action.payload.contentIds))];
   }
 
   private async resolveStreamPayload(input: {

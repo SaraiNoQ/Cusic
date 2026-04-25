@@ -4,6 +4,8 @@ import type {
   ChatSessionMessageDto,
   ChatTurnRequestDto,
   ChatTurnResponseDto,
+  SaveAiPlaylistRequestDto,
+  SaveAiPlaylistResponseDto,
 } from '@music-ai/shared';
 import { readAuthSession } from './auth-session';
 import { apiFetch, getApiBaseUrl } from './client';
@@ -21,6 +23,17 @@ export async function fetchDjSessionMessages(sessionId: string) {
   const response = await apiFetch<ApiSuccessEnvelope<ChatSessionMessageDto[]>>(
     `/dj/sessions/${sessionId}/messages`,
   );
+
+  return response.data;
+}
+
+export async function saveAiPlaylist(input: SaveAiPlaylistRequestDto) {
+  const response = await apiFetch<
+    ApiSuccessEnvelope<SaveAiPlaylistResponseDto>
+  >('/dj/playlists', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
 
   return response.data;
 }

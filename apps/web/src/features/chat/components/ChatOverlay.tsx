@@ -10,9 +10,12 @@ export function ChatOverlay({
   input,
   isPending,
   prompts,
+  canSaveGeneratedPlaylists,
+  savingPlaylistMessageId,
   onClose,
   onInputChange,
   onPromptSelect,
+  onSavePlaylist,
   onSubmit,
 }: Readonly<{
   isOpen: boolean;
@@ -20,9 +23,12 @@ export function ChatOverlay({
   input: string;
   isPending: boolean;
   prompts: string[];
+  canSaveGeneratedPlaylists: boolean;
+  savingPlaylistMessageId?: string;
   onClose: () => void;
   onInputChange: (value: string) => void;
   onPromptSelect: (prompt: string) => void;
+  onSavePlaylist: (messageId: string) => void;
   onSubmit: () => void;
 }>) {
   if (!isOpen) {
@@ -49,7 +55,13 @@ export function ChatOverlay({
 
         <div className={styles.chatOverlayBody}>
           <PromptChips prompts={prompts} onSelect={onPromptSelect} />
-          <ChatMessageList messages={messages} isPending={isPending} />
+          <ChatMessageList
+            messages={messages}
+            isPending={isPending}
+            canSaveGeneratedPlaylists={canSaveGeneratedPlaylists}
+            savingPlaylistMessageId={savingPlaylistMessageId}
+            onSavePlaylist={onSavePlaylist}
+          />
           <ChatComposer
             value={input}
             isPending={isPending}

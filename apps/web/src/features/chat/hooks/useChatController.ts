@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { fetchContentById } from '../../../lib/api/content-api';
 import {
   fetchDjSessionMessages,
+  saveAiPlaylist,
   streamDjMessage,
   submitDjMessage,
 } from '../../../lib/api/dj-api';
@@ -25,6 +26,8 @@ function toChatVm(message: ChatSessionMessageDto): ChatMessageVm {
     id: message.id,
     role: message.role === 'user' ? 'user' : 'assistant',
     text: message.text,
+    intent: message.intent ?? null,
+    actions: message.actions ?? [],
   };
 }
 
@@ -99,6 +102,16 @@ export function useChatController(playerController: PlayerController) {
           queueContentIds: playerController.queue.map((item) => item.id),
         },
       }),
+  });
+
+  const savePlaylistMutation = useMutation({
+    mutationFn: async ({
+      sessionId,
+      messageId,
+    }: {
+      sessionId: string;
+      messageId: string;
+    }) => saveAiPlaylist({ sessionId, messageId }),
   });
 
   useEffect(() => {
@@ -191,6 +204,8 @@ export function useChatController(playerController: PlayerController) {
         id: response.data.messageId,
         role: 'assistant',
         text: '',
+        intent: response.data.intent,
+        actions: response.data.actions,
       });
 
       let streamedReply = '';
@@ -237,6 +252,36 @@ export function useChatController(playerController: PlayerController) {
     }
   };
 
+  const savePlaylistFromMessage = async (messageId: string) => {
+    if (!authUser) {
+      setStatusText('Login is required before AI DJ can save a playlist.');
+      return;
+    }
+
+    if (!sessionId) {
+      setStatusText('This AI DJ draft is not attached to a live session yet.');
+      return;
+    }
+
+    try {
+      const result = await savePlaylistMutation.mutateAsync({
+        sessionId,
+        messageId,
+      });
+      if (result.playlist?.id) {
+        playerController.setSelectedPlaylistId(result.playlist.id);
+      }
+      void playerController.refreshPlaylists();
+      setStatusText(
+        result.created
+          ? `Saved ${result.playlist?.title ?? 'the AI DJ draft'} to your library.`
+          : `${result.playlist?.title ?? 'That AI DJ draft'} is already in your library.`,
+      );
+    } catch {
+      setStatusText('AI DJ could not persist that draft into your library.');
+    }
+  };
+
   return {
     sessionId,
     input,
@@ -245,7 +290,12 @@ export function useChatController(playerController: PlayerController) {
     hasHydratedSession,
     setInput,
     sendMessage,
+    savePlaylistFromMessage,
+    savingPlaylistMessageId: savePlaylistMutation.isPending
+      ? savePlaylistMutation.variables?.messageId
+      : undefined,
     hydrateConversation,
     resetConversation,
+    canSaveGeneratedPlaylists: Boolean(authUser),
   };
 }

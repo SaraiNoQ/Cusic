@@ -726,6 +726,7 @@ Content-Type: application/json
 6. 当前支持动作：
    - `queue_replace`
    - `queue_append`
+7. 当 `intent=theme_playlist_preview` 且用户已登录时，前端可调用 `POST /dj/playlists` 把本轮主题预览保存为 `ai_generated` 歌单。
 
 请求 DTO：
 
@@ -749,6 +750,7 @@ Content-Type: application/json
   "data": {
     "sessionId": "chat_01",
     "messageId": "msg_02",
+    "intent": "theme_playlist_preview",
     "replyText": "可以，先给你三首偏夜间氛围的粤语歌。",
     "actions": [
       {
@@ -770,7 +772,7 @@ Content-Type: application/json
 
 1. 必须登录。
 2. 只允许读取当前用户自己的会话。
-3. 仅返回可直接渲染的 `user/assistant` 文本消息。
+3. 返回可直接渲染的 `user/assistant` 文本消息，并携带 `intent/actions` 供前端恢复可继续执行的 UI 状态。
 
 响应 DTO：
 
@@ -790,13 +792,61 @@ Content-Type: application/json
       "role": "assistant",
       "messageType": "action",
       "text": "收到。我把主频道切到更贴近你这句指令的航线。",
+      "intent": "theme_playlist_preview",
+      "actions": [
+        {
+          "type": "queue_replace",
+          "payload": {
+            "contentIds": ["cnt_01", "cnt_02", "cnt_03"]
+          }
+        }
+      ],
       "createdAt": "2026-04-25T13:20:01.000Z"
     }
   ]
 }
 ```
 
-### 7.3 `GET /dj/chat/stream`
+### 7.3 `POST /dj/playlists`
+
+用途：将某条 AI DJ 的主题预览结果保存为个人音乐库中的 `ai_generated` 歌单。
+
+首版实现约束：
+
+1. 必须登录。
+2. 只能保存当前登录用户自己会话中的助手消息。
+3. 只有 `theme_playlist_preview` 类型回复允许保存。
+4. 服务端会读取助手消息里的结构化 `actions + trace_json`，以对应内容项创建歌单。
+5. 对同一条 `messageId` 重复保存时保持幂等，直接返回已存在歌单，不重复创建。
+
+请求 DTO：
+
+```json
+{
+  "sessionId": "chat_01",
+  "messageId": "msg_02"
+}
+```
+
+响应 DTO：
+
+```json
+{
+  "success": true,
+  "data": {
+    "created": true,
+    "playlist": {
+      "id": "pl_ai_01",
+      "title": "来几首粤语夜间听感 - AI DJ",
+      "description": "A reusable playlist captured from an AI DJ theme preview inside the current player lane.",
+      "playlistType": "ai_generated",
+      "itemCount": 3
+    }
+  }
+}
+```
+
+### 7.4 `GET /dj/chat/stream`
 
 用途：以 SSE 接收 AI DJ 流式回复。
 

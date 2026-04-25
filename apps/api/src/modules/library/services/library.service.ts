@@ -12,6 +12,7 @@ import type {
 import {
   ContentType as PrismaContentType,
   PlaylistType,
+  Prisma,
   SourceType,
 } from '@prisma/client';
 import { ContentService } from '../../content/services/content.service';
@@ -159,6 +160,65 @@ export class LibraryService {
     const { contentIds: _contentIds, ...summary } = playlist;
 
     return this.toPlaylistSummary(summary);
+  }
+
+  async createAiGeneratedPlaylist(
+    input: {
+      title: string;
+      description: string;
+      contentIds: string[];
+      generatedContext?: Record<string, unknown>;
+      reasonText?: string;
+    },
+    userId: string,
+  ): Promise<PlaylistSummaryDto> {
+    const uniqueIds = [...new Set(input.contentIds)];
+    const validIds: string[] = [];
+
+    for (const contentId of uniqueIds) {
+      const contentItem =
+        await this.contentService.ensureContentItem(contentId);
+      if (contentItem) {
+        validIds.push(contentItem.id);
+      }
+    }
+
+    const playlist = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.playlist.create({
+        data: {
+          userId,
+          title: input.title,
+          description: input.description,
+          playlistType: PlaylistType.AI_GENERATED,
+          sourceType: SourceType.AI,
+          generatedContextJson: input.generatedContext as
+            | Prisma.InputJsonValue
+            | undefined,
+        },
+      });
+
+      for (const [index, contentItemId] of validIds.entries()) {
+        await tx.playlistItem.create({
+          data: {
+            playlistId: created.id,
+            contentItemId,
+            position: index + 1,
+            addedByType: SourceType.AI,
+            reasonText: input.reasonText,
+          },
+        });
+      }
+
+      return created;
+    });
+
+    return this.toPlaylistSummary({
+      id: playlist.id,
+      title: playlist.title,
+      description: playlist.description ?? '',
+      playlistType: this.fromPrismaPlaylistType(playlist.playlistType),
+      itemCount: validIds.length,
+    });
   }
 
   async updatePlaylist(
@@ -314,9 +374,8 @@ export class LibraryService {
         if (existingIds.has(contentId)) {
           continue;
         }
-        const contentItem = await this.contentService.ensureContentItem(
-          contentId,
-        );
+        const contentItem =
+          await this.contentService.ensureContentItem(contentId);
         if (contentItem) {
           validIds.push(contentItem.id);
         }
@@ -666,9 +725,7 @@ export class LibraryService {
     }
   }
 
-  private toPlaylistSummary(
-    playlist: PlaylistSummaryDto,
-  ): PlaylistSummaryDto {
+  private toPlaylistSummary(playlist: PlaylistSummaryDto): PlaylistSummaryDto {
     return {
       id: playlist.id,
       title: playlist.title,

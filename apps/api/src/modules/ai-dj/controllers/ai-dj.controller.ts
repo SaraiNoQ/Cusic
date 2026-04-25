@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
   ApiQuery,
   ApiResponse,
@@ -23,6 +24,7 @@ import { RequestWithUser } from '../../auth/guards/jwt-auth.guard';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../../auth/guards/optional-jwt-auth.guard';
 import { ChatTurnDto } from '../dto/chat-turn.dto';
+import { SaveAiPlaylistDto } from '../dto/save-ai-playlist.dto';
 import { AiDjService } from '../services/ai-dj.service';
 
 @ApiTags('ai-dj')
@@ -65,6 +67,27 @@ export class AiDjController {
         sessionId,
         request.user!.id,
       ),
+      meta: {},
+    };
+  }
+
+  @Post('playlists')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Save an AI DJ theme preview as a playlist' })
+  @ApiBody({ type: SaveAiPlaylistDto })
+  @ApiResponse({ status: 200, description: 'AI playlist saved' })
+  async saveAiPlaylist(
+    @Body() body: SaveAiPlaylistDto,
+    @Req() request: RequestWithUser,
+  ) {
+    return {
+      success: true,
+      data: await this.aiDjService.saveGeneratedPlaylist({
+        userId: request.user!.id,
+        sessionId: body.sessionId,
+        messageId: body.messageId,
+        title: body.title,
+      }),
       meta: {},
     };
   }

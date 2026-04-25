@@ -236,6 +236,12 @@ export interface ChatTurnRequestDto {
   surfaceContext?: ChatSurfaceContextDto;
 }
 
+export type AiDjIntent =
+  | 'queue_replace'
+  | 'queue_append'
+  | 'recommend_explain'
+  | 'theme_playlist_preview';
+
 export interface AiDjQueueReplaceActionDto {
   type: 'queue_replace';
   payload: {
@@ -257,6 +263,7 @@ export type AiDjActionDto =
 export interface ChatTurnResponseDto {
   sessionId: string;
   messageId: string;
+  intent: AiDjIntent;
   replyText: string;
   actions: AiDjActionDto[];
 }
@@ -293,6 +300,8 @@ export interface ChatSessionMessageDto {
   role: 'assistant' | 'user';
   messageType: 'text' | 'action';
   text: string;
+  intent?: AiDjIntent | null;
+  actions?: AiDjActionDto[];
   createdAt: string;
 }
 
@@ -300,6 +309,19 @@ export interface ChatMessageVm {
   id: string;
   role: 'assistant' | 'user';
   text: string;
+  intent?: AiDjIntent | null;
+  actions?: AiDjActionDto[];
+}
+
+export interface SaveAiPlaylistRequestDto {
+  sessionId: string;
+  messageId: string;
+  title?: string;
+}
+
+export interface SaveAiPlaylistResponseDto {
+  created: boolean;
+  playlist: PlaylistSummaryDto | null;
 }
 
 export interface PlayerSurfaceState {

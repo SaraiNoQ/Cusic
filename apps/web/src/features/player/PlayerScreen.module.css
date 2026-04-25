@@ -1873,6 +1873,28 @@
   line-height: 1.6;
 }
 
+.chatBubbleActions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.chatActionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(190, 143, 93, 0.42);
+  border-radius: 999px;
+  color: rgba(238, 224, 205, 0.82);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+.chatActionButton:disabled {
+  opacity: 0.6;
+}
+
 .chatOverlayBody .composer {
   margin-top: 0;
 }
