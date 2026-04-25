@@ -45,6 +45,20 @@ export class ImportsService {
     return this.toImportJobDto(job);
   }
 
+  async listImportJobs(userId: string): Promise<ImportJobDto[]> {
+    const jobs = await this.prisma.importJob.findMany({
+      where: {
+        userId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 20,
+    });
+
+    return jobs.map((job) => this.toImportJobDto(job));
+  }
+
   private toPrismaJobType(input: 'playlist' | 'history') {
     return input === 'history'
       ? JobType.HISTORY_IMPORT

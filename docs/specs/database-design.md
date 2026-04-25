@@ -712,6 +712,7 @@
 1. imports 首版先只做任务持久化基线，不接真实第三方 provider 抓取。
 2. `input_payload_json` 保留用户提交的导入参数，`result_summary_json` 首版只写入任务已受理的摘要信息。
 3. `job_type` 当前只落 `PLAYLIST_IMPORT` 与 `HISTORY_IMPORT`，后续 worker 再负责真正执行。
+4. `GET /imports` 当前按 `created_at desc` 读取最近 20 条任务，作为导入历史面板的后端基线。
 
 #### 3.9.2 `daily_playlist_jobs`
 

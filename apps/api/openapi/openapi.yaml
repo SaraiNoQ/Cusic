@@ -1022,6 +1022,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ImportJobDto'
+  /imports:
+    get:
+      summary: List import jobs
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Import job list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ImportJobDto'
   /imports/{jobId}:
     get:
       summary: Get import job status

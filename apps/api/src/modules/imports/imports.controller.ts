@@ -27,6 +27,23 @@ import { ImportsService } from './imports.service';
 export class ImportsController {
   constructor(private readonly importsService: ImportsService) {}
 
+  @Get()
+  @ApiOperation({ summary: 'List import jobs' })
+  @ApiResponse({ status: 200, description: 'Import job list' })
+  async listImportJobs(@Req() request: RequestWithUser) {
+    const items = await this.importsService.listImportJobs(request.user!.id);
+
+    return {
+      success: true,
+      data: {
+        items,
+      },
+      meta: {
+        total: items.length,
+      },
+    };
+  }
+
   @Post('playlists')
   @ApiOperation({ summary: 'Create playlist or history import job' })
   @ApiBody({ type: CreateImportJobDto })

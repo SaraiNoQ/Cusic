@@ -958,7 +958,17 @@ Content-Type: application/json
 
 ## 8. 导入、任务与系统接口
 
-### 8.1 `POST /imports/playlists`
+### 8.1 `GET /imports`
+
+用途：列出当前登录用户最近的导入任务。
+
+首版实现约束：
+
+1. 必须登录。
+2. 默认按 `createdAt desc` 返回最近 20 条。
+3. 当前只返回任务摘要列表，不做分页参数开放。
+
+### 8.2 `POST /imports/playlists`
 
 用途：提交歌单或历史导入任务。
 
@@ -1007,7 +1017,7 @@ Content-Type: application/json
 }
 ```
 
-### 8.2 `GET /imports/:jobId`
+### 8.3 `GET /imports/:jobId`
 
 用途：查询导入任务状态。
 
