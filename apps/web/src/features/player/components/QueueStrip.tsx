@@ -5,10 +5,12 @@ export function QueueStrip({
   queue,
   activeIndex,
   onSelectIndex,
+  onOpenRecommendation,
 }: Readonly<{
   queue: ContentItemDto[];
   activeIndex: number;
   onSelectIndex: (index: number) => void;
+  onOpenRecommendation: () => void;
 }>) {
   const activeTrack = queue[activeIndex] ?? queue[0] ?? null;
 
@@ -16,7 +18,16 @@ export function QueueStrip({
     <section className={styles.queuePanel}>
       <div className={styles.queueHeader}>
         <span>QUEUE</span>
-        <span>{queue.length} TRACKS</span>
+        <div className={styles.queueHeaderMeta}>
+          <button
+            type="button"
+            className={styles.queueUtilityButton}
+            onClick={onOpenRecommendation}
+          >
+            RADAR
+          </button>
+          <span>{queue.length} TRACKS</span>
+        </div>
       </div>
       <button
         type="button"

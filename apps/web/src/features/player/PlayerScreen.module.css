@@ -1060,6 +1060,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 9px 14px 10px;
   color: rgba(230, 222, 207, 0.64);
   font-size: 15px;
@@ -1068,6 +1069,35 @@
 
 .queueHeader span:first-child {
   color: #ff9a3c;
+}
+
+.queueHeaderMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.queueUtilityButton {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(191, 139, 101, 0.48);
+  border-radius: 999px;
+  background: rgba(8, 15, 23, 0.88);
+  color: #f2d3a4;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.queueUtilityButton:hover {
+  border-color: rgba(255, 153, 44, 0.82);
+  color: #ffb365;
+  box-shadow: 0 0 18px rgba(255, 147, 45, 0.16);
+  transform: translateY(-1px);
 }
 
 .queueChannel {
@@ -1133,8 +1163,6 @@
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
   gap: 12px;
-  padding: 0 16px 12px;
-  background: rgba(3, 8, 13, 0.58);
 }
 
 .recommendationCard,
@@ -1272,7 +1300,7 @@
 .chatSection {
   flex: 1;
   min-height: 0;
-  padding: 0 16px;
+  padding: 0 16px 16px;
   background: rgba(3, 8, 13, 0.58);
 }
 
@@ -1705,6 +1733,32 @@
     rgba(4, 9, 14, 0.98)
   );
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58);
+}
+
+.recommendationOverlayCard {
+  position: relative;
+  z-index: 1;
+  align-self: center;
+  width: min(100%, 920px);
+  max-height: min(760px, calc(100dvh - 48px));
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(184, 139, 101, 0.36);
+  border-radius: 28px;
+  background:
+    radial-gradient(
+      circle at 18% 8%,
+      rgba(255, 191, 116, 0.08),
+      transparent 36%
+    ),
+    linear-gradient(180deg, rgba(8, 16, 24, 0.97), rgba(4, 9, 14, 0.985));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58);
+}
+
+.recommendationOverlayBody {
+  margin-top: 18px;
+  max-height: calc(min(760px, calc(100dvh - 48px)) - 112px);
+  overflow: auto;
 }
 
 .authCard {
@@ -2207,7 +2261,6 @@
 
   .controlStrip,
   .queuePanel,
-  .recommendationPanel,
   .chatSection {
     padding-right: 10px;
     padding-left: 10px;
@@ -2267,6 +2320,16 @@
     font-size: 12px;
   }
 
+  .queueHeaderMeta {
+    gap: 8px;
+  }
+
+  .queueUtilityButton {
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: 10px;
+  }
+
   .queueChannel {
     min-height: 54px;
     gap: 10px;
@@ -2292,6 +2355,16 @@
     height: calc(100% - 30px);
     padding: 12px 12px 10px;
     border-radius: 22px;
+  }
+
+  .recommendationOverlayCard {
+    width: min(100%, 680px);
+    padding: 16px;
+  }
+
+  .recommendationOverlayBody {
+    margin-top: 14px;
+    max-height: calc(100dvh - 168px);
   }
 
   .djMessageRow {

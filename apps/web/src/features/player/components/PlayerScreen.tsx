@@ -8,13 +8,14 @@ import { useChatController } from '../../chat/hooks/useChatController';
 import { SearchOverlay } from '../../search/components/SearchOverlay';
 import { useSearchController } from '../../search/hooks/useSearchController';
 import { useAuthStore } from '../../../store/auth-store';
+import { useUiStore } from '../../../store/ui-store';
 import styles from '../PlayerScreen.module.css';
 import { usePlayerController } from '../hooks/usePlayerController';
 import { ControlStrip } from './ControlStrip';
 import { DeviceHeader } from './DeviceHeader';
 import { FlipClock } from './FlipClock';
 import { QueueStrip } from './QueueStrip';
-import { RecommendationPanel } from './RecommendationPanel';
+import { RecommendationOverlay } from './RecommendationOverlay';
 
 const promptSuggestions = [
   '来一组深夜写作的粤语歌',
@@ -27,6 +28,12 @@ export function PlayerScreen() {
   const player = usePlayerController();
   const chat = useChatController(player);
   const search = useSearchController();
+  const isRecommendationOpen = useUiStore(
+    (state) => state.isRecommendationOpen,
+  );
+  const setRecommendationOpen = useUiStore(
+    (state) => state.setRecommendationOpen,
+  );
   const authUser = useAuthStore((state) => state.user);
   const isAuthOpen = useAuthStore((state) => state.isAuthOpen);
   const isAuthPending = useAuthStore((state) => state.isPending);
@@ -45,7 +52,7 @@ export function PlayerScreen() {
   }, [hydrateAuth]);
 
   useEffect(() => {
-    if (!search.isSearchOpen) {
+    if (!search.isSearchOpen && !isRecommendationOpen) {
       return;
     }
 
@@ -55,7 +62,7 @@ export function PlayerScreen() {
     return () => {
       document.body.style.overflow = previous;
     };
-  }, [search.isSearchOpen]);
+  }, [isRecommendationOpen, search.isSearchOpen]);
 
   useEffect(() => {
     const shell = shellRef.current;
@@ -86,6 +93,26 @@ export function PlayerScreen() {
     };
   }, []);
 
+  const openRecommendation = () => {
+    search.closeSearch();
+    closeAuth();
+    setRecommendationOpen(true);
+  };
+
+  const closeRecommendation = () => {
+    setRecommendationOpen(false);
+  };
+
+  const openSearch = () => {
+    closeRecommendation();
+    search.openSearch();
+  };
+
+  const openAuthPanel = () => {
+    closeRecommendation();
+    openAuth();
+  };
+
   return (
     <main className={styles.screen}>
       <AtmosphereCanvas
@@ -114,8 +141,8 @@ export function PlayerScreen() {
             className={`${styles.deviceShell} ${player.isPlaying ? styles.deviceShellLive : ''}`}
           >
             <DeviceHeader
-              onOpenSearch={search.openSearch}
-              onOpenAuth={openAuth}
+              onOpenSearch={openSearch}
+              onOpenAuth={openAuthPanel}
               onLogout={() => void logout()}
               userLabel={authUser?.displayName ?? authUser?.email ?? null}
               isPlaying={player.isPlaying}
@@ -163,14 +190,7 @@ export function PlayerScreen() {
               queue={player.queue}
               activeIndex={player.activeIndex}
               onSelectIndex={(index) => void player.playQueueIndex(index)}
-            />
-
-            <RecommendationPanel
-              nowRecommendation={player.nowRecommendation}
-              dailyPlaylist={player.dailyPlaylist}
-              onPlay={(track) => void player.playTrack(track)}
-              onQueue={(track) => void player.addToQueue(track)}
-              onLoadDaily={() => void player.loadDailyPlaylist()}
+              onOpenRecommendation={openRecommendation}
             />
 
             <ChatPanel
@@ -227,6 +247,22 @@ export function PlayerScreen() {
             `围绕《${track.title}》继续扩展一组更有太空电台感的曲目`,
           );
           search.closeSearch();
+        }}
+      />
+
+      <RecommendationOverlay
+        isOpen={isRecommendationOpen}
+        nowRecommendation={player.nowRecommendation}
+        dailyPlaylist={player.dailyPlaylist}
+        onClose={closeRecommendation}
+        onPlay={(track) => {
+          void player.playTrack(track);
+          closeRecommendation();
+        }}
+        onQueue={(track) => void player.addToQueue(track)}
+        onLoadDaily={() => {
+          void player.loadDailyPlaylist();
+          closeRecommendation();
         }}
       />
 
