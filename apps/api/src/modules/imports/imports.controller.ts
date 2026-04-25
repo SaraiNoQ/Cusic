@@ -1,39 +1,48 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
   ApiParam,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { IsObject, IsString } from 'class-validator';
-
-class CreateImportJobDto {
-  @IsString()
-  providerName!: string;
-
-  @IsString()
-  importType!: string;
-
-  @IsObject()
-  payload!: Record<string, unknown>;
-}
+import { RequestWithUser } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CreateImportJobDto } from './dto/create-import-job.dto';
+import { ImportsService } from './imports.service';
 
 @ApiTags('imports')
 @ApiBearerAuth()
 @Controller('imports')
+@UseGuards(JwtAuthGuard)
 export class ImportsController {
+  constructor(private readonly importsService: ImportsService) {}
+
   @Post('playlists')
   @ApiOperation({ summary: 'Create playlist or history import job' })
+  @ApiBody({ type: CreateImportJobDto })
   @ApiResponse({ status: 200, description: 'Import job created' })
-  createImportJob(@Body() body: CreateImportJobDto) {
+  async createImportJob(
+    @Body() body: CreateImportJobDto,
+    @Req() request: RequestWithUser,
+  ) {
     return {
       success: true,
-      data: {
-        jobId: 'job_stub',
-        status: 'queued',
+      data: await this.importsService.createImportJob({
+        userId: request.user!.id,
         providerName: body.providerName,
-      },
+        importType: body.importType,
+        payload: body.payload,
+      }),
       meta: {},
     };
   }
@@ -42,15 +51,14 @@ export class ImportsController {
   @ApiOperation({ summary: 'Get import job status' })
   @ApiParam({ name: 'jobId', type: String })
   @ApiResponse({ status: 200, description: 'Import job status' })
-  getImportJob(@Param('jobId') jobId: string) {
+  async getImportJob(
+    @Param('jobId') jobId: string,
+    @Req() request: RequestWithUser,
+  ) {
     return {
       success: true,
-      data: {
-        jobId,
-        status: 'queued',
-      },
+      data: await this.importsService.getImportJob(jobId, request.user!.id),
       meta: {},
     };
   }
 }
-

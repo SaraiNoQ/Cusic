@@ -962,6 +962,13 @@ Content-Type: application/json
 
 用途：提交歌单或历史导入任务。
 
+首版实现约束：
+
+1. 必须登录。
+2. 当前只完成任务持久化基线，不真正抓取第三方平台内容。
+3. 请求会创建一条 `import_jobs` 记录，状态初始化为 `queued`。
+4. 当前支持 `importType=playlist` 与 `importType=history`，分别映射到 `PLAYLIST_IMPORT` 与 `HISTORY_IMPORT`。
+
 请求 DTO：
 
 ```json
@@ -981,7 +988,21 @@ Content-Type: application/json
   "success": true,
   "data": {
     "jobId": "job_01",
-    "status": "queued"
+    "status": "queued",
+    "providerName": "spotify",
+    "jobType": "playlist_import",
+    "payload": {
+      "playlistUrl": "https://..."
+    },
+    "resultSummary": {
+      "accepted": true,
+      "mode": "baseline_stub"
+    },
+    "errorText": null,
+    "createdAt": "2026-04-26T10:12:00.000Z",
+    "updatedAt": "2026-04-26T10:12:00.000Z",
+    "startedAt": null,
+    "finishedAt": null
   }
 }
 ```
@@ -989,6 +1010,12 @@ Content-Type: application/json
 ### 8.2 `GET /imports/:jobId`
 
 用途：查询导入任务状态。
+
+首版实现约束：
+
+1. 必须登录。
+2. 只允许读取当前用户自己的导入任务。
+3. 若任务不存在，返回 `IMPORT_JOB_NOT_FOUND` 对应的 404。
 
 ### 8.3 `GET /system/health`
 

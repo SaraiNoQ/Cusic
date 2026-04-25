@@ -361,6 +361,70 @@ components:
           anyOf:
             - $ref: '#/components/schemas/PlaylistSummaryDto'
             - type: 'null'
+    CreateImportJobRequestDto:
+      type: object
+      required: [providerName, importType, payload]
+      properties:
+        providerName:
+          type: string
+        importType:
+          type: string
+          enum: [playlist, history]
+        payload:
+          type: object
+          additionalProperties: true
+    ImportJobDto:
+      type: object
+      required:
+        [
+          jobId,
+          status,
+          providerName,
+          jobType,
+          payload,
+          resultSummary,
+          errorText,
+          createdAt,
+          updatedAt,
+          startedAt,
+          finishedAt,
+        ]
+      properties:
+        jobId:
+          type: string
+        status:
+          type: string
+          enum: [queued, running, succeeded, failed, canceled]
+        providerName:
+          type: string
+        jobType:
+          type: string
+          enum: [playlist_import, history_import]
+        payload:
+          type: object
+          additionalProperties: true
+        resultSummary:
+          anyOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        errorText:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
     AiDjStreamChunkEventDto:
       type: object
       required: [event, sessionId, messageId, delta]
@@ -943,12 +1007,26 @@ paths:
   /imports/playlists:
     post:
       summary: Create import job
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateImportJobRequestDto'
       responses:
         '200':
           description: Import accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportJobDto'
   /imports/{jobId}:
     get:
       summary: Get import job status
+      security:
+        - bearerAuth: []
       parameters:
         - in: path
           name: jobId
@@ -958,3 +1036,7 @@ paths:
       responses:
         '200':
           description: Import status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportJobDto'

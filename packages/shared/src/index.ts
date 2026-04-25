@@ -324,6 +324,35 @@ export interface SaveAiPlaylistResponseDto {
   playlist: PlaylistSummaryDto | null;
 }
 
+export type ImportJobStatus =
+  | 'queued'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'canceled';
+
+export type ImportJobType = 'playlist_import' | 'history_import';
+
+export interface CreateImportJobRequestDto {
+  providerName: string;
+  importType: 'playlist' | 'history';
+  payload: Record<string, unknown>;
+}
+
+export interface ImportJobDto {
+  jobId: string;
+  status: ImportJobStatus;
+  providerName: string;
+  jobType: ImportJobType;
+  payload: Record<string, unknown>;
+  resultSummary: Record<string, unknown> | null;
+  errorText: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
 export interface PlayerSurfaceState {
   queue: ContentItemDto[];
   currentTrack: ContentItemDto | null;
