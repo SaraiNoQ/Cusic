@@ -134,10 +134,7 @@
     var(--device-base-width),
     calc((100vw - 24px) / var(--device-scale))
   );
-  height: min(
-    var(--device-base-height),
-    calc((100vw - 24px) * 1.205)
-  );
+  height: min(var(--device-base-height), calc((100vw - 24px) * 1.205));
   min-height: 820px;
   flex-direction: column;
   overflow: hidden;
@@ -214,6 +211,7 @@
 .heroPanel,
 .controlStrip,
 .queuePanel,
+.recommendationPanel,
 .chatSection,
 .deviceFooter {
   position: relative;
@@ -1129,6 +1127,146 @@
   font-size: 16px;
   font-weight: 500;
   letter-spacing: 0.08em;
+}
+
+.recommendationPanel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+  gap: 12px;
+  padding: 0 16px 12px;
+  background: rgba(3, 8, 13, 0.58);
+}
+
+.recommendationCard,
+.dailyCard {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(89, 144, 164, 0.24);
+  border-radius: 16px;
+  background:
+    radial-gradient(
+      circle at 82% 18%,
+      rgba(255, 156, 70, 0.08),
+      transparent 28%
+    ),
+    linear-gradient(180deg, rgba(4, 10, 16, 0.76), rgba(3, 8, 13, 0.9));
+}
+
+.recommendationHeader {
+  display: grid;
+  gap: 6px;
+}
+
+.recommendationHeader span {
+  color: #ff9a3c;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+}
+
+.recommendationHeader p {
+  color: rgba(229, 219, 203, 0.72);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.recommendationList {
+  display: grid;
+  gap: 8px;
+}
+
+.recommendationItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 13px;
+  border: 1px solid rgba(82, 132, 150, 0.18);
+  border-radius: 14px;
+  background: rgba(5, 11, 17, 0.44);
+}
+
+.recommendationCopy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.recommendationCopy strong {
+  overflow: hidden;
+  color: rgba(240, 229, 213, 0.92);
+  font-size: 15px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recommendationCopy span {
+  color: rgba(128, 176, 188, 0.74);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.recommendationActions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.recommendationActions button,
+.dailySummary button {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(194, 142, 88, 0.52);
+  border-radius: 999px;
+  background: rgba(8, 15, 23, 0.88);
+  color: #f2d3a4;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.dailySummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 13px;
+  border: 1px solid rgba(82, 132, 150, 0.18);
+  border-radius: 14px;
+  background: rgba(5, 11, 17, 0.44);
+}
+
+.dailySummary div {
+  display: grid;
+  gap: 4px;
+}
+
+.dailySummary strong {
+  color: rgba(239, 228, 212, 0.92);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.dailySummary span {
+  color: rgba(104, 170, 184, 0.75);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+.dailyPreview {
+  display: flex;
+  min-height: 28px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dailyPreview span {
+  padding: 4px 8px;
+  border: 1px solid rgba(82, 132, 150, 0.18);
+  border-radius: 999px;
+  color: rgba(219, 212, 201, 0.76);
+  font-size: 12px;
 }
 
 .chatSection {
@@ -2069,9 +2207,28 @@
 
   .controlStrip,
   .queuePanel,
+  .recommendationPanel,
   .chatSection {
     padding-right: 10px;
     padding-left: 10px;
+  }
+
+  .recommendationPanel {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .recommendationItem {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .recommendationActions {
+    justify-content: flex-start;
+  }
+
+  .dailySummary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .controlPanel {

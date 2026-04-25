@@ -10,6 +10,15 @@ type ApiFetchOptions = {
   skipAuthRefresh?: boolean;
 };
 
+function getClientTimezone() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return timezone?.trim() ? timezone : null;
+}
+
 export function getApiBaseUrl() {
   const configuredBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (configuredBaseUrl) {
@@ -72,6 +81,9 @@ async function performFetch(
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...(getClientTimezone()
+        ? { 'X-Cusic-Timezone': getClientTimezone()! }
+        : {}),
       ...(!options.skipAuth && session?.accessToken
         ? { Authorization: `Bearer ${session.accessToken}` }
         : {}),

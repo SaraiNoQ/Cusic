@@ -428,6 +428,11 @@
 1. `index(user_id, created_at desc)`
 2. `index(target_type, target_id)`
 
+实现记录：
+
+1. Phase 3 首版已将 `/feedback` 写入 Prisma。
+2. 如果请求携带 `recommendation_result_id`，服务端会校验该推荐结果归属当前用户。
+
 ### 3.6 画像与上下文域
 
 #### 3.6.1 `taste_profiles`
@@ -451,6 +456,11 @@
 
 1. `unique(user_id)`
 2. `ivfflat/hnsw(embedding)`
+
+实现记录：
+
+1. Phase 3 首版在首次访问 `/profile/taste-report` 时同步生成 baseline profile。
+2. baseline profile 当前基于 `playback_events`、`favorites`、`playlists` 聚合，不依赖导入数据或外部 provider。
 
 #### 3.6.2 `taste_profile_tags`
 
@@ -489,6 +499,11 @@
 
 1. `index(user_id, created_at desc)`
 
+实现记录：
+
+1. 首次生成 baseline profile 时写入一条 snapshot。
+2. 每次 `PATCH /profile/tags` 成功后也会写入一条 snapshot，用于回溯画像变化。
+
 #### 3.6.4 `context_snapshots`
 
 用途：保存推荐与 AI DJ 使用的上下文快照。
@@ -509,6 +524,11 @@
 索引建议：
 
 1. `index(user_id, created_at desc)`
+
+实现记录：
+
+1. Phase 3 推荐基线会在 `GET /recommend/now` 和首次生成 `GET /playlist/daily` 时落上下文快照。
+2. 首版仅保证 `timezone` 与 `local_time` 真实；`location_text`、`weather_json`、`calendar_summary_json`、`task_label`、`mood_label` 暂为空。
 
 ### 3.7 推荐域
 
@@ -532,6 +552,12 @@
 1. `index(user_id, recommendation_type, created_at desc)`
 2. `index(context_snapshot_id)`
 
+实现记录：
+
+1. `recommendation_type=NOW` 用于首页“此刻推荐”。
+2. `recommendation_type=DAILY` 用于“今日歌单”生成说明。
+3. 首版 `trace_json` 记录规则版本、时区和候选数，不记录模型推理细节。
+
 #### 3.7.2 `recommendation_items`
 
 用途：记录单次推荐中的候选内容。
@@ -550,6 +576,11 @@
 
 1. `unique(recommendation_result_id, rank)`
 2. `index(recommendation_result_id, content_item_id)`
+
+实现记录：
+
+1. `rank` 从 1 开始。
+2. `reason_text` 保存规则模板化解释，供首页推荐卡片直接展示。
 
 ### 3.8 AI 对话与知识域
 

@@ -165,6 +165,7 @@ export interface RecommendationCardDto {
   contentId: string;
   title: string;
   reason: string;
+  content: ContentItemDto;
 }
 
 export interface TasteTagDto {
@@ -178,6 +179,49 @@ export interface TasteProfileDto {
   summary: string;
   explorationLevel: string;
   tags: TasteTagDto[];
+}
+
+export interface TasteTagUpdateDto {
+  type: string;
+  value: string;
+  action: 'increase' | 'decrease' | 'remove';
+}
+
+export interface UpdateTasteTagsDto {
+  updates: TasteTagUpdateDto[];
+}
+
+export interface TasteProfileUpdateResponseDto {
+  updated: number;
+  profile: TasteProfileDto;
+}
+
+export interface NowRecommendationDto {
+  recommendationId: string;
+  explanation: string;
+  items: RecommendationCardDto[];
+}
+
+export interface DailyPlaylistDto {
+  playlistId: string;
+  title: string;
+  description: string;
+  itemCount: number;
+  recommendationResultId: string | null;
+  items: ContentItemDto[];
+}
+
+export interface RecommendationFeedbackDto {
+  targetType: string;
+  targetId: string;
+  feedbackType: 'like' | 'dislike' | 'more_like_this' | 'less_like_this';
+  recommendationResultId?: string | null;
+  reasonText?: string | null;
+}
+
+export interface RecommendationFeedbackResponseDto {
+  feedbackId: string;
+  recorded: boolean;
 }
 
 export interface ChatTurnRequestDto {

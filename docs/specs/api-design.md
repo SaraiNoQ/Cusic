@@ -542,6 +542,12 @@ Content-Type: application/json
 
 用途：获取用户画像报告。
 
+实现记录：
+
+1. 该接口需要 Bearer token。
+2. 若当前用户尚无 `taste_profiles` 记录，服务端会基于 `playback_events`、`favorites`、`playlists` 同步生成一份 baseline profile。
+3. 首版标签主要覆盖 `artist`、`language`、`type`、`album`，不依赖外部导入或 LLM。
+
 响应 DTO：
 
 ```json
@@ -566,6 +572,16 @@ Content-Type: application/json
 
 用途：修正画像标签。
 
+实现记录：
+
+1. 该接口需要 Bearer token。
+2. `action` 首版支持：
+   - `increase`
+   - `decrease`
+   - `remove`
+3. `increase` 会提升正向标签权重，`decrease` 会提升负向标签权重，`remove` 会移除对应标签。
+4. 每次 patch 后都会重算 `summary`，并写入一条 `taste_profile_snapshots`。
+
 请求 DTO：
 
 ```json
@@ -580,9 +596,33 @@ Content-Type: application/json
 }
 ```
 
+响应 DTO：
+
+```json
+{
+  "success": true,
+  "data": {
+    "updated": 1,
+    "profile": {
+      "summary": "You currently lean toward zh listening and track-leaning sessions.",
+      "explorationLevel": "medium",
+      "tags": []
+    }
+  }
+}
+```
+
 ### 6.3 `GET /recommend/now`
 
 用途：获取此刻推荐。
+
+实现记录：
+
+1. 该接口允许匿名访问。
+2. 已登录用户会创建一条 `context_snapshots`，随后把推荐结果写入 `recommendation_results` 与 `recommendation_items`。
+3. 未登录用户返回 demo fallback，不写数据库。
+4. 浏览器端可通过 `X-Cusic-Timezone` 传入时区；首版上下文只保证 `timezone` 与 `local_time` 真实。
+5. 首版排序采用规则排序，不接天气、日历、外部导入，也不做向量召回。
 
 响应 DTO：
 
@@ -596,7 +636,13 @@ Content-Type: application/json
       {
         "contentId": "cnt_01",
         "title": "Song A",
-        "reason": "适合夜间专注"
+        "reason": "适合夜间专注",
+        "content": {
+          "id": "cnt_01",
+          "type": "track",
+          "title": "Song A",
+          "artists": ["Artist A"]
+        }
       }
     ]
   }
@@ -607,9 +653,38 @@ Content-Type: application/json
 
 用途：获取今日歌单。
 
+实现记录：
+
+1. 该接口允许匿名访问。
+2. 已登录用户按“每用户每天一份”同步生成或复用 daily playlist，并写入 `daily_playlist_jobs`。
+3. 首次生成时同时落一条 `DAILY` 类型 `recommendation_results`，并把 `recommendationResultId` 写入歌单 `generated_context_json`。
+4. 未登录用户返回 demo fallback。
+
+响应 DTO：
+
+```json
+{
+  "success": true,
+  "data": {
+    "playlistId": "pl_daily_01",
+    "title": "Today in Cusic",
+    "description": "A daily evening sequence shaped around zh listening and track-leaning sessions.",
+    "itemCount": 5,
+    "recommendationResultId": "rec_daily_01",
+    "items": []
+  }
+}
+```
+
 ### 6.5 `POST /feedback`
 
 用途：提交推荐或内容反馈。
+
+实现记录：
+
+1. 该接口需要 Bearer token。
+2. 若传入 `recommendationResultId`，服务端会校验该结果属于当前用户。
+3. 成功请求写入 `preference_feedback`。
 
 请求 DTO：
 
@@ -623,9 +698,17 @@ Content-Type: application/json
 }
 ```
 
-错误码：
+响应 DTO：
 
-1. `FEEDBACK_TARGET_INVALID`
+```json
+{
+  "success": true,
+  "data": {
+    "feedbackId": "fb_01",
+    "recorded": true
+  }
+}
+```
 
 ## 7. AI DJ 与语音接口
 

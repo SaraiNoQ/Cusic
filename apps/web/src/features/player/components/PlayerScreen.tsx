@@ -14,6 +14,7 @@ import { ControlStrip } from './ControlStrip';
 import { DeviceHeader } from './DeviceHeader';
 import { FlipClock } from './FlipClock';
 import { QueueStrip } from './QueueStrip';
+import { RecommendationPanel } from './RecommendationPanel';
 
 const promptSuggestions = [
   '来一组深夜写作的粤语歌',
@@ -162,6 +163,14 @@ export function PlayerScreen() {
               queue={player.queue}
               activeIndex={player.activeIndex}
               onSelectIndex={(index) => void player.playQueueIndex(index)}
+            />
+
+            <RecommendationPanel
+              nowRecommendation={player.nowRecommendation}
+              dailyPlaylist={player.dailyPlaylist}
+              onPlay={(track) => void player.playTrack(track)}
+              onQueue={(track) => void player.addToQueue(track)}
+              onLoadDaily={() => void player.loadDailyPlaylist()}
             />
 
             <ChatPanel

@@ -25,6 +25,10 @@ import {
   recordPlaybackEvent,
   syncQueue,
 } from '../../../lib/api/player-api';
+import {
+  fetchDailyPlaylist,
+  fetchNowRecommendation,
+} from '../../../lib/api/recommendation-api';
 import { queryKeys } from '../../../lib/query/query-keys';
 import { useAuthStore } from '../../../store/auth-store';
 import { usePlayerStore } from '../../../store/player-store';
@@ -84,6 +88,16 @@ export function usePlayerController() {
     enabled: Boolean(currentTrack?.id),
   });
 
+  const recommendationNowQuery = useQuery({
+    queryKey: queryKeys.recommendationNow(authUser?.id),
+    queryFn: fetchNowRecommendation,
+  });
+
+  const dailyPlaylistQuery = useQuery({
+    queryKey: queryKeys.dailyPlaylist(authUser?.id),
+    queryFn: fetchDailyPlaylist,
+  });
+
   const queueMutation = useMutation({
     mutationFn: (payload: QueueUpdateDto) => syncQueue(payload),
   });
@@ -131,7 +145,9 @@ export function usePlayerController() {
 
     setQueue(playerQueue.items);
     setCurrentTrack(
-      playerQueue.currentTrack ?? playerQueue.items[playerQueue.activeIndex] ?? null,
+      playerQueue.currentTrack ??
+        playerQueue.items[playerQueue.activeIndex] ??
+        null,
     );
     setActiveIndex(playerQueue.activeIndex);
     setProgressSeconds(Math.floor(playerQueue.positionMs / 1000));
@@ -195,6 +211,8 @@ export function usePlayerController() {
 
   const relatedItems = relatedQuery.data ?? [];
   const playlists = playlistsQuery.data ?? [];
+  const nowRecommendation = recommendationNowQuery.data ?? null;
+  const dailyPlaylist = dailyPlaylistQuery.data ?? null;
 
   const syncQueueState = async (
     mode: 'replace' | 'append',
@@ -248,6 +266,18 @@ export function usePlayerController() {
     if (message) {
       setStatusText(message);
     }
+  };
+
+  const loadDailyPlaylist = async () => {
+    if (!dailyPlaylist || dailyPlaylist.items.length === 0) {
+      setStatusText('Daily playlist is still calibrating.');
+      return;
+    }
+
+    await replaceQueue(
+      dailyPlaylist.items,
+      `Loaded ${dailyPlaylist.title} into the player lane.`,
+    );
   };
 
   const playTrack = async (track: ContentItemDto) => {
@@ -501,6 +531,8 @@ export function usePlayerController() {
     audioHandlers,
     playlists,
     relatedItems,
+    nowRecommendation,
+    dailyPlaylist,
     queue,
     currentTrack,
     activeIndex,
@@ -520,5 +552,6 @@ export function usePlayerController() {
     toggleFavorite,
     addCurrentTrackToPlaylist,
     replaceQueue,
+    loadDailyPlaylist,
   };
 }

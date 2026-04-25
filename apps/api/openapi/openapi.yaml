@@ -90,8 +90,7 @@ components:
           type: boolean
     PlayerQueueStateDto:
       type: object
-      required:
-        [queueId, count, items, activeIndex, currentTrack, positionMs]
+      required: [queueId, count, items, activeIndex, currentTrack, positionMs]
       properties:
         queueId:
           type: string
@@ -169,7 +168,7 @@ components:
                 type: boolean
     RecommendationCardDto:
       type: object
-      required: [contentId, title, reason]
+      required: [contentId, title, reason, content]
       properties:
         contentId:
           type: string
@@ -177,6 +176,97 @@ components:
           type: string
         reason:
           type: string
+        content:
+          $ref: '#/components/schemas/ContentItemDto'
+    UpdateTasteTagsDto:
+      type: object
+      required: [updates]
+      properties:
+        updates:
+          type: array
+          items:
+            type: object
+            required: [type, value, action]
+            properties:
+              type:
+                type: string
+              value:
+                type: string
+              action:
+                type: string
+                enum: [increase, decrease, remove]
+    TasteProfileUpdateResponseDto:
+      type: object
+      required: [updated, profile]
+      properties:
+        updated:
+          type: integer
+        profile:
+          $ref: '#/components/schemas/TasteProfileDto'
+    NowRecommendationDto:
+      type: object
+      required: [recommendationId, explanation, items]
+      properties:
+        recommendationId:
+          type: string
+        explanation:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecommendationCardDto'
+    DailyPlaylistDto:
+      type: object
+      required:
+        [
+          playlistId,
+          title,
+          description,
+          itemCount,
+          recommendationResultId,
+          items,
+        ]
+      properties:
+        playlistId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        itemCount:
+          type: integer
+        recommendationResultId:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentItemDto'
+    RecommendationFeedbackDto:
+      type: object
+      required: [targetType, targetId, feedbackType]
+      properties:
+        targetType:
+          type: string
+        targetId:
+          type: string
+        feedbackType:
+          type: string
+          enum: [like, dislike, more_like_this, less_like_this]
+        recommendationResultId:
+          type: string
+          nullable: true
+        reasonText:
+          type: string
+          nullable: true
+    RecommendationFeedbackResponseDto:
+      type: object
+      required: [feedbackId, recorded]
+      properties:
+        feedbackId:
+          type: string
+        recorded:
+          type: boolean
     ChatTurnRequestDto:
       type: object
       required: [message, responseMode]
@@ -554,33 +644,83 @@ paths:
   /profile/taste-report:
     get:
       summary: Get taste profile
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: Taste profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TasteProfileDto'
   /profile/tags:
     patch:
       summary: Update profile tags
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTasteTagsDto'
       responses:
         '200':
           description: Tags updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TasteProfileUpdateResponseDto'
   /recommend/now:
     get:
       summary: Get contextual recommendations
+      parameters:
+        - in: header
+          name: X-Cusic-Timezone
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Recommendation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NowRecommendationDto'
   /playlist/daily:
     get:
       summary: Get daily playlist
+      parameters:
+        - in: header
+          name: X-Cusic-Timezone
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Daily playlist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyPlaylistDto'
   /feedback:
     post:
       summary: Submit feedback
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecommendationFeedbackDto'
       responses:
         '200':
           description: Feedback recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationFeedbackResponseDto'
   /dj/chat:
     post:
       summary: Submit a DJ chat turn
