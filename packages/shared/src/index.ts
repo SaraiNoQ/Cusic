@@ -113,6 +113,44 @@ export interface PlaylistSummaryDto {
   itemCount: number;
 }
 
+export interface PlaylistItemDto {
+  position: number;
+  content: ContentItemDto;
+}
+
+export interface PlaylistDetailDto extends PlaylistSummaryDto {
+  items: PlaylistItemDto[];
+}
+
+export interface UpdatePlaylistDto {
+  title?: string;
+  description?: string;
+}
+
+export interface PlaylistItemsAppendResponseDto {
+  playlistId: string;
+  addedCount: number;
+  skippedCount: number;
+  itemCount: number;
+}
+
+export interface PlaylistItemRemovalResponseDto {
+  playlistId: string;
+  contentId: string;
+  removed: boolean;
+  itemCount: number;
+}
+
+export interface PlaylistDeleteResponseDto {
+  playlistId: string;
+  deleted: boolean;
+}
+
+export interface PlaylistUpdateResponseDto {
+  updated: boolean;
+  playlist: PlaylistDetailDto | null;
+}
+
 export interface FavoriteDto {
   contentId: string;
   favoriteType: 'track' | 'podcast' | 'radio' | 'album';

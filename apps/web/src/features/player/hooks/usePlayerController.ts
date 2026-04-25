@@ -368,7 +368,7 @@ export function usePlayerController() {
       return;
     }
 
-    await playlistItemMutation.mutateAsync({
+    const result = await playlistItemMutation.mutateAsync({
       playlistId: selectedPlaylistId,
       contentId: track.id,
     });
@@ -377,6 +377,11 @@ export function usePlayerController() {
     const playlistTitle =
       playlists.find((item) => item.id === selectedPlaylistId)?.title ??
       'your active playlist';
+    if (result.data.addedCount === 0) {
+      setStatusText(`${track.title} is already stored in ${playlistTitle}.`);
+      return;
+    }
+
     setStatusText(`Added ${track.title} to ${playlistTitle}.`);
   };
 

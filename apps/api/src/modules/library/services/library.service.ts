@@ -1,4 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import type {
+  PlaylistDeleteResponseDto,
+  PlaylistDetailDto,
+  PlaylistItemRemovalResponseDto,
+  PlaylistItemsAppendResponseDto,
+  PlaylistItemDto,
+  PlaylistSummaryDto,
+  PlaylistUpdateResponseDto,
+  UpdatePlaylistDto,
+} from '@music-ai/shared';
 import {
   ContentType as PrismaContentType,
   PlaylistType,
@@ -39,7 +49,7 @@ export class LibraryService {
           userId,
           deletedAt: null,
         },
-        orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [{ isPinned: 'desc' }, { updatedAt: 'desc' }],
         include: {
           _count: {
             select: { items: true },
@@ -47,18 +57,67 @@ export class LibraryService {
         },
       });
 
-      return playlists.map((playlist) => ({
+      return playlists.map((playlist) =>
+        this.toPlaylistSummary({
+          id: playlist.id,
+          title: playlist.title,
+          description: playlist.description ?? '',
+          playlistType: this.fromPrismaPlaylistType(playlist.playlistType),
+          itemCount: playlist._count.items,
+        }),
+      );
+    }
+
+    return this.playlists.map(({ contentIds: _contentIds, ...playlist }) =>
+      this.toPlaylistSummary(playlist),
+    );
+  }
+
+  async getPlaylistDetail(
+    playlistId: string,
+    userId?: string,
+  ): Promise<PlaylistDetailDto | null> {
+    if (userId) {
+      const playlist = await this.prisma.playlist.findFirst({
+        where: {
+          id: playlistId,
+          userId,
+          deletedAt: null,
+        },
+        include: {
+          items: {
+            orderBy: { position: 'asc' },
+            include: { contentItem: true },
+          },
+          _count: {
+            select: { items: true },
+          },
+        },
+      });
+
+      if (!playlist) {
+        return null;
+      }
+
+      return {
         id: playlist.id,
         title: playlist.title,
         description: playlist.description ?? '',
         playlistType: this.fromPrismaPlaylistType(playlist.playlistType),
         itemCount: playlist._count.items,
-      }));
+        items: playlist.items.map((item) => ({
+          position: item.position,
+          content: this.contentService.toContentItemDto(item.contentItem),
+        })),
+      };
     }
 
-    return this.playlists.map(
-      ({ contentIds: _contentIds, ...playlist }) => playlist,
-    );
+    const playlist = this.playlists.find((item) => item.id === playlistId);
+    if (!playlist) {
+      return null;
+    }
+
+    return this.toDemoPlaylistDetail(playlist);
   }
 
   async createPlaylist(title: string, description: string, userId?: string) {
@@ -78,13 +137,13 @@ export class LibraryService {
         },
       });
 
-      return {
+      return this.toPlaylistSummary({
         id: playlist.id,
         title: playlist.title,
         description: playlist.description ?? '',
         playlistType: this.fromPrismaPlaylistType(playlist.playlistType),
         itemCount: playlist._count.items,
-      };
+      });
     }
 
     const playlist: PlaylistRecord = {
@@ -99,10 +158,129 @@ export class LibraryService {
     this.playlists = [playlist, ...this.playlists];
     const { contentIds: _contentIds, ...summary } = playlist;
 
-    return summary;
+    return this.toPlaylistSummary(summary);
   }
 
-  async addItems(playlistId: string, contentIds: string[], userId?: string) {
+  async updatePlaylist(
+    playlistId: string,
+    input: UpdatePlaylistDto,
+    userId?: string,
+  ): Promise<PlaylistUpdateResponseDto> {
+    if (userId) {
+      const existing = await this.getPlaylistDetail(playlistId, userId);
+      if (!existing) {
+        return {
+          updated: false,
+          playlist: null,
+        };
+      }
+
+      if (input.title === undefined && input.description === undefined) {
+        return {
+          updated: false,
+          playlist: existing,
+        };
+      }
+
+      const playlist = await this.prisma.playlist.update({
+        where: { id: playlistId },
+        data: {
+          ...(input.title !== undefined ? { title: input.title } : {}),
+          ...(input.description !== undefined
+            ? { description: input.description }
+            : {}),
+        },
+        include: {
+          items: {
+            orderBy: { position: 'asc' },
+            include: { contentItem: true },
+          },
+          _count: {
+            select: { items: true },
+          },
+        },
+      });
+
+      return {
+        updated: true,
+        playlist: {
+          id: playlist.id,
+          title: playlist.title,
+          description: playlist.description ?? '',
+          playlistType: this.fromPrismaPlaylistType(playlist.playlistType),
+          itemCount: playlist._count.items,
+          items: playlist.items.map((item) => ({
+            position: item.position,
+            content: this.contentService.toContentItemDto(item.contentItem),
+          })),
+        },
+      };
+    }
+
+    const playlist = this.playlists.find((item) => item.id === playlistId);
+    if (!playlist) {
+      return {
+        updated: false,
+        playlist: null,
+      };
+    }
+
+    if (input.title === undefined && input.description === undefined) {
+      return {
+        updated: false,
+        playlist: await this.toDemoPlaylistDetail(playlist),
+      };
+    }
+
+    if (input.title !== undefined) {
+      playlist.title = input.title;
+    }
+    if (input.description !== undefined) {
+      playlist.description = input.description;
+    }
+
+    return {
+      updated: true,
+      playlist: await this.toDemoPlaylistDetail(playlist),
+    };
+  }
+
+  async deletePlaylist(
+    playlistId: string,
+    userId?: string,
+  ): Promise<PlaylistDeleteResponseDto> {
+    if (userId) {
+      const result = await this.prisma.playlist.updateMany({
+        where: {
+          id: playlistId,
+          userId,
+          deletedAt: null,
+        },
+        data: {
+          deletedAt: new Date(),
+        },
+      });
+
+      return {
+        playlistId,
+        deleted: result.count > 0,
+      };
+    }
+
+    const before = this.playlists.length;
+    this.playlists = this.playlists.filter((item) => item.id !== playlistId);
+
+    return {
+      playlistId,
+      deleted: before !== this.playlists.length,
+    };
+  }
+
+  async addItems(
+    playlistId: string,
+    contentIds: string[],
+    userId?: string,
+  ): Promise<PlaylistItemsAppendResponseDto | null> {
     if (userId) {
       const playlist = await this.prisma.playlist.findFirst({
         where: {
@@ -149,27 +327,36 @@ export class LibraryService {
         orderBy: { position: 'desc' },
         select: { position: true },
       });
-      let position = lastItem?.position ?? 0;
-      await this.prisma.$transaction(
-        validIds.map((contentItemId) =>
-          this.prisma.playlistItem.create({
+      const itemCount = await this.prisma.$transaction(async (tx) => {
+        if (validIds.length > 0) {
+          let position = lastItem?.position ?? 0;
+          for (const contentItemId of validIds) {
+            await tx.playlistItem.create({
+              data: {
+                playlistId,
+                contentItemId,
+                position: ++position,
+                addedByType: SourceType.USER,
+              },
+            });
+          }
+          await tx.playlist.update({
+            where: { id: playlistId },
             data: {
-              playlistId,
-              contentItemId,
-              position: ++position,
-              addedByType: SourceType.USER,
+              updatedAt: new Date(),
             },
-          }),
-        ),
-      );
+          });
+        }
 
-      const itemCount = await this.prisma.playlistItem.count({
-        where: { playlistId },
+        return tx.playlistItem.count({
+          where: { playlistId },
+        });
       });
 
       return {
         playlistId,
         addedCount: validIds.length,
+        skippedCount: uniqueIds.length - validIds.length,
         itemCount,
       };
     }
@@ -179,16 +366,121 @@ export class LibraryService {
       return null;
     }
 
-    const validIds = (await this.contentService.getByIds(contentIds)).map(
+    const uniqueIds = [...new Set(contentIds)];
+    const validIds = (await this.contentService.getByIds(uniqueIds)).map(
       (item) => item.id,
     );
     const nextIds = [...new Set([...playlist.contentIds, ...validIds])];
+    const addedCount = nextIds.length - playlist.contentIds.length;
     playlist.contentIds = nextIds;
     playlist.itemCount = nextIds.length;
 
     return {
       playlistId,
-      addedCount: validIds.length,
+      addedCount,
+      skippedCount: uniqueIds.length - addedCount,
+      itemCount: playlist.itemCount,
+    };
+  }
+
+  async removeItem(
+    playlistId: string,
+    contentId: string,
+    userId?: string,
+  ): Promise<PlaylistItemRemovalResponseDto> {
+    if (userId) {
+      const playlist = await this.prisma.playlist.findFirst({
+        where: {
+          id: playlistId,
+          userId,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!playlist) {
+        return {
+          playlistId,
+          contentId,
+          removed: false,
+          itemCount: 0,
+        };
+      }
+
+      const existing = await this.prisma.playlistItem.findFirst({
+        where: {
+          playlistId,
+          contentItemId: contentId,
+        },
+        orderBy: { position: 'asc' },
+        select: { id: true, position: true },
+      });
+
+      if (!existing) {
+        return {
+          playlistId,
+          contentId,
+          removed: false,
+          itemCount: await this.prisma.playlistItem.count({
+            where: { playlistId },
+          }),
+        };
+      }
+
+      const itemCount = await this.prisma.$transaction(async (tx) => {
+        await tx.playlistItem.delete({
+          where: { id: existing.id },
+        });
+        await tx.playlistItem.updateMany({
+          where: {
+            playlistId,
+            position: {
+              gt: existing.position,
+            },
+          },
+          data: {
+            position: {
+              decrement: 1,
+            },
+          },
+        });
+        await tx.playlist.update({
+          where: { id: playlistId },
+          data: {
+            updatedAt: new Date(),
+          },
+        });
+
+        return tx.playlistItem.count({
+          where: { playlistId },
+        });
+      });
+
+      return {
+        playlistId,
+        contentId,
+        removed: true,
+        itemCount,
+      };
+    }
+
+    const playlist = this.playlists.find((item) => item.id === playlistId);
+    if (!playlist) {
+      return {
+        playlistId,
+        contentId,
+        removed: false,
+        itemCount: 0,
+      };
+    }
+
+    const before = playlist.contentIds.length;
+    playlist.contentIds = playlist.contentIds.filter((id) => id !== contentId);
+    playlist.itemCount = playlist.contentIds.length;
+
+    return {
+      playlistId,
+      contentId,
+      removed: before !== playlist.contentIds.length,
       itemCount: playlist.itemCount,
     };
   }
@@ -372,5 +664,37 @@ export class LibraryService {
       default:
         return 'user_created';
     }
+  }
+
+  private toPlaylistSummary(
+    playlist: PlaylistSummaryDto,
+  ): PlaylistSummaryDto {
+    return {
+      id: playlist.id,
+      title: playlist.title,
+      description: playlist.description,
+      playlistType: playlist.playlistType,
+      itemCount: playlist.itemCount,
+    };
+  }
+
+  private async toDemoPlaylistDetail(
+    playlist: PlaylistRecord,
+  ): Promise<PlaylistDetailDto> {
+    const items = await this.contentService.getByIds(playlist.contentIds);
+
+    return {
+      id: playlist.id,
+      title: playlist.title,
+      description: playlist.description,
+      playlistType: playlist.playlistType,
+      itemCount: items.length,
+      items: items.map(
+        (content, index): PlaylistItemDto => ({
+          position: index + 1,
+          content,
+        }),
+      ),
+    };
   }
 }

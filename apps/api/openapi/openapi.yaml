@@ -112,6 +112,39 @@ components:
             - type: 'null'
         positionMs:
           type: integer
+    PlaylistSummaryDto:
+      type: object
+      required: [id, title, description, playlistType, itemCount]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        playlistType:
+          type: string
+          enum: [user_created, ai_generated, daily, imported]
+        itemCount:
+          type: integer
+    PlaylistItemDto:
+      type: object
+      required: [position, content]
+      properties:
+        position:
+          type: integer
+        content:
+          $ref: '#/components/schemas/ContentItemDto'
+    PlaylistDetailDto:
+      allOf:
+        - $ref: '#/components/schemas/PlaylistSummaryDto'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/PlaylistItemDto'
     TasteProfileDto:
       type: object
       required: [summary, explorationLevel, tags]
@@ -408,6 +441,49 @@ paths:
       responses:
         '200':
           description: Playlist created
+  /library/playlists/{id}:
+    get:
+      summary: Get playlist detail
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Playlist detail or null when missing
+    patch:
+      summary: Update playlist metadata
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Playlist updated
+    delete:
+      summary: Delete playlist
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Playlist deleted
   /library/playlists/{id}/items:
     post:
       summary: Add playlist items
@@ -422,7 +498,27 @@ paths:
             type: string
       responses:
         '200':
-          description: Items added
+          description: Items added, with addedCount and skippedCount
+  /library/playlists/{id}/items/{contentId}:
+    delete:
+      summary: Remove playlist item
+      security:
+        - bearerAuth: []
+        - {}
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: contentId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Playlist item removed
   /library/favorites:
     get:
       summary: List favorites

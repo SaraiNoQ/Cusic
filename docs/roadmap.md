@@ -94,7 +94,7 @@
 
 目标：从 demo user 过渡到真实用户和真实数据。
 
-当前状态：已启动。已完成邮箱验证码登录、JWT access token、refresh token 轮换、session 持久化与前端登录入口；用户歌单、收藏、播放事件、播放队列、当前播放状态与内容搜索 catalog 已开始落到 Prisma。
+当前状态：已启动。已完成邮箱验证码登录、JWT access token、refresh token 轮换、session 持久化与前端登录入口；用户歌单、收藏、播放事件、播放队列、当前播放状态与内容搜索 catalog 已开始落到 Prisma，当前正在补齐真实歌单管理闭环。
 
 核心工作：
 

@@ -2,7 +2,13 @@ import type {
   ApiSuccessEnvelope,
   FavoriteDto,
   FavoriteSummaryDto,
+  PlaylistDeleteResponseDto,
+  PlaylistDetailDto,
+  PlaylistItemRemovalResponseDto,
+  PlaylistItemsAppendResponseDto,
   PlaylistSummaryDto,
+  PlaylistUpdateResponseDto,
+  UpdatePlaylistDto,
 } from '@music-ai/shared';
 import { apiFetch } from './client';
 
@@ -15,6 +21,15 @@ export type PlaylistResponse = ApiSuccessEnvelope<{
 export async function fetchPlaylists() {
   const response = await apiFetch<PlaylistResponse>('/library/playlists');
   return response.data.items;
+}
+
+export type PlaylistDetailResponse = ApiSuccessEnvelope<PlaylistDetailDto | null>;
+
+export async function fetchPlaylistDetail(playlistId: string) {
+  const response = await apiFetch<PlaylistDetailResponse>(
+    `/library/playlists/${playlistId}`,
+  );
+  return response.data;
 }
 
 export type FavoriteResponse = ApiSuccessEnvelope<{
@@ -48,13 +63,47 @@ export async function removeFavorite(contentId: string) {
 }
 
 export async function addPlaylistItem(playlistId: string, contentId: string) {
-  return apiFetch<ApiSuccessEnvelope<{ addedCount: number }>>(
+  return apiFetch<ApiSuccessEnvelope<PlaylistItemsAppendResponseDto>>(
     `/library/playlists/${playlistId}/items`,
     {
       method: 'POST',
       body: JSON.stringify({
         contentIds: [contentId],
       }),
+    },
+  );
+}
+
+export async function updatePlaylist(
+  playlistId: string,
+  payload: UpdatePlaylistDto,
+) {
+  return apiFetch<ApiSuccessEnvelope<PlaylistUpdateResponseDto>>(
+    `/library/playlists/${playlistId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export async function deletePlaylist(playlistId: string) {
+  return apiFetch<ApiSuccessEnvelope<PlaylistDeleteResponseDto>>(
+    `/library/playlists/${playlistId}`,
+    {
+      method: 'DELETE',
+    },
+  );
+}
+
+export async function removePlaylistItem(
+  playlistId: string,
+  contentId: string,
+) {
+  return apiFetch<ApiSuccessEnvelope<PlaylistItemRemovalResponseDto>>(
+    `/library/playlists/${playlistId}/items/${contentId}`,
+    {
+      method: 'DELETE',
     },
   );
 }

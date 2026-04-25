@@ -420,7 +420,40 @@ Content-Type: application/json
 1. 携带 Bearer token 时读取当前用户的 Prisma 歌单；首次访问会创建一个默认 `Cusic` daily playlist。
 2. 未登录时返回 demo playlist，保持公开页面可用。
 
-### 5.5 `POST /library/playlists`
+### 5.5 `GET /library/playlists/:id`
+
+用途：获取单个歌单详情。
+
+认证行为：
+
+1. 携带 Bearer token 时读取当前用户名下歌单及其 `playlist_items` 明细。
+2. 未登录时读取 demo playlist 明细。
+3. 歌单不存在时返回 `null` 数据，不抛出额外 envelope 结构变化。
+
+响应数据：
+
+```json
+{
+  "id": "pl_01",
+  "title": "深夜工作歌单",
+  "description": "写方案时听",
+  "playlistType": "user_created",
+  "itemCount": 2,
+  "items": [
+    {
+      "position": 1,
+      "content": {
+        "id": "cnt_01",
+        "type": "track",
+        "title": "Midnight Tramlines",
+        "artists": ["南岛女声"]
+      }
+    }
+  ]
+}
+```
+
+### 5.6 `POST /library/playlists`
 
 用途：创建歌单。
 
@@ -433,11 +466,43 @@ Content-Type: application/json
 }
 ```
 
-### 5.6 `POST /library/playlists/:id/items`
+### 5.7 `PATCH /library/playlists/:id`
+
+用途：更新歌单标题或描述。
+
+实现约束：
+
+1. 仅更新传入字段。
+2. 当前阶段返回 `{ updated, playlist }`，便于前端直接回写详情。
+
+### 5.8 `DELETE /library/playlists/:id`
+
+用途：删除歌单。
+
+实现约束：
+
+1. 登录用户歌单采用软删除。
+2. 未登录 demo playlist 采用内存删除。
+
+### 5.9 `POST /library/playlists/:id/items`
 
 用途：向歌单中追加内容。
 
-### 5.7 `GET /library/favorites`
+实现约束：
+
+1. 重复内容不会重复写入同一歌单。
+2. 响应会返回 `addedCount` 与 `skippedCount`，前端可区分“已在歌单内”和“本次新增”。
+
+### 5.10 `DELETE /library/playlists/:id/items/:contentId`
+
+用途：从歌单中移除一个内容项。
+
+实现约束：
+
+1. 删除后会重排剩余内容的 `position`。
+2. 若目标内容不存在于歌单中，返回 `removed: false`。
+
+### 5.11 `GET /library/favorites`
 
 用途：获取当前用户收藏列表，用于前端刷新后恢复收藏状态。
 
@@ -454,7 +519,7 @@ Content-Type: application/json
 }
 ```
 
-### 5.8 `POST /library/favorites`
+### 5.12 `POST /library/favorites`
 
 用途：收藏内容。
 
@@ -467,7 +532,7 @@ Content-Type: application/json
 }
 ```
 
-### 5.9 `DELETE /library/favorites/:contentId`
+### 5.13 `DELETE /library/favorites/:contentId`
 
 用途：取消收藏。
 

@@ -308,6 +308,11 @@
 1. `unique(playlist_id, position)`
 2. `index(playlist_id, content_item_id)`
 
+实现记录：
+
+1. Phase 3 第二步起，登录用户歌单详情读取 `playlist_items + content_items`，不再只返回摘要计数。
+2. 从歌单移除内容时会同步重排后续 `position`，保证单个歌单内顺序连续且唯一。
+
 #### 3.4.3 `favorites`
 
 用途：收藏表。
@@ -330,6 +335,7 @@
 
 1. Phase 3 首版已将登录用户的收藏写入 Prisma；取消收藏使用 `deleted_at` 软删除。
 2. 收藏或歌单追加内容时，API 会先通过 Prisma 内容库确认 `content_items` 已存在，再写入用户关系表。
+3. 歌单元数据编辑与歌单软删除也已落到 Prisma；公开未登录态仍保留 demo playlist 兜底。
 
 ### 3.5 行为与反馈域
 

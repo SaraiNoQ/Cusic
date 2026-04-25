@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -14,6 +15,7 @@ import { OptionalJwtAuthGuard } from '../../auth/guards/optional-jwt-auth.guard'
 import { AddPlaylistItemsDto } from '../dto/add-playlist-items.dto';
 import { CreatePlaylistDto } from '../dto/create-playlist.dto';
 import { FavoriteDto } from '../dto/favorite.dto';
+import { UpdatePlaylistDto } from '../dto/update-playlist.dto';
 import { LibraryService } from '../services/library.service';
 
 @ApiTags('library')
@@ -59,6 +61,52 @@ export class LibraryController {
     };
   }
 
+  @Get('playlists/:id')
+  @ApiOperation({ summary: 'Get playlist detail' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiResponse({ status: 200, description: 'Playlist detail' })
+  async getPlaylistDetail(
+    @Param('id') id: string,
+    @Req() request: RequestWithUser,
+  ) {
+    return {
+      success: true,
+      data: await this.libraryService.getPlaylistDetail(id, request.user?.id),
+      meta: {},
+    };
+  }
+
+  @Patch('playlists/:id')
+  @ApiOperation({ summary: 'Update playlist metadata' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiResponse({ status: 200, description: 'Playlist updated' })
+  async updatePlaylist(
+    @Param('id') id: string,
+    @Body() body: UpdatePlaylistDto,
+    @Req() request: RequestWithUser,
+  ) {
+    return {
+      success: true,
+      data: await this.libraryService.updatePlaylist(id, body, request.user?.id),
+      meta: {},
+    };
+  }
+
+  @Delete('playlists/:id')
+  @ApiOperation({ summary: 'Delete a playlist' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiResponse({ status: 200, description: 'Playlist deleted' })
+  async deletePlaylist(
+    @Param('id') id: string,
+    @Req() request: RequestWithUser,
+  ) {
+    return {
+      success: true,
+      data: await this.libraryService.deletePlaylist(id, request.user?.id),
+      meta: {},
+    };
+  }
+
   @Post('playlists/:id/items')
   @ApiOperation({ summary: 'Append content items to a playlist' })
   @ApiParam({ name: 'id', type: String })
@@ -76,7 +124,34 @@ export class LibraryController {
 
     return {
       success: true,
-      data: result ?? { playlistId: id, addedCount: 0, itemCount: 0 },
+      data:
+        result ?? {
+          playlistId: id,
+          addedCount: 0,
+          skippedCount: body.contentIds.length,
+          itemCount: 0,
+        },
+      meta: {},
+    };
+  }
+
+  @Delete('playlists/:id/items/:contentId')
+  @ApiOperation({ summary: 'Remove a content item from a playlist' })
+  @ApiParam({ name: 'id', type: String })
+  @ApiParam({ name: 'contentId', type: String })
+  @ApiResponse({ status: 200, description: 'Playlist item removed' })
+  async removePlaylistItem(
+    @Param('id') id: string,
+    @Param('contentId') contentId: string,
+    @Req() request: RequestWithUser,
+  ) {
+    return {
+      success: true,
+      data: await this.libraryService.removeItem(
+        id,
+        contentId,
+        request.user?.id,
+      ),
       meta: {},
     };
   }
