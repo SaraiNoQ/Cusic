@@ -967,6 +967,7 @@ Content-Type: application/json
 1. 必须登录。
 2. 默认按 `createdAt desc` 返回最近 20 条。
 3. 当前只返回任务摘要列表，不做分页参数开放。
+4. `resultSummary` 会返回 worker 执行阶段的结构化摘要，便于前端列表和详情展示。
 
 ### 8.2 `POST /imports/playlists`
 
@@ -975,9 +976,10 @@ Content-Type: application/json
 首版实现约束：
 
 1. 必须登录。
-2. 当前只完成任务持久化基线，不真正抓取第三方平台内容。
-3. 请求会创建一条 `import_jobs` 记录，状态初始化为 `queued`。
-4. 当前支持 `importType=playlist` 与 `importType=history`，分别映射到 `PLAYLIST_IMPORT` 与 `HISTORY_IMPORT`。
+2. 请求会创建一条 `import_jobs` 记录，状态初始化为 `queued`，并同步入队到 BullMQ。
+3. 若队列不可用或入队失败，接口必须直接返回错误，不能留下“已成功受理但未入队”的假状态。
+4. 当前仍不真正抓取第三方平台内容；worker 首版只执行受控 stub 处理。
+5. 当前支持 `importType=playlist` 与 `importType=history`，分别映射到 `PLAYLIST_IMPORT` 与 `HISTORY_IMPORT`。
 
 请求 DTO：
 
@@ -1006,7 +1008,11 @@ Content-Type: application/json
     },
     "resultSummary": {
       "accepted": true,
-      "mode": "baseline_stub"
+      "mode": "baseline_stub",
+      "phase": "accepted",
+      "importType": "playlist",
+      "providerName": "spotify",
+      "summaryText": "Queued a playlist import for spotify."
     },
     "errorText": null,
     "createdAt": "2026-04-26T10:12:00.000Z",
@@ -1026,6 +1032,7 @@ Content-Type: application/json
 1. 必须登录。
 2. 只允许读取当前用户自己的导入任务。
 3. 若任务不存在，返回 `IMPORT_JOB_NOT_FOUND` 对应的 404。
+4. worker 执行时，状态按 `queued -> running -> succeeded/failed` 流转；前端应轮询该接口直到任务进入终态。
 
 ### 8.3 `GET /system/health`
 

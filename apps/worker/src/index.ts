@@ -1,11 +1,15 @@
-const queueName = process.env.WORKER_QUEUE_NAME ?? 'music-ai-default';
-const heartbeatMs = Number.parseInt(process.env.WORKER_HEARTBEAT_MS ?? '60000', 10);
+import { PrismaClient } from '@prisma/client';
+import { createImportsWorker } from './imports-worker';
+
+const heartbeatMs = Number.parseInt(
+  process.env.WORKER_HEARTBEAT_MS ?? '60000',
+  10,
+);
 
 function log(status: string, extra?: Record<string, unknown>) {
   console.log(
     JSON.stringify({
       service: 'worker',
-      queueName,
       status,
       timestamp: new Date().toISOString(),
       ...extra,
@@ -14,23 +18,28 @@ function log(status: string, extra?: Record<string, unknown>) {
 }
 
 async function main() {
+  const prisma = new PrismaClient();
+  const importsWorker = createImportsWorker(prisma);
+
   log('bootstrapped', { heartbeatMs });
 
   const timer = setInterval(() => {
     log('heartbeat');
   }, heartbeatMs);
 
-  const shutdown = (signal: string) => {
+  const shutdown = async (signal: string) => {
     clearInterval(timer);
     log('shutting_down', { signal });
+    await importsWorker.close();
+    await prisma.$disconnect();
     process.exit(0);
   };
 
-  process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
 }
 
-main().catch((error: unknown) => {
+main().catch(async (error: unknown) => {
   console.error(
     JSON.stringify({
       service: 'worker',

@@ -373,6 +373,35 @@ components:
         payload:
           type: object
           additionalProperties: true
+    ImportJobResultSummaryDto:
+      type: object
+      required: [mode, phase]
+      properties:
+        mode:
+          type: string
+          enum: [baseline_stub, worker_stub]
+        phase:
+          type: string
+          enum: [accepted, running, completed, failed]
+        accepted:
+          type: boolean
+        importType:
+          type: string
+          enum: [playlist, history]
+        providerName:
+          type: string
+        summaryText:
+          type: string
+        importedItemCount:
+          type: integer
+        playlistCount:
+          type: integer
+        historyItemCount:
+          type: integer
+        warnings:
+          type: array
+          items:
+            type: string
     ImportJobDto:
       type: object
       required:
@@ -405,8 +434,7 @@ components:
           additionalProperties: true
         resultSummary:
           anyOf:
-            - type: object
-              additionalProperties: true
+            - $ref: '#/components/schemas/ImportJobResultSummaryDto'
             - type: 'null'
         errorText:
           type: string

@@ -12,6 +12,8 @@
     "test": "node -e \"console.log('worker: no tests yet')\""
   },
   "dependencies": {
+    "@music-ai/shared": "workspace:*",
+    "@prisma/client": "^6.19.3",
     "bullmq": "^5.40.0",
     "ioredis": "^5.4.2"
   },
@@ -19,4 +21,3 @@
     "tsx": "^4.19.3"
   }
 }
-

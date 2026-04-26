@@ -709,10 +709,14 @@
 
 实现记录：
 
-1. imports 首版先只做任务持久化基线，不接真实第三方 provider 抓取。
-2. `input_payload_json` 保留用户提交的导入参数，`result_summary_json` 首版只写入任务已受理的摘要信息。
-3. `job_type` 当前只落 `PLAYLIST_IMPORT` 与 `HISTORY_IMPORT`，后续 worker 再负责真正执行。
-4. `GET /imports` 当前按 `created_at desc` 读取最近 20 条任务，作为导入历史面板的后端基线。
+1. imports 当前仍不接真实第三方 provider 抓取，但已经进入异步执行闭环。
+2. `input_payload_json` 保留用户提交的导入参数，`result_summary_json` 会按阶段写入结构化摘要：
+   - API 受理时写 `mode=baseline_stub`、`phase=accepted`
+   - worker 执行中写 `mode=worker_stub`、`phase=running`
+   - worker 完成后写 `mode=worker_stub`、`phase=completed/failed`
+3. `job_type` 当前只落 `PLAYLIST_IMPORT` 与 `HISTORY_IMPORT`，worker 首版按类型走不同 stub 执行分支，便于后续接真实 provider。
+4. worker 更新任务时，必须先把 `job_status=QUEUED` 原子推进到 `RUNNING`；若更新条数为 0，则跳过执行，避免重复处理已终态任务。
+5. `GET /imports` 当前按 `created_at desc` 读取最近 20 条任务，作为导入历史面板的后端基线。
 
 #### 3.9.2 `daily_playlist_jobs`
 

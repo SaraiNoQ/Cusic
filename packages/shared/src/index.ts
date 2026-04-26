@@ -333,6 +333,27 @@ export type ImportJobStatus =
 
 export type ImportJobType = 'playlist_import' | 'history_import';
 
+export type ImportJobExecutionMode = 'baseline_stub' | 'worker_stub';
+
+export type ImportJobExecutionPhase =
+  | 'accepted'
+  | 'running'
+  | 'completed'
+  | 'failed';
+
+export interface ImportJobResultSummaryDto {
+  mode: ImportJobExecutionMode;
+  phase: ImportJobExecutionPhase;
+  accepted?: boolean;
+  importType?: 'playlist' | 'history';
+  providerName?: string;
+  summaryText?: string;
+  importedItemCount?: number;
+  playlistCount?: number;
+  historyItemCount?: number;
+  warnings?: string[];
+}
+
 export interface CreateImportJobRequestDto {
   providerName: string;
   importType: 'playlist' | 'history';
@@ -345,12 +366,18 @@ export interface ImportJobDto {
   providerName: string;
   jobType: ImportJobType;
   payload: Record<string, unknown>;
-  resultSummary: Record<string, unknown> | null;
+  resultSummary: ImportJobResultSummaryDto | null;
   errorText: string | null;
   createdAt: string;
   updatedAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+}
+
+export const IMPORTS_QUEUE_NAME = 'music-ai-imports';
+
+export interface ImportQueueJobData {
+  jobId: string;
 }
 
 export interface PlayerSurfaceState {

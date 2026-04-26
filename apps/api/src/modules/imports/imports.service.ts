@@ -1,11 +1,30 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import type { ImportJobDto } from '@music-ai/shared';
+import {
+  Injectable,
+  NotFoundException,
+  OnModuleDestroy,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import type {
+  ImportJobDto,
+  ImportJobResultSummaryDto,
+  ImportQueueJobData,
+} from '@music-ai/shared';
 import { JobStatus, JobType, Prisma } from '@prisma/client';
+import type { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
+import { createImportsQueue } from './imports.queue';
 
 @Injectable()
-export class ImportsService {
-  constructor(private readonly prisma: PrismaService) {}
+export class ImportsService implements OnModuleDestroy {
+  private readonly queue: Queue<ImportQueueJobData>;
+
+  constructor(private readonly prisma: PrismaService) {
+    this.queue = createImportsQueue();
+  }
+
+  async onModuleDestroy() {
+    await this.queue.close();
+  }
 
   async createImportJob(input: {
     userId: string;
@@ -13,19 +32,56 @@ export class ImportsService {
     importType: 'playlist' | 'history';
     payload: Record<string, unknown>;
   }): Promise<ImportJobDto> {
-    const job = await this.prisma.importJob.create({
-      data: {
-        userId: input.userId,
-        providerName: input.providerName.trim(),
-        jobStatus: JobStatus.QUEUED,
-        jobType: this.toPrismaJobType(input.importType),
-        inputPayloadJson: input.payload as Prisma.InputJsonValue,
-        resultSummaryJson: {
-          accepted: true,
-          mode: 'baseline_stub',
-        } as Prisma.InputJsonValue,
-      },
-    });
+    const providerName = input.providerName.trim();
+    let job:
+      | Awaited<ReturnType<typeof this.prisma.importJob.create>>
+      | undefined;
+
+    try {
+      job = await this.prisma.importJob.create({
+        data: {
+          userId: input.userId,
+          providerName,
+          jobStatus: JobStatus.QUEUED,
+          jobType: this.toPrismaJobType(input.importType),
+          inputPayloadJson: input.payload as Prisma.InputJsonValue,
+          resultSummaryJson: this.toResultSummaryJson({
+            accepted: true,
+            mode: 'baseline_stub',
+            phase: 'accepted',
+            importType: input.importType,
+            providerName,
+            summaryText: `Queued a ${input.importType} import for ${providerName}.`,
+          }),
+        },
+      });
+
+      await this.queue.add(
+        'import_job',
+        { jobId: job.id },
+        {
+          jobId: job.id,
+        },
+      );
+    } catch (error) {
+      if (job) {
+        await this.prisma.importJob
+          .deleteMany({
+            where: {
+              id: job.id,
+              jobStatus: JobStatus.QUEUED,
+              startedAt: null,
+            },
+          })
+          .catch(() => undefined);
+      }
+
+      throw new ServiceUnavailableException(
+        `Import queue is unavailable: ${
+          error instanceof Error ? error.message : 'unknown queue error'
+        }`,
+      );
+    }
 
     return this.toImportJobDto(job);
   }
@@ -84,7 +140,7 @@ export class ImportsService {
       providerName: job.providerName,
       jobType: this.fromPrismaJobType(job.jobType),
       payload: this.readJsonObject(job.inputPayloadJson) ?? {},
-      resultSummary: this.readJsonObject(job.resultSummaryJson),
+      resultSummary: this.readResultSummary(job.resultSummaryJson),
       errorText: job.errorText,
       createdAt: job.createdAt.toISOString(),
       updatedAt: job.updatedAt.toISOString(),
@@ -121,5 +177,18 @@ export class ImportsService {
     }
 
     return value as Record<string, unknown>;
+  }
+
+  private readResultSummary(value: Prisma.JsonValue | null) {
+    const summary = this.readJsonObject(value);
+    if (!summary) {
+      return null;
+    }
+
+    return summary as unknown as ImportJobResultSummaryDto;
+  }
+
+  private toResultSummaryJson(summary: ImportJobResultSummaryDto) {
+    return summary as unknown as Prisma.InputJsonValue;
   }
 }
