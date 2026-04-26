@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { createImportsWorker } from './imports-worker';
+import { createImportsWorker } from './imports-worker.js';
 
 const heartbeatMs = Number.parseInt(
   process.env.WORKER_HEARTBEAT_MS ?? '60000',
