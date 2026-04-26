@@ -27,7 +27,7 @@
 
 当前推进中：
 
-1. `Phase 4` 首轮 AI DJ 闭环已完成，当前开始把 `imports` 从“任务持久化 + 列表基线”推进到“BullMQ/worker 执行闭环 + 导入历史 UI”。
+1. `Phase 4` 首轮 AI DJ 闭环已完成；当前 `imports` 已进入 BullMQ/worker 执行闭环，并补上了登录态导入历史浮层，下一步再接真实 provider 执行器。
 
 ## 2. 阶段规划总览
 

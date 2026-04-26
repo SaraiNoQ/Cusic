@@ -12,4 +12,6 @@ export const queryKeys = {
     ['recommendationNow', userId ?? 'anonymous'] as const,
   dailyPlaylist: (userId?: string | null) =>
     ['dailyPlaylist', userId ?? 'anonymous'] as const,
+  importJobs: (userId?: string | null) =>
+    ['importJobs', userId ?? 'anonymous'] as const,
 };
