@@ -7,6 +7,7 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json .npmrc ./
 COPY packages ./packages
 COPY apps/worker/package.json ./apps/worker/package.json
+COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile=false
 
 FROM deps AS build
