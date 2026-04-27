@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   OnModuleDestroy,
@@ -13,12 +14,16 @@ import { JobStatus, JobType, Prisma } from '@prisma/client';
 import type { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { createImportsQueue } from './imports.queue';
+import { ProviderRegistryService } from './providers/provider-registry.service';
 
 @Injectable()
 export class ImportsService implements OnModuleDestroy {
   private readonly queue: Queue<ImportQueueJobData>;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly providerRegistry: ProviderRegistryService,
+  ) {
     this.queue = createImportsQueue();
   }
 
@@ -33,6 +38,23 @@ export class ImportsService implements OnModuleDestroy {
     payload: Record<string, unknown>;
   }): Promise<ImportJobDto> {
     const providerName = input.providerName.trim();
+
+    if (!providerName) {
+      throw new BadRequestException('Provider name is required');
+    }
+
+    const provider = this.providerRegistry.getProvider(providerName);
+    if (provider) {
+      const validation = provider.validatePayload(input.payload);
+      if (!validation.valid) {
+        throw new BadRequestException(
+          validation.error ?? 'Invalid import payload',
+        );
+      }
+    }
+
+    const executionMode = provider ? 'provider_live' : 'worker_stub';
+
     let job:
       | Awaited<ReturnType<typeof this.prisma.importJob.create>>
       | undefined;
@@ -47,7 +69,7 @@ export class ImportsService implements OnModuleDestroy {
           inputPayloadJson: input.payload as Prisma.InputJsonValue,
           resultSummaryJson: this.toResultSummaryJson({
             accepted: true,
-            mode: 'baseline_stub',
+            mode: executionMode,
             phase: 'accepted',
             importType: input.importType,
             providerName,

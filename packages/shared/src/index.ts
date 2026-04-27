@@ -333,7 +333,7 @@ export type ImportJobStatus =
 
 export type ImportJobType = 'playlist_import' | 'history_import';
 
-export type ImportJobExecutionMode = 'baseline_stub' | 'worker_stub';
+export type ImportJobExecutionMode = 'baseline_stub' | 'worker_stub' | 'provider_live';
 
 export type ImportJobExecutionPhase =
   | 'accepted'
@@ -400,4 +400,10 @@ export interface ChatPanelState {
 export interface SearchOverlayState {
   isOpen: boolean;
   query: string;
+}
+
+export interface ProviderConnectionStatusDto {
+  provider: string;
+  connected: boolean;
+  message: string;
 }

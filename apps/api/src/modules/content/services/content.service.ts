@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
   ContentItem as PrismaContentItem,
   ContentType as PrismaContentType,
@@ -6,6 +6,8 @@ import {
 } from '@prisma/client';
 import type { ContentItemDto } from '@music-ai/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { JamendoContentProvider } from '../providers/jamendo-content.provider';
+import type { JamendoTrackInfo } from '../providers/jamendo-content.provider';
 import { MockContentProvider } from '../providers/mock-content.provider';
 import type { ContentCatalogItem } from '../types/content-catalog-item.type';
 
@@ -19,20 +21,130 @@ type SearchInput = {
 
 @Injectable()
 export class ContentService implements OnModuleInit {
+  private readonly logger = new Logger(ContentService.name);
   private readonly demoProviderName = 'cusic_demo';
+  private readonly jamendoProviderName = 'jamendo';
   private catalogSyncPromise?: Promise<void>;
 
   constructor(
     private readonly mockContentProvider: MockContentProvider,
+    private readonly jamendoContentProvider: JamendoContentProvider,
     private readonly prisma: PrismaService,
   ) {}
 
   async onModuleInit() {
-    await this.ensureDemoCatalogSynced();
+    await this.ensureCatalogSynced();
+  }
+
+  private async ensureCatalogSynced() {
+    this.catalogSyncPromise ??= this.syncCatalog();
+    await this.catalogSyncPromise;
+  }
+
+  private async syncCatalog() {
+    if (this.jamendoContentProvider.isConfigured()) {
+      this.logger.log('Jamendo configured — seeding catalog');
+      await this.seedJamendoCatalog();
+      return;
+    }
+
+    this.logger.log('Jamendo not configured — using demo catalog');
+    await this.syncDemoCatalog();
+  }
+
+  private async seedJamendoCatalog() {
+    try {
+      const tracks = await this.jamendoContentProvider.listPopularTracks(100, 0);
+      for (const track of tracks) {
+        await this.upsertJamendoTrack(track);
+      }
+      this.logger.log(`Seeded ${tracks.length} Jamendo tracks`);
+    } catch (error) {
+      this.logger.warn(
+        `Jamendo seeding failed: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+      this.logger.log('Falling back to demo catalog');
+      await this.syncDemoCatalog();
+    }
+  }
+
+  private async upsertJamendoTrack(track: JamendoTrackInfo) {
+    const contentId = `jamendo_track_${track.jamendoId}`;
+
+    const contentItem = await this.prisma.contentItem.upsert({
+      where: { id: contentId },
+      create: {
+        id: contentId,
+        contentType: PrismaContentType.TRACK,
+        canonicalTitle: track.title,
+        albumName: track.albumName,
+        primaryArtistNames: [track.artistName],
+        durationMs: track.durationMs,
+        language: track.language,
+        coverUrl: track.coverUrl,
+        playable: true,
+        metadataJson: { audioUrl: track.audioUrl },
+      },
+      update: {
+        canonicalTitle: track.title,
+        albumName: track.albumName,
+        primaryArtistNames: [track.artistName],
+        durationMs: track.durationMs,
+        language: track.language,
+        coverUrl: track.coverUrl,
+        playable: true,
+        metadataJson: { audioUrl: track.audioUrl },
+      },
+    });
+
+    await this.prisma.contentProviderMapping.upsert({
+      where: {
+        providerName_providerContentId: {
+          providerName: this.jamendoProviderName,
+          providerContentId: track.jamendoId,
+        },
+      },
+      create: {
+        contentItemId: contentItem.id,
+        providerName: this.jamendoProviderName,
+        providerContentId: track.jamendoId,
+        providerContentType: 'track',
+        rawPayloadJson: {
+          jamendoId: track.jamendoId,
+          title: track.title,
+          artist: track.artistName,
+          album: track.albumName,
+          durationMs: track.durationMs,
+          audioUrl: track.audioUrl,
+          coverUrl: track.coverUrl,
+          releaseDate: track.releaseDate,
+        },
+        syncStatus: 'READY',
+        lastSyncedAt: new Date(),
+      },
+      update: {
+        contentItemId: contentItem.id,
+        providerContentType: 'track',
+        rawPayloadJson: {
+          jamendoId: track.jamendoId,
+          title: track.title,
+          artist: track.artistName,
+          album: track.albumName,
+          durationMs: track.durationMs,
+          audioUrl: track.audioUrl,
+          coverUrl: track.coverUrl,
+          releaseDate: track.releaseDate,
+        },
+        syncStatus: 'READY',
+        lastSyncedAt: new Date(),
+      },
+    });
+
+    return contentItem;
   }
 
   async search(input: SearchInput) {
-    await this.ensureDemoCatalogSynced();
+    await this.ensureCatalogSynced();
     const page = input.page ?? 1;
     const pageSize = input.pageSize ?? 20;
     const query = input.q?.trim().toLowerCase();
@@ -80,7 +192,7 @@ export class ContentService implements OnModuleInit {
   }
 
   async getById(id: string) {
-    await this.ensureDemoCatalogSynced();
+    await this.ensureCatalogSynced();
     const item = await this.prisma.contentItem.findUnique({
       where: { id },
     });
@@ -89,7 +201,7 @@ export class ContentService implements OnModuleInit {
   }
 
   async getByIds(ids: string[]) {
-    await this.ensureDemoCatalogSynced();
+    await this.ensureCatalogSynced();
     const uniqueIds = [...new Set(ids)];
     const items = await this.prisma.contentItem.findMany({
       where: { id: { in: uniqueIds } },
@@ -104,7 +216,7 @@ export class ContentService implements OnModuleInit {
   }
 
   async getRelated(id: string) {
-    await this.ensureDemoCatalogSynced();
+    await this.ensureCatalogSynced();
     const source = await this.prisma.contentItem.findUnique({
       where: { id },
     });
@@ -132,6 +244,19 @@ export class ContentService implements OnModuleInit {
       return existing;
     }
 
+    if (id.startsWith('jamendo_track_')) {
+      const jamendoId = id.replace('jamendo_track_', '');
+      try {
+        const tracks = await this.jamendoContentProvider.getTrack(jamendoId);
+        if (tracks.length > 0) {
+          return this.upsertJamendoTrack(tracks[0]);
+        }
+      } catch {
+        this.logger.warn(`Unable to fetch Jamendo track ${jamendoId}`);
+      }
+      return null;
+    }
+
     const item =
       this.mockContentProvider.listCatalog().find((entry) => entry.id === id) ??
       null;
@@ -142,9 +267,17 @@ export class ContentService implements OnModuleInit {
     return this.upsertCatalogItem(item);
   }
 
+  jamendoProvider(): JamendoContentProvider {
+    return this.jamendoContentProvider;
+  }
+
   async ensureDemoCatalogSynced() {
     this.catalogSyncPromise ??= this.syncDemoCatalog();
     await this.catalogSyncPromise;
+  }
+
+  async jamendoContentId(jamendoTrackId: string) {
+    return `jamendo_track_${jamendoTrackId}`;
   }
 
   private async syncDemoCatalog() {

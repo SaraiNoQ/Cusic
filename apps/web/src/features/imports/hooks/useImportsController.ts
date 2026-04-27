@@ -15,15 +15,14 @@ import { useUiStore } from '../../../store/ui-store';
 const defaultPayloadByType: Record<'playlist' | 'history', string> = {
   playlist: JSON.stringify(
     {
-      playlistUrl: 'https://open.spotify.com/playlist/...',
+      playlistId: 123456,
     },
     null,
     2,
   ),
   history: JSON.stringify(
     {
-      exportUrl: 'https://example.com/history.json',
-      sourceLabel: 'desktop export',
+      albumId: 789012,
     },
     null,
     2,
@@ -41,7 +40,7 @@ function isTerminalStatus(status: ImportJobDto['status']) {
 export function useImportsController() {
   const authUser = useAuthStore((state) => state.user);
   const isImportsOpen = useUiStore((state) => state.isImportsOpen);
-  const [providerName, setProviderName] = useState('spotify');
+  const [providerName, setProviderName] = useState('jamendo');
   const [importType, setImportType] = useState<'playlist' | 'history'>(
     'playlist',
   );

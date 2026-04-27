@@ -90,7 +90,7 @@ export function ImportOverlay({
                 <input
                   value={providerName}
                   onChange={(event) => onProviderNameChange(event.target.value)}
-                  placeholder="spotify"
+                  placeholder="jamendo"
                 />
               </label>
 
@@ -135,7 +135,9 @@ export function ImportOverlay({
             <div className={styles.importFormFooter}>
               <p>
                 {formError ??
-                  'Jobs run through BullMQ and are tracked until they settle.'}
+                  (providerName === 'jamendo'
+                    ? 'Enter a Jamendo playlist or album ID. Jobs run through BullMQ.'
+                    : 'Jobs run through BullMQ and are tracked until they settle.')}
               </p>
               <button
                 type="button"
