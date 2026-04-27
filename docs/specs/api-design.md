@@ -1,8 +1,8 @@
 # 音乐 AI App API 设计文档
 
-- 文档版本：v0.1
+- 文档版本：v0.2
 - 文档状态：初版
-- 更新时间：2026-04-25
+- 更新时间：2026-04-27
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`、`docs/specs/database-design.md`
 
 ## 1. 设计目标与约束
@@ -253,9 +253,10 @@ Content-Type: application/json
 实现记录：
 
 1. Phase 3 起搜索读取 Prisma `content_items`，不再直接从内存 mock catalog 返回。
-2. API 会先将 demo catalog 幂等同步到 `content_items` 与 `content_provider_mappings`，其中 `provider_name` 为 `cusic_demo`。
-3. `q` 会匹配标题、专辑、语言与艺人名；`type` 与 `language` 用于结构化筛选。
-4. 首版仍使用普通字段过滤与应用层艺人匹配，全文搜索和向量检索留到后续推荐阶段。
+2. 若 `JAMENDO_CLIENT_ID` 已配置，API 启动时会从 Jamendo API 同步 ~100 首热门曲目作为内容目录种子数据（`provider_name=jamendo`）。未配置时回退到 `cusic_demo` 的 8 首 demo 曲目。
+3. Jamendo 曲目携带真实 MP3 音频地址与封面图，`playable=true`。内容 ID 格式为 `jamendo_track_{jamendoId}`。
+4. `q` 会匹配标题、专辑、语言与艺人名；`type` 与 `language` 用于结构化筛选。
+5. 首版仍使用普通字段过滤与应用层艺人匹配，全文搜索和向量检索留到后续推荐阶段。
 
 查询参数：
 
@@ -973,52 +974,97 @@ Content-Type: application/json
 
 用途：提交歌单或历史导入任务。
 
-首版实现约束：
+实现记录：
 
 1. 必须登录。
 2. 请求会创建一条 `import_jobs` 记录，状态初始化为 `queued`，并同步入队到 BullMQ。
-3. 若队列不可用或入队失败，接口必须直接返回错误，不能留下“已成功受理但未入队”的假状态。
-4. 当前仍不真正抓取第三方平台内容；worker 首版只执行受控 stub 处理。
-5. 当前支持 `importType=playlist` 与 `importType=history`，分别映射到 `PLAYLIST_IMPORT` 与 `HISTORY_IMPORT`。
+3. 若队列不可用或入队失败，接口必须直接返回错误，不能留下”已成功受理但未入队”的假状态。
+4. 当前支持 `importType=playlist` 与 `importType=history`，分别映射到 `PLAYLIST_IMPORT` 与 `HISTORY_IMPORT`。
+5. 已接入首个真实 provider（`jamendo`）：注册 provider 的请求会先经过 `ProviderRegistryService` 做 payload 校验，通过后再创建任务并入队；worker 执行时会调用 Jamendo API 拉取真实曲目并落库。
+6. 未注册的 provider 仍走 stub 执行分支，返回模拟结果并附带 warning。
 
-请求 DTO：
+请求 DTO（Jamendo 示例）：
 
 ```json
 {
-  "providerName": "spotify",
-  "importType": "playlist",
-  "payload": {
-    "playlistUrl": "https://..."
+  “providerName”: “jamendo”,
+  “importType”: “playlist”,
+  “payload”: {
+    “playlistId”: 107113
   }
 }
 ```
 
-响应 DTO：
+请求 DTO（历史/专辑导入）：
 
 ```json
 {
-  "success": true,
-  "data": {
-    "jobId": "job_01",
-    "status": "queued",
-    "providerName": "spotify",
-    "jobType": "playlist_import",
-    "payload": {
-      "playlistUrl": "https://..."
+  “providerName”: “jamendo”,
+  “importType”: “history”,
+  “payload”: {
+    “albumId”: 789012
+  }
+}
+```
+
+响应 DTO（受理阶段）：
+
+```json
+{
+  “success”: true,
+  “data”: {
+    “jobId”: “job_01”,
+    “status”: “queued”,
+    “providerName”: “jamendo”,
+    “jobType”: “playlist_import”,
+    “payload”: {
+      “playlistId”: 107113
     },
-    "resultSummary": {
-      "accepted": true,
-      "mode": "baseline_stub",
-      "phase": "accepted",
-      "importType": "playlist",
-      "providerName": "spotify",
-      "summaryText": "Queued a playlist import for spotify."
+    “resultSummary”: {
+      “accepted”: true,
+      “mode”: “provider_live”,
+      “phase”: “accepted”,
+      “importType”: “playlist”,
+      “providerName”: “jamendo”,
+      “summaryText”: “Queued a playlist import for jamendo.”
     },
-    "errorText": null,
-    "createdAt": "2026-04-26T10:12:00.000Z",
-    "updatedAt": "2026-04-26T10:12:00.000Z",
-    "startedAt": null,
-    "finishedAt": null
+    “errorText”: null,
+    “createdAt”: “2026-04-27T10:12:00.000Z”,
+    “updatedAt”: “2026-04-27T10:12:00.000Z”,
+    “startedAt”: null,
+    “finishedAt”: null
+  }
+}
+```
+
+响应 DTO（worker 完成后）：
+
+```json
+{
+  “success”: true,
+  “data”: {
+    “jobId”: “job_01”,
+    “status”: “succeeded”,
+    “providerName”: “jamendo”,
+    “jobType”: “playlist_import”,
+    “payload”: {
+      “playlistId”: 107113
+    },
+    “resultSummary”: {
+      “mode”: “provider_live”,
+      “phase”: “completed”,
+      “importType”: “playlist”,
+      “providerName”: “jamendo”,
+      “importedItemCount”: 15,
+      “playlistCount”: 1,
+      “summaryText”: “Imported 15 tracks from Jamendo playlist #107113 and saved as the playlist \”Jamendo Import — Jamendo playlist #107113\”.”,
+      “warnings”: []
+    },
+    “errorText”: null,
+    “createdAt”: “2026-04-27T10:12:00.000Z”,
+    “updatedAt”: “2026-04-27T10:12:05.000Z”,
+    “startedAt”: “2026-04-27T10:12:01.000Z”,
+    “finishedAt”: “2026-04-27T10:12:05.000Z”
   }
 }
 ```

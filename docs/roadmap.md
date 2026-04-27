@@ -1,8 +1,8 @@
 # Cusic 开发路线图
 
-- 文档版本：v0.1
+- 文档版本：v0.2
 - 文档状态：初版
-- 更新时间：2026-04-25
+- 更新时间：2026-04-27
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`
 
 ## 1. 目标与当前状态
@@ -27,7 +27,9 @@
 
 当前推进中：
 
-1. `Phase 4` 首轮 AI DJ 闭环已完成；当前 `imports` 已进入 BullMQ/worker 执行闭环，并补上了登录态导入历史浮层，下一步再接真实 provider 执行器。
+1. `Phase 4` 首轮 AI DJ 闭环已完成。
+2. `Phase 5` imports 已接入首个真实 provider（Jamendo），通过 `JAMENDO_CLIENT_ID` 配置即可使用。Worker 会从 Jamendo API 拉取歌单/专辑曲目，标准化后写入 `content_items` 并创建 `imported` 歌单。同时 API 启动时会从 Jamendo 同步 ~100 首热门曲目作为内容目录种子数据。
+3. 已建立可扩展的 Provider 抽象层（`ImportProvider` interface + `ProviderRegistryService`），后续新增 provider 只需实现接口并注册即可。
 
 ## 2. 阶段规划总览
 
@@ -141,13 +143,15 @@
 
 ### Phase 5：Taste Profile + Recommendation
 
-目标：让产品从“能聊天”升级到“懂用户”。
+目标：让产品从”能聊天”升级到”懂用户”。
 
 核心工作：
 
 1. 导入外部歌单与收听记录。
 2. 构建用户听歌画像。
 3. 生成此刻推荐与今日歌单。
+
+当前状态：imports 已接入首个真实 provider（Jamendo API），可直接导入 Jamendo 歌单/专辑；内容目录已从 demo mock 升级为真实 Jamendo 曲目库。画像与推荐仍为规则型 baseline，尚未引入向量召回或 LLM 画像分析。
 
 交付产物：
 

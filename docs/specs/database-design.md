@@ -1,8 +1,8 @@
 # 音乐 AI App 数据库设计文档
 
-- 文档版本：v0.1
+- 文档版本：v0.2
 - 文档状态：初版
-- 更新时间：2026-04-23
+- 更新时间：2026-04-27
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`
 
 ## 1. 设计目标与约束
@@ -262,6 +262,7 @@
 1. Phase 3 起 API 启动或首次内容访问时，会将内置 demo catalog 幂等同步到 `content_items`。
 2. 同步时会写入 `content_provider_mappings`，`provider_name` 使用 `cusic_demo`，`provider_content_id` 使用 catalog 内容 ID。
 3. demo 内容的播放 URL 作为 provider 元数据保存在 `content_items.metadata_json.audioUrl`，后续替换真实 provider 时保持统一内容 ID 与 provider mapping 边界。
+4. Jamendo provider 接入后（Phase 5），若 `JAMENDO_CLIENT_ID` 已配置，API 启动时将从 Jamendo 同步 ~100 首热门曲目。Jamendo 内容的 `id` 格式为 `jamendo_track_{jamendoId}`，`provider_name` 为 `jamendo`，携带真实 MP3 音频地址与封面图。Worker 执行导入时同样会按 `jamendo` provider 写入 `content_provider_mappings`。
 
 ### 3.4 音乐库与歌单域
 
@@ -709,14 +710,16 @@
 
 实现记录：
 
-1. imports 当前仍不接真实第三方 provider 抓取，但已经进入异步执行闭环。
-2. `input_payload_json` 保留用户提交的导入参数，`result_summary_json` 会按阶段写入结构化摘要：
-   - API 受理时写 `mode=baseline_stub`、`phase=accepted`
-   - worker 执行中写 `mode=worker_stub`、`phase=running`
-   - worker 完成后写 `mode=worker_stub`、`phase=completed/failed`
-3. `job_type` 当前只落 `PLAYLIST_IMPORT` 与 `HISTORY_IMPORT`，worker 首版按类型走不同 stub 执行分支，便于后续接真实 provider。
-4. worker 更新任务时，必须先把 `job_status=QUEUED` 原子推进到 `RUNNING`；若更新条数为 0，则跳过执行，避免重复处理已终态任务。
-5. `GET /imports` 当前按 `created_at desc` 读取最近 20 条任务，作为导入历史面板的后端基线。
+1. imports 已接入首个真实 provider（Jamendo API），通过 `JAMENDO_CLIENT_ID` 配置即可使用；未配置时仍可走 stub 执行分支。
+2. 已建立可扩展的 `ImportProvider` 抽象层与 `ProviderRegistryService`，按 `provider_name` 路由到不同 provider 实现。新增 provider 只需实现接口并注册。
+3. `input_payload_json` 保留用户提交的导入参数。Jamendo provider 接受 `playlistId`（number）或 `albumId`（number）作为 payload 字段；`result_summary_json` 会按阶段写入结构化摘要：
+   - API 受理时写 `mode=provider_live/stub`、`phase=accepted`
+   - worker 执行中写 `phase=running`
+   - worker 完成后写 `phase=completed/failed`，并携带真实 `importedItemCount`、`playlistCount`
+4. worker 执行时会调用 Jamendo API 拉取歌单/专辑曲目，标准化后 upsert 到 `content_items` 与 `content_provider_mappings`，最后创建 `playlist_type=IMPORTED` 的歌单。
+5. `job_type` 当前只落 `PLAYLIST_IMPORT` 与 `HISTORY_IMPORT`。
+6. worker 更新任务时，必须先把 `job_status=QUEUED` 原子推进到 `RUNNING`；若更新条数为 0，则跳过执行，避免重复处理已终态任务。
+7. `GET /imports` 当前按 `created_at desc` 读取最近 20 条任务，作为导入历史面板的后端基线。
 
 #### 3.9.2 `daily_playlist_jobs`
 
