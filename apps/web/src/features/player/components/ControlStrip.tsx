@@ -1,4 +1,5 @@
 import type { ContentItemDto } from '@music-ai/shared';
+import type { CSSProperties } from 'react';
 import styles from '../PlayerScreen.module.css';
 import { formatClock } from '../player-utils';
 
@@ -35,6 +36,9 @@ export function ControlStrip({
     durationSeconds > 0
       ? Math.min((progressSeconds / durationSeconds) * 100, 100)
       : 0;
+  const volumeStyle = {
+    '--volume-percent': `${Math.round(volume * 100)}%`,
+  } as CSSProperties;
   const artists = track?.artists.join(' · ') ?? 'PLAYING';
 
   return (
@@ -124,6 +128,7 @@ export function ControlStrip({
               max="1"
               step="0.01"
               value={volume}
+              style={volumeStyle}
               onChange={(e) => onVolumeChange(Number(e.target.value))}
               aria-label="Volume"
               className={styles.volumeSlider}

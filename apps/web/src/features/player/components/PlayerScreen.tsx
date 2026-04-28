@@ -267,7 +267,6 @@ export function PlayerScreen() {
               queue={player.queue}
               activeIndex={player.activeIndex}
               canOpenImports={Boolean(authUser)}
-              onSelectIndex={(index) => void player.playQueueIndex(index)}
               onOpenQueue={openQueue}
               onOpenImports={openImports}
               onOpenRecommendation={openRecommendation}
@@ -277,15 +276,12 @@ export function PlayerScreen() {
               messages={chat.messages}
               input={chat.input}
               isPending={chat.isPending}
-              prompts={promptSuggestions}
-              statusText={player.statusText}
               currentTrackTitle={
                 player.currentTrack
                   ? `${player.currentTrack.title} - ${player.currentTrack.artists[0] ?? 'Cusic'}`
                   : null
               }
               onInputChange={chat.setInput}
-              onPromptSelect={(prompt) => void chat.sendMessage(prompt)}
               onSubmit={() => chat.sendMessage()}
               onOpenConversation={openChatOverlay}
             />

@@ -29,7 +29,7 @@
 
 1. `Phase 4` 首轮 AI DJ 闭环已完成，DeepSeek V4 Pro 已接入（LLM Provider 抽象 + 熔断/重试/回退）。
 2. `Phase 5` imports 已接入首个真实 provider（Jamendo），画像与推荐已集成 LLM 解释生成。
-3. 前端 UX 已修复：播放器抖动、音量控制、队列浮窗、聊天面板常驻回复等问题已解决。
+3. 前端 UX 已继续收敛：首页字号已上调，顶部 header/hero 纵向占比已压缩，AI DJ 首页空态改为单入口按钮，音量滑杆视觉进度与拖点位置已重新对齐。
 4. 服务器已迁移至 `10.132.166.83`，Docker registry mirror 已配置。
 
 ## 2. 阶段规划总览

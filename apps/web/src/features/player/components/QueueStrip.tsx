@@ -5,7 +5,6 @@ export function QueueStrip({
   queue,
   activeIndex,
   canOpenImports,
-  onSelectIndex,
   onOpenQueue,
   onOpenRecommendation,
   onOpenImports,
@@ -13,7 +12,6 @@ export function QueueStrip({
   queue: ContentItemDto[];
   activeIndex: number;
   canOpenImports: boolean;
-  onSelectIndex: (index: number) => void;
   onOpenQueue: () => void;
   onOpenRecommendation: () => void;
   onOpenImports: () => void;
