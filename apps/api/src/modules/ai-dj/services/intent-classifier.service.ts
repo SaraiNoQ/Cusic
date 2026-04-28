@@ -55,7 +55,20 @@ Return ONLY a valid JSON object: {"intent": "<intent>", "confidence": <0.0-1.0>}
       },
     );
 
-    const parsed = JSON.parse(result.trim()) as {
+    let jsonText = result.trim();
+
+    const fenceMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) {
+      jsonText = fenceMatch[1].trim();
+    }
+
+    const braceStart = jsonText.indexOf('{');
+    const braceEnd = jsonText.lastIndexOf('}');
+    if (braceStart !== -1 && braceEnd !== -1 && braceEnd > braceStart) {
+      jsonText = jsonText.slice(braceStart, braceEnd + 1);
+    }
+
+    const parsed = JSON.parse(jsonText) as {
       intent: string;
       confidence: number;
     };
