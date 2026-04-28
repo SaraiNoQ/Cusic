@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ChatMessageVm } from '@music-ai/shared';
+import { useChatStore } from '../../../store/chat-store';
 import styles from '../../player/PlayerScreen.module.css';
 import { ChatComposer } from './ChatComposer';
 
@@ -45,9 +46,22 @@ export function ChatPanel({
   onOpenConversation: () => void;
 }>) {
   const [time, setTime] = useState('21:09');
-  const transmission = isPending
-    ? 'Calibrating a new transmission path through the current library...'
-    : getLatestAssistantMessage(messages);
+  const streamingMessageId = useChatStore((state) => state.streamingMessageId);
+
+  const streamingText = useMemo(() => {
+    if (!streamingMessageId) {
+      return null;
+    }
+    return (
+      messages.find((m) => m.id === streamingMessageId)?.text || null
+    );
+  }, [streamingMessageId, messages]);
+
+  const transmission = streamingText
+    ? streamingText
+    : isPending
+      ? 'Calibrating a new transmission path through the current library...'
+      : getLatestAssistantMessage(messages);
 
   useEffect(() => {
     const update = () => setTime(getTransmissionTime());

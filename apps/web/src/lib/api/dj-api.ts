@@ -44,6 +44,7 @@ export async function streamDjMessage(
     messageId: string;
   },
   onEvent: (event: AiDjStreamEventDto) => void,
+  signal?: AbortSignal,
 ) {
   const session = readAuthSession();
   const url = new URL(`${getApiBaseUrl()}/dj/chat/stream`);
@@ -57,6 +58,7 @@ export async function streamDjMessage(
         ? { Authorization: `Bearer ${session.accessToken}` }
         : {}),
     },
+    signal,
   });
 
   if (!response.ok || !response.body) {
@@ -98,7 +100,20 @@ export async function streamDjMessage(
     } as AiDjStreamEventDto);
   };
 
+  const streamTimeoutMs = 90_000;
+  const startedAt = Date.now();
+
   while (true) {
+    if (signal?.aborted) {
+      reader.cancel();
+      break;
+    }
+
+    if (Date.now() - startedAt > streamTimeoutMs) {
+      reader.cancel();
+      throw new Error('Stream timed out after 90 seconds');
+    }
+
     const { done, value } = await reader.read();
     if (done) {
       break;

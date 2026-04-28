@@ -13,11 +13,13 @@ type ChatStore = {
   sessionId?: string;
   input: string;
   isPending: boolean;
+  streamingMessageId: string | null;
   messages: ChatMessageVm[];
   hasHydratedSession: boolean;
   setSessionId: (sessionId?: string) => void;
   setInput: (input: string) => void;
   setPending: (isPending: boolean) => void;
+  setStreamingMessageId: (messageId: string | null) => void;
   appendMessage: (message: ChatMessageVm) => void;
   upsertMessage: (message: ChatMessageVm) => void;
   updateMessageText: (messageId: string, text: string) => void;
@@ -30,11 +32,13 @@ export const useChatStore = create<ChatStore>((set) => ({
   sessionId: undefined,
   input: '',
   isPending: false,
+  streamingMessageId: null,
   messages: initialChatMessages,
   hasHydratedSession: false,
   setSessionId: (sessionId) => set({ sessionId }),
   setInput: (input) => set({ input }),
   setPending: (isPending) => set({ isPending }),
+  setStreamingMessageId: (streamingMessageId) => set({ streamingMessageId }),
   appendMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
   upsertMessage: (message) =>
@@ -60,6 +64,7 @@ export const useChatStore = create<ChatStore>((set) => ({
       sessionId: undefined,
       input: '',
       isPending: false,
+      streamingMessageId: null,
       messages: initialChatMessages,
       hasHydratedSession: false,
     }),

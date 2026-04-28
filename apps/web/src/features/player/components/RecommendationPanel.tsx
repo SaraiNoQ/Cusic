@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { DailyPlaylistDto, NowRecommendationDto } from '@music-ai/shared';
 import styles from '../PlayerScreen.module.css';
 
@@ -7,6 +8,7 @@ export function RecommendationPanel({
   onPlay,
   onQueue,
   onLoadDaily,
+  onFeedback,
 }: Readonly<{
   nowRecommendation: NowRecommendationDto | null;
   dailyPlaylist: DailyPlaylistDto | null;
@@ -15,8 +17,22 @@ export function RecommendationPanel({
     contentId: NowRecommendationDto['items'][number]['content'],
   ) => void;
   onLoadDaily: () => void;
+  onFeedback?: (
+    contentId: string,
+    feedbackType: 'like' | 'dislike',
+  ) => void;
 }>) {
   const items = nowRecommendation?.items ?? [];
+  const [feedbackState, setFeedbackState] = useState<
+    Record<string, 'liked' | 'disliked' | null>
+  >({});
+
+  const handleFeedback = (contentId: string, type: 'like' | 'dislike') => {
+    const current = feedbackState[contentId];
+    const next = current === type ? null : type;
+    setFeedbackState((prev) => ({ ...prev, [contentId]: next }));
+    onFeedback?.(contentId, next ?? type);
+  };
 
   return (
     <section className={styles.recommendationPanel}>
@@ -42,6 +58,40 @@ export function RecommendationPanel({
                 <button type="button" onClick={() => onQueue(item.content)}>
                   QUEUE
                 </button>
+                {onFeedback ? (
+                  <>
+                    <button
+                      type="button"
+                      className={
+                        feedbackState[item.contentId] === 'liked'
+                          ? styles.feedbackButtonActive
+                          : undefined
+                      }
+                      onClick={() => handleFeedback(item.contentId, 'like')}
+                      title="Like this recommendation"
+                    >
+                      {feedbackState[item.contentId] === 'liked'
+                        ? '★'
+                        : '☆'}
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        feedbackState[item.contentId] === 'disliked'
+                          ? styles.feedbackButtonActive
+                          : undefined
+                      }
+                      onClick={() =>
+                        handleFeedback(item.contentId, 'dislike')
+                      }
+                      title="Not interested"
+                    >
+                      {feedbackState[item.contentId] === 'disliked'
+                        ? '✕'
+                        : '×'}
+                    </button>
+                  </>
+                ) : null}
               </div>
             </div>
           ))}

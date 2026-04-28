@@ -288,6 +288,7 @@ export interface AiDjStreamDoneEventDto {
   messageId: string;
   replyText: string;
   actions: AiDjActionDto[];
+  intent?: AiDjIntent;
 }
 
 export type AiDjStreamEventDto =

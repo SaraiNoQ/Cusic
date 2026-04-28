@@ -83,6 +83,9 @@ export function useChatController(playerController: PlayerController) {
   const setSessionId = useChatStore((state) => state.setSessionId);
   const setInput = useChatStore((state) => state.setInput);
   const setPending = useChatStore((state) => state.setPending);
+  const setStreamingMessageId = useChatStore(
+    (state) => state.setStreamingMessageId,
+  );
   const appendMessage = useChatStore((state) => state.appendMessage);
   const upsertMessage = useChatStore((state) => state.upsertMessage);
   const updateMessageText = useChatStore((state) => state.updateMessageText);
@@ -189,8 +192,11 @@ export function useChatController(playerController: PlayerController) {
       return;
     }
 
+    const abortController = new AbortController();
+    const userMsgId = `msg_user_${Date.now()}`;
+
     appendMessage({
-      id: `msg_user_${Date.now()}`,
+      id: userMsgId,
       role: 'user',
       text: message,
     });
@@ -200,46 +206,101 @@ export function useChatController(playerController: PlayerController) {
     try {
       const response = await chatMutation.mutateAsync(message);
       setSessionId(response.data.sessionId);
-      upsertMessage({
-        id: response.data.messageId,
-        role: 'assistant',
-        text: '',
-        intent: response.data.intent,
-        actions: response.data.actions,
-      });
 
+      const assistantMsgId = response.data.messageId;
+      let messageCreated = false;
       let streamedReply = '';
+      let streamedActions = response.data.actions;
+      let streamedIntent = response.data.intent;
+
+      setStreamingMessageId(assistantMsgId);
+
+      const ensureMessage = () => {
+        if (!messageCreated) {
+          messageCreated = true;
+          upsertMessage({
+            id: assistantMsgId,
+            role: 'assistant',
+            text: '',
+            intent: streamedIntent,
+            actions: streamedActions,
+          });
+        }
+      };
 
       try {
         await streamDjMessage(
           {
             sessionId: response.data.sessionId,
-            messageId: response.data.messageId,
+            messageId: assistantMsgId,
           },
           (event) => {
             if (event.event === 'chunk') {
+              ensureMessage();
               streamedReply += event.delta;
-              updateMessageText(response.data.messageId, streamedReply);
+              updateMessageText(assistantMsgId, streamedReply);
+              return;
+            }
+
+            if (event.event === 'actions') {
+              streamedActions = event.actions;
+              upsertMessage({
+                id: assistantMsgId,
+                role: 'assistant',
+                text: streamedReply,
+                intent: streamedIntent,
+                actions: streamedActions,
+              });
+              applyActions(event.actions);
               return;
             }
 
             if (event.event === 'done') {
-              updateMessageText(
-                response.data.messageId,
-                event.replyText || streamedReply || response.data.replyText,
-              );
+              if (event.actions && event.actions.length > 0) {
+                streamedActions = event.actions;
+              }
+              if (event.intent) {
+                streamedIntent = event.intent;
+              }
+
+              const finalText =
+                event.replyText || streamedReply || response.data.replyText;
+              upsertMessage({
+                id: assistantMsgId,
+                role: 'assistant',
+                text: finalText,
+                intent: streamedIntent,
+                actions: streamedActions,
+              });
             }
           },
+          abortController.signal,
         );
       } catch {
-        updateMessageText(response.data.messageId, response.data.replyText);
+        if (!messageCreated && response.data.replyText) {
+          upsertMessage({
+            id: assistantMsgId,
+            role: 'assistant',
+            text: response.data.replyText,
+            intent: response.data.intent,
+            actions: response.data.actions,
+          });
+        }
       }
 
-      if (!streamedReply) {
-        updateMessageText(response.data.messageId, response.data.replyText);
+      if (!streamedReply && !messageCreated) {
+        upsertMessage({
+          id: assistantMsgId,
+          role: 'assistant',
+          text: response.data.replyText,
+          intent: response.data.intent,
+          actions: response.data.actions,
+        });
       }
 
-      await applyActions(response.data.actions);
+      if (streamedActions.length > 0) {
+        await applyActions(streamedActions);
+      }
     } catch {
       appendMessage({
         id: `msg_err_${Date.now()}`,
@@ -248,7 +309,9 @@ export function useChatController(playerController: PlayerController) {
       });
       setStatusText('AI DJ lane lost signal, but the player is still online.');
     } finally {
+      abortController.abort();
       setPending(false);
+      setStreamingMessageId(null);
     }
   };
 

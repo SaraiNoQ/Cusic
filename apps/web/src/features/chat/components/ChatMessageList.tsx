@@ -1,6 +1,21 @@
 import type { ChatMessageVm } from '@music-ai/shared';
 import styles from '../../player/PlayerScreen.module.css';
 
+function getActionLabel(intent: string | null) {
+  switch (intent) {
+    case 'theme_playlist_preview':
+      return { primary: 'SAVE PLAYLIST', secondary: 'QUEUE IT' };
+    case 'queue_replace':
+      return { primary: 'REPLACE QUEUE', secondary: 'REPLAY' };
+    case 'queue_append':
+      return { primary: 'APPEND TO QUEUE', secondary: 'ENQUEUE' };
+    case 'recommend_explain':
+      return { primary: 'EXPLORE', secondary: 'PLAY ALL' };
+    default:
+      return { primary: 'APPLY', secondary: 'ENQUEUE' };
+  }
+}
+
 export function ChatMessageList({
   messages,
   isPending,
@@ -16,41 +31,58 @@ export function ChatMessageList({
 }>) {
   return (
     <div className={styles.messageList}>
-      {messages.map((message) => (
-        <article
-          key={message.id}
-          className={
-            message.role === 'assistant'
-              ? `${styles.chatBubble} ${styles.chatBubbleAssistant}`
-              : `${styles.chatBubble} ${styles.chatBubbleUser}`
-          }
-        >
-          <div className={styles.chatBubbleTopline}>
-            <span className={styles.chatRole}>
-              {message.role === 'assistant' ? 'AI DJ' : 'COMMAND'}
-            </span>
-            <span className={styles.chatBubbleIndex}>TX</span>
-          </div>
-          <p>{message.text}</p>
-          {canSaveGeneratedPlaylists &&
-          message.role === 'assistant' &&
-          message.intent === 'theme_playlist_preview' &&
-          (message.actions?.length ?? 0) > 0 ? (
-            <div className={styles.chatBubbleActions}>
-              <button
-                type="button"
-                className={styles.chatActionButton}
-                onClick={() => onSavePlaylist(message.id)}
-                disabled={savingPlaylistMessageId === message.id}
-              >
-                {savingPlaylistMessageId === message.id
-                  ? 'SAVING...'
-                  : 'SAVE PLAYLIST'}
-              </button>
+      {messages.map((message) => {
+        const hasActions = (message.actions?.length ?? 0) > 0;
+        const labels = getActionLabel(message.intent);
+
+        return (
+          <article
+            key={message.id}
+            className={
+              message.role === 'assistant'
+                ? `${styles.chatBubble} ${styles.chatBubbleAssistant}`
+                : `${styles.chatBubble} ${styles.chatBubbleUser}`
+            }
+          >
+            <div className={styles.chatBubbleTopline}>
+              <span className={styles.chatRole}>
+                {message.role === 'assistant' ? 'AI DJ' : 'COMMAND'}
+              </span>
+              {message.intent ? (
+                <span className={styles.chatBubbleIndex}>
+                  {message.intent.toUpperCase()}
+                </span>
+              ) : (
+                <span className={styles.chatBubbleIndex}>TX</span>
+              )}
             </div>
-          ) : null}
-        </article>
-      ))}
+            <p>{message.text}</p>
+            {message.role === 'assistant' && hasActions ? (
+              <div className={styles.chatBubbleActions}>
+                {message.intent === 'theme_playlist_preview' &&
+                canSaveGeneratedPlaylists ? (
+                  <button
+                    type="button"
+                    className={styles.chatActionButton}
+                    onClick={() => onSavePlaylist(message.id)}
+                    disabled={savingPlaylistMessageId === message.id}
+                  >
+                    {savingPlaylistMessageId === message.id
+                      ? 'SAVING...'
+                      : labels.primary}
+                  </button>
+                ) : (
+                  <span className={styles.chatActionHint}>
+                    {hasActions
+                      ? `${message.actions.length} track${message.actions.length > 1 ? 's' : ''} queued`
+                      : null}
+                  </span>
+                )}
+              </div>
+            ) : null}
+          </article>
+        );
+      })}
 
       {isPending ? (
         <article

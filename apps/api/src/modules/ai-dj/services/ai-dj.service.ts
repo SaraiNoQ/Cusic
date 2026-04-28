@@ -488,6 +488,7 @@ export class AiDjService {
           messageId,
           replyText: fullText,
           actions: payload.actions,
+          intent: streamContext.intent,
         },
       });
 
