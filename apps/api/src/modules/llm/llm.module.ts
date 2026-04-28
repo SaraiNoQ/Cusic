@@ -25,12 +25,15 @@ import { LlmService } from './services/llm.service';
             'LLM_BASE_URL',
             'https://api.deepseek.com/v1',
           ),
-          model: config.get<string>('LLM_MODEL', 'deepseek-chat'),
-          temperature: config.get<number>('LLM_TEMPERATURE', 0.7),
-          maxTokens: config.get<number>('LLM_MAX_TOKENS', 1024),
-          requestTimeoutMs: config.get<number>(
-            'LLM_REQUEST_TIMEOUT_MS',
-            15_000,
+          model: config.get<string>('LLM_MODEL', 'deepseek-v4-pro'),
+          temperature: Number(
+            config.get<string>('LLM_TEMPERATURE', '0.7'),
+          ),
+          maxTokens: Number(
+            config.get<string>('LLM_MAX_TOKENS', '1024'),
+          ),
+          requestTimeoutMs: Number(
+            config.get<string>('LLM_REQUEST_TIMEOUT_MS', '15000'),
           ),
         });
       },
