@@ -48,13 +48,39 @@ export function ChatPanel({
               <div className={styles.djCopy}>
                 <span className={styles.djName}>CUSIC</span>
                 <article className={styles.djBubble}>
-                  <p>
-                    {streamingMessageId
-                      ? 'Transmitting your live DJ reply...'
-                      : isPending
-                        ? 'Calibrating a new transmission path through the current queue...'
-                        : 'AI DJ session live. Open the conversation deck to continue with requests, explanations, and queue changes.'}
-                  </p>
+                  {(() => {
+                    const visibleMessages = messages.filter(
+                      (m) => m.id !== bootMessageId,
+                    );
+                    if (visibleMessages.length === 0) {
+                      return (
+                        <p>
+                          {streamingMessageId
+                            ? 'Transmitting your live DJ reply...'
+                            : isPending
+                              ? 'Calibrating a new transmission path through the current queue...'
+                              : 'AI DJ session live. Open the conversation deck to continue with requests, explanations, and queue changes.'}
+                        </p>
+                      );
+                    }
+                    return visibleMessages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={
+                          message.role === 'assistant'
+                            ? `${styles.djMiniMessage} ${styles.djMiniAssistant}`
+                            : `${styles.djMiniMessage} ${styles.djMiniUser}`
+                        }
+                      >
+                        <span className={styles.djMiniRole}>
+                          {message.role === 'assistant' ? 'CUSIC' : 'YOU'}
+                        </span>
+                        <span className={styles.djMiniText}>
+                          {message.text}
+                        </span>
+                      </div>
+                    ));
+                  })()}
                 </article>
                 <div className={styles.replyRail}>
                   <button type="button" onClick={onOpenConversation}>

@@ -1,3 +1,4 @@
+import { useRef, type KeyboardEvent } from 'react';
 import styles from '../../player/PlayerScreen.module.css';
 
 export function ChatComposer({
@@ -11,18 +12,37 @@ export function ChatComposer({
   onChange: (value: string) => void;
   onSubmit: () => void;
 }>) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      event.key === 'Enter' &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing
+    ) {
+      event.preventDefault();
+      if (value.trim() && !isPending) {
+        void onSubmit();
+      }
+    }
+  };
+
   return (
     <form
       className={styles.composer}
       onSubmit={(event) => {
         event.preventDefault();
-        void onSubmit();
+        if (value.trim()) {
+          void onSubmit();
+        }
       }}
     >
       <textarea
+        ref={textareaRef}
         rows={1}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onKeyDown={handleKeyDown}
         placeholder="Say something to the DJ..."
       />
       <button
