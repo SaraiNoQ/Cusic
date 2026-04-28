@@ -29,9 +29,11 @@ export function RecommendationPanel({
 
   const handleFeedback = (contentId: string, type: 'like' | 'dislike') => {
     const current = feedbackState[contentId];
-    const next = current === type ? null : type;
+    const stateKey = type === 'like' ? 'liked' : 'disliked';
+    const next = current === stateKey ? null : stateKey;
     setFeedbackState((prev) => ({ ...prev, [contentId]: next }));
-    onFeedback?.(contentId, next ?? type);
+    const fbType: 'like' | 'dislike' = next === 'liked' ? 'like' : 'dislike';
+    onFeedback?.(contentId, next ? fbType : type);
   };
 
   return (
