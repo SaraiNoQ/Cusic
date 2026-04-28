@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REMOTE_HOST="${REMOTE_HOST:-root@10.132.166.5}"
+REMOTE_HOST="${REMOTE_HOST:-root@10.132.166.83}"
 REMOTE_DIR="${REMOTE_DIR:-/root/music_app}"
 
 rsync -az --delete \

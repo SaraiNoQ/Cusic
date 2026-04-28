@@ -27,14 +27,25 @@ This document defines the default delivery flow for `Cusic` after the monorepo, 
 ## Server Delivery Flow
 1. Push branch to GitHub and open a PR.
 2. After review, merge into `master`.
-3. On `10.132.166.5`, run:
+3. On `10.132.166.83`, run:
    - `cd /root/music_app && git pull origin master`
-   - `docker compose build`
-   - `docker compose up -d`
+   - `COMPOSE_BAKE=false docker compose build --pull=false <service>`
+   - `docker compose up -d <service>`
 4. Verify:
    - `curl http://127.0.0.1:3001/api/v1/system/health`
    - `curl -I http://127.0.0.1:3000`
    - `docker compose ps`
+
+### Docker Build Notes
+- The server may not have direct access to Docker Hub. A registry mirror is configured in `/etc/docker/daemon.json`:
+  ```json
+  {
+    "registry-mirrors": ["https://docker.1ms.run", "https://docker.xuanyuan.me"],
+    "ipv6": false
+  }
+  ```
+- Use `--pull=false` to avoid re-pulling base images. Only rebuild the service that changed (e.g., `web`, `api`).
+- Use `COMPOSE_BAKE=false` when Bake-related metadata resolution issues occur.
 
 ## Public Tunnel Delivery
 - Public Web traffic is routed by Cloudflare Tunnel from `https://web.sarainoq.cn` to `http://localhost:3000`.

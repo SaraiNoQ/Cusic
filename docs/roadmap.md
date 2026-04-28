@@ -1,8 +1,8 @@
 # Cusic 开发路线图
 
-- 文档版本：v0.2
-- 文档状态：初版
-- 更新时间：2026-04-27
+- 文档版本：v0.3
+- 文档状态：持续更新
+- 更新时间：2026-04-28
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`
 
 ## 1. 目标与当前状态
@@ -27,9 +27,10 @@
 
 当前推进中：
 
-1. `Phase 4` 首轮 AI DJ 闭环已完成。
-2. `Phase 5` imports 已接入首个真实 provider（Jamendo），通过 `JAMENDO_CLIENT_ID` 配置即可使用。Worker 会从 Jamendo API 拉取歌单/专辑曲目，标准化后写入 `content_items` 并创建 `imported` 歌单。同时 API 启动时会从 Jamendo 同步 ~100 首热门曲目作为内容目录种子数据。
-3. 已建立可扩展的 Provider 抽象层（`ImportProvider` interface + `ProviderRegistryService`），后续新增 provider 只需实现接口并注册即可。
+1. `Phase 4` 首轮 AI DJ 闭环已完成，DeepSeek V4 Pro 已接入（LLM Provider 抽象 + 熔断/重试/回退）。
+2. `Phase 5` imports 已接入首个真实 provider（Jamendo），画像与推荐已集成 LLM 解释生成。
+3. 前端 UX 已修复：播放器抖动、音量控制、队列浮窗、聊天面板常驻回复等问题已解决。
+4. 服务器已迁移至 `10.132.166.83`，Docker registry mirror 已配置。
 
 ## 2. 阶段规划总览
 
@@ -227,4 +228,4 @@
 2. 对应文档修订。
 3. 截图或录屏。
 4. 验收清单。
-5. 可在 `10.132.166.5` 上运行的构建结果。
+5. 可在 `10.132.166.83` 上运行的构建结果。
