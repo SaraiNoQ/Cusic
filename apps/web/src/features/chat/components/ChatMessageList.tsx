@@ -1,7 +1,9 @@
 import type { ChatMessageVm } from '@music-ai/shared';
 import styles from '../../player/PlayerScreen.module.css';
 
-function getActionLabel(intent: string | null) {
+import type { AiDjIntent } from '@music-ai/shared';
+
+function getActionLabel(intent: AiDjIntent | null | undefined) {
   switch (intent) {
     case 'theme_playlist_preview':
       return { primary: 'SAVE PLAYLIST', secondary: 'QUEUE IT' };
