@@ -47,6 +47,8 @@ export function usePlayerController() {
   const durationSeconds = usePlayerStore((state) => state.durationSeconds);
   const statusText = usePlayerStore((state) => state.statusText);
   const favoriteIds = usePlayerStore((state) => state.favoriteIds);
+  const volume = usePlayerStore((state) => state.volume);
+  const setVolume = usePlayerStore((state) => state.setVolume);
   const selectedPlaylistId = usePlayerStore(
     (state) => state.selectedPlaylistId,
   );
@@ -465,6 +467,13 @@ export function usePlayerController() {
   };
 
   useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.volume = volume;
+    }
+  }, [volume]);
+
+  useEffect(() => {
     if (!currentTrack) {
       return;
     }
@@ -571,6 +580,8 @@ export function usePlayerController() {
     statusText,
     favoriteIds,
     selectedPlaylistId,
+    volume,
+    setVolume,
     setSelectedPlaylistId,
     refreshPlaylists: () => playlistsQuery.refetch(),
     playTrack,

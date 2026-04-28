@@ -17,6 +17,7 @@ import { usePlayerController } from '../hooks/usePlayerController';
 import { ControlStrip } from './ControlStrip';
 import { DeviceHeader } from './DeviceHeader';
 import { FlipClock } from './FlipClock';
+import { QueueOverlay } from './QueueOverlay';
 import { QueueStrip } from './QueueStrip';
 import { RecommendationOverlay } from './RecommendationOverlay';
 
@@ -37,11 +38,13 @@ export function PlayerScreen() {
   );
   const isChatOverlayOpen = useUiStore((state) => state.isChatOverlayOpen);
   const isImportsOpen = useUiStore((state) => state.isImportsOpen);
+  const isQueueOpen = useUiStore((state) => state.isQueueOpen);
   const setRecommendationOpen = useUiStore(
     (state) => state.setRecommendationOpen,
   );
   const setChatOverlayOpen = useUiStore((state) => state.setChatOverlayOpen);
   const setImportsOpen = useUiStore((state) => state.setImportsOpen);
+  const setQueueOpen = useUiStore((state) => state.setQueueOpen);
   const authUser = useAuthStore((state) => state.user);
   const isAuthOpen = useAuthStore((state) => state.isAuthOpen);
   const isAuthPending = useAuthStore((state) => state.isPending);
@@ -65,6 +68,7 @@ export function PlayerScreen() {
       !isRecommendationOpen &&
       !isChatOverlayOpen &&
       !isImportsOpen &&
+      !isQueueOpen &&
       !isAuthOpen
     ) {
       return;
@@ -80,6 +84,7 @@ export function PlayerScreen() {
     isAuthOpen,
     isChatOverlayOpen,
     isImportsOpen,
+    isQueueOpen,
     isRecommendationOpen,
     search.isSearchOpen,
   ]);
@@ -113,11 +118,25 @@ export function PlayerScreen() {
     };
   }, []);
 
+  const openQueue = () => {
+    search.closeSearch();
+    closeAuth();
+    setChatOverlayOpen(false);
+    setImportsOpen(false);
+    setRecommendationOpen(false);
+    setQueueOpen(true);
+  };
+
+  const closeQueue = () => {
+    setQueueOpen(false);
+  };
+
   const openRecommendation = () => {
     search.closeSearch();
     closeAuth();
     setChatOverlayOpen(false);
     setImportsOpen(false);
+    setQueueOpen(false);
     setRecommendationOpen(true);
   };
 
@@ -127,6 +146,7 @@ export function PlayerScreen() {
 
   const openSearch = () => {
     closeRecommendation();
+    closeQueue();
     setChatOverlayOpen(false);
     setImportsOpen(false);
     search.openSearch();
@@ -134,6 +154,7 @@ export function PlayerScreen() {
 
   const openAuthPanel = () => {
     closeRecommendation();
+    closeQueue();
     setChatOverlayOpen(false);
     setImportsOpen(false);
     openAuth();
@@ -142,6 +163,7 @@ export function PlayerScreen() {
   const openChatOverlay = () => {
     search.closeSearch();
     closeRecommendation();
+    closeQueue();
     closeAuth();
     setImportsOpen(false);
     setChatOverlayOpen(true);
@@ -157,6 +179,7 @@ export function PlayerScreen() {
   const openImports = () => {
     search.closeSearch();
     closeRecommendation();
+    closeQueue();
     closeAuth();
     setChatOverlayOpen(false);
     setImportsOpen(true);
@@ -223,7 +246,8 @@ export function PlayerScreen() {
               progressSeconds={player.progressSeconds}
               durationSeconds={player.durationSeconds}
               statusText={player.statusText}
-              queueDepth={player.queue.length}
+              volume={player.volume}
+              onVolumeChange={(v) => player.setVolume(v)}
               onPrevious={() => void player.playPrevious()}
               onTogglePlayPause={() => void player.togglePlayPause()}
               onNext={() => void player.playNext()}
@@ -244,6 +268,7 @@ export function PlayerScreen() {
               activeIndex={player.activeIndex}
               canOpenImports={Boolean(authUser)}
               onSelectIndex={(index) => void player.playQueueIndex(index)}
+              onOpenQueue={openQueue}
               onOpenImports={openImports}
               onOpenRecommendation={openRecommendation}
             />
@@ -304,6 +329,14 @@ export function PlayerScreen() {
           );
           search.closeSearch();
         }}
+      />
+
+      <QueueOverlay
+        isOpen={isQueueOpen}
+        queue={player.queue}
+        activeIndex={player.activeIndex}
+        onClose={closeQueue}
+        onSelectIndex={(index) => void player.playQueueIndex(index)}
       />
 
       <RecommendationOverlay

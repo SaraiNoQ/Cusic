@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { ChatMessageVm } from '@music-ai/shared';
 import styles from '../../player/PlayerScreen.module.css';
 
@@ -31,8 +32,16 @@ export function ChatMessageList({
   savingPlaylistMessageId?: string;
   onSavePlaylist: (messageId: string) => void;
 }>) {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, [messages, isPending]);
+
   return (
-    <div className={styles.messageList}>
+    <div className={styles.messageList} ref={listRef}>
       {messages.map((message) => {
         const hasActions = (message.actions?.length ?? 0) > 0;
         const labels = getActionLabel(message.intent);

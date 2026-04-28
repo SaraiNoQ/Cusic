@@ -6,6 +6,7 @@ export function QueueStrip({
   activeIndex,
   canOpenImports,
   onSelectIndex,
+  onOpenQueue,
   onOpenRecommendation,
   onOpenImports,
 }: Readonly<{
@@ -13,6 +14,7 @@ export function QueueStrip({
   activeIndex: number;
   canOpenImports: boolean;
   onSelectIndex: (index: number) => void;
+  onOpenQueue: () => void;
   onOpenRecommendation: () => void;
   onOpenImports: () => void;
 }>) {
@@ -45,12 +47,7 @@ export function QueueStrip({
       <button
         type="button"
         className={styles.queueChannel}
-        disabled={!activeTrack}
-        onClick={() => {
-          if (activeTrack) {
-            onSelectIndex(Math.max(activeIndex, 0));
-          }
-        }}
+        onClick={onOpenQueue}
       >
         <span className={styles.queueStatusDot} />
         <span className={styles.queueName}>Cusic</span>

@@ -1,20 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import type { ChatMessageVm } from '@music-ai/shared';
+import { useEffect, useState } from 'react';
 import { useChatStore } from '../../../store/chat-store';
 import styles from '../../player/PlayerScreen.module.css';
 import { ChatComposer } from './ChatComposer';
-
-const fallbackTransmission =
-  "This is Cusic. It's late on the line, and here's a song that moves with your breath. Let every phrase end in a whisper, then lift off the ground a little. After a long day with Claude Code, just breathe.";
-
-function getLatestAssistantMessage(messages: ChatMessageVm[]) {
-  return (
-    [...messages].reverse().find((message) => message.role === 'assistant')
-      ?.text ?? fallbackTransmission
-  );
-}
 
 function getTransmissionTime() {
   return new Intl.DateTimeFormat('en-US', {
@@ -34,7 +23,7 @@ export function ChatPanel({
   onSubmit,
   onOpenConversation,
 }: Readonly<{
-  messages: ChatMessageVm[];
+  messages: import('@music-ai/shared').ChatMessageVm[];
   input: string;
   isPending: boolean;
   prompts: string[];
@@ -48,20 +37,8 @@ export function ChatPanel({
   const [time, setTime] = useState('21:09');
   const streamingMessageId = useChatStore((state) => state.streamingMessageId);
 
-  const streamingText = useMemo(() => {
-    if (!streamingMessageId) {
-      return null;
-    }
-    return (
-      messages.find((m) => m.id === streamingMessageId)?.text || null
-    );
-  }, [streamingMessageId, messages]);
-
-  const transmission = streamingText
-    ? streamingText
-    : isPending
-      ? 'Calibrating a new transmission path through the current library...'
-      : getLatestAssistantMessage(messages);
+  const messageCount = messages.length;
+  const hasConversation = messageCount > 1;
 
   useEffect(() => {
     const update = () => setTime(getTransmissionTime());
@@ -88,7 +65,19 @@ export function ChatPanel({
           <div className={styles.djCopy}>
             <span className={styles.djName}>CUSIC</span>
             <article className={styles.djBubble}>
-              <p>{transmission}</p>
+              {isPending || streamingMessageId ? (
+                <p>
+                  {streamingMessageId
+                    ? 'Transmitting...'
+                    : 'Calibrating a new transmission path...'}
+                </p>
+              ) : (
+                <p>
+                  {hasConversation
+                    ? `AI DJ session active — ${messageCount} messages in lane. Open the console to continue.`
+                    : "This is Cusic. Send a message to start a live DJ session — I'll pick tracks that fit your mood, time, and taste."}
+                </p>
+              )}
             </article>
             <div className={styles.replyRail}>
               <span>{time}</span>

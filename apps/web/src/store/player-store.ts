@@ -11,6 +11,8 @@ type PlayerStore = {
   statusText: string;
   favoriteIds: string[];
   selectedPlaylistId: string;
+  volume: number;
+  setVolume: (volume: number) => void;
   setStatusText: (statusText: string) => void;
   setQueue: (queue: ContentItemDto[]) => void;
   setCurrentTrack: (track: ContentItemDto | null) => void;
@@ -33,6 +35,8 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
   statusText: 'Calibrating player surface…',
   favoriteIds: [],
   selectedPlaylistId: '',
+  volume: 0.8,
+  setVolume: (volume) => set({ volume }),
   setStatusText: (statusText) => set({ statusText }),
   setQueue: (queue) => set({ queue }),
   setCurrentTrack: (currentTrack) => set({ currentTrack }),

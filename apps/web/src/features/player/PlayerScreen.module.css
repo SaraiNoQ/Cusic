@@ -163,7 +163,6 @@
     0 0 72px rgba(255, 159, 76, 0.08);
   transform: scale(var(--device-scale));
   transform-origin: top left;
-  transition: box-shadow 200ms ease;
 }
 
 .deviceShell::before {
@@ -966,8 +965,7 @@
 .iconButtonActive {
   border-color: rgba(255, 153, 44, 0.82);
   color: #ffb365;
-  box-shadow: 0 0 18px rgba(255, 147, 45, 0.16);
-  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(255, 147, 45, 0.16), 0 -2px 8px rgba(255, 147, 45, 0.08);
 }
 
 .utilityCluster {
@@ -999,8 +997,18 @@
   letter-spacing: 0.1em;
 }
 
-.volumeMeter div {
-  position: relative;
+.volumeSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+}
+
+.volumeSlider::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 999px;
   background: linear-gradient(
@@ -1012,16 +1020,38 @@
   box-shadow: 0 0 9px rgba(255, 141, 26, 0.38);
 }
 
-.volumeMeter i {
-  position: absolute;
-  top: 50%;
-  right: 1px;
+.volumeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
   width: 12px;
   height: 12px;
+  margin-top: -4px;
   border-radius: 50%;
   background: #f7be83;
-  transform: translateY(-50%);
   box-shadow: 0 0 11px rgba(255, 186, 117, 0.65);
+  cursor: pointer;
+}
+
+.volumeSlider::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #ff8b18 0%,
+    #ffb15d 84%,
+    rgba(255, 177, 93, 0.12) 84%
+  );
+  box-shadow: 0 0 9px rgba(255, 141, 26, 0.38);
+}
+
+.volumeSlider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: #f7be83;
+  box-shadow: 0 0 11px rgba(255, 186, 117, 0.65);
+  cursor: pointer;
 }
 
 .progressRow {
@@ -1096,8 +1126,7 @@
 .queueUtilityButton:hover {
   border-color: rgba(255, 153, 44, 0.82);
   color: #ffb365;
-  box-shadow: 0 0 18px rgba(255, 147, 45, 0.16);
-  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(255, 147, 45, 0.16), 0 -2px 8px rgba(255, 147, 45, 0.08);
 }
 
 .queueChannel {
@@ -2847,6 +2876,154 @@
   .searchActions {
     justify-content: flex-start;
   }
+}
+
+.queueOverlayCard {
+  position: relative;
+  z-index: 1;
+  align-self: center;
+  width: min(100%, 680px);
+  max-height: min(640px, calc(100dvh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(184, 139, 101, 0.36);
+  border-radius: 28px;
+  background:
+    radial-gradient(
+      circle at 18% 8%,
+      rgba(255, 191, 116, 0.08),
+      transparent 36%
+    ),
+    linear-gradient(180deg, rgba(8, 16, 24, 0.97), rgba(4, 9, 14, 0.985));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58);
+}
+
+.queueOverlayHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(186, 141, 104, 0.22);
+}
+
+.queueOverlayHeader h2 {
+  color: #ff9a3c;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+}
+
+.queueOverlayHeader span {
+  color: rgba(119, 169, 180, 0.72);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+.queueOverlayClose {
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid rgba(184, 139, 101, 0.42);
+  border-radius: 999px;
+  background: rgba(8, 15, 23, 0.88);
+  color: rgba(235, 224, 208, 0.78);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.queueOverlayClose:hover {
+  border-color: rgba(255, 153, 44, 0.82);
+  color: #ffb365;
+  box-shadow: 0 0 18px rgba(255, 147, 45, 0.16);
+}
+
+.queueOverlayList {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.queueOverlayEmpty {
+  color: rgba(190, 198, 201, 0.56);
+  font-size: 15px;
+  line-height: 1.6;
+  text-align: center;
+  padding: 40px 16px;
+}
+
+.queueOverlayItem {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(83, 151, 176, 0.2);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(8, 18, 27, 0.78), rgba(4, 11, 17, 0.9));
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.queueOverlayItem:hover {
+  border-color: rgba(255, 153, 44, 0.52);
+  background: linear-gradient(180deg, rgba(12, 24, 34, 0.84), rgba(6, 14, 21, 0.94));
+}
+
+.queueOverlayItemActive {
+  border-color: rgba(255, 153, 44, 0.72);
+  background: linear-gradient(180deg, rgba(22, 32, 40, 0.88), rgba(10, 18, 26, 0.94));
+  box-shadow: 0 0 18px rgba(255, 147, 45, 0.1);
+}
+
+.queueOverlayIndex {
+  color: #ff9a3c;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.queueOverlayTrackInfo {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.queueOverlayTrackInfo strong {
+  overflow: hidden;
+  color: rgba(238, 225, 207, 0.94);
+  font-size: 15px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queueOverlayTrackInfo span {
+  overflow: hidden;
+  color: rgba(128, 176, 188, 0.7);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queueOverlayDuration {
+  color: rgba(128, 158, 166, 0.56);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-align: right;
 }
 
 @keyframes scanShift {

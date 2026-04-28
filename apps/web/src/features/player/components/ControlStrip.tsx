@@ -9,7 +9,8 @@ export function ControlStrip({
   progressSeconds,
   durationSeconds,
   statusText,
-  queueDepth,
+  volume,
+  onVolumeChange,
   onPrevious,
   onTogglePlayPause,
   onNext,
@@ -22,7 +23,8 @@ export function ControlStrip({
   progressSeconds: number;
   durationSeconds: number;
   statusText: string;
-  queueDepth: number;
+  volume: number;
+  onVolumeChange: (volume: number) => void;
   onPrevious: () => void;
   onTogglePlayPause: () => void;
   onNext: () => void;
@@ -114,14 +116,18 @@ export function ControlStrip({
           >
             FAV
           </button>
-          <div
-            className={styles.volumeMeter}
-            aria-label={`Queue depth ${queueDepth}`}
-          >
+          <div className={styles.volumeMeter}>
             <span>VOL</span>
-            <div>
-              <i />
-            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volume}
+              onChange={(e) => onVolumeChange(Number(e.target.value))}
+              aria-label="Volume"
+              className={styles.volumeSlider}
+            />
           </div>
         </div>
       </div>
