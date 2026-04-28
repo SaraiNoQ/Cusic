@@ -75,7 +75,7 @@ export function ChatMessageList({
                   </button>
                 ) : (
                   <span className={styles.chatActionHint}>
-                    {hasActions
+                    {hasActions && message.actions
                       ? `${message.actions.length} track${message.actions.length > 1 ? 's' : ''} queued`
                       : null}
                   </span>
