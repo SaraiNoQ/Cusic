@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AiDjModule } from './ai-dj/ai-dj.module';
 import { AuthModule } from './auth/auth.module';
 import { ContentModule } from './content/content.module';
@@ -7,6 +8,7 @@ import { EventsModule } from './events/events.module';
 import { ImportsModule } from './imports/imports.module';
 import { KnowledgeModule } from './knowledge/knowledge.module';
 import { LibraryModule } from './library/library.module';
+import { LlmModule } from './llm/llm.module';
 import { ProfileModule } from './profile/profile.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RecommendationModule } from './recommendation/recommendation.module';
@@ -15,8 +17,10 @@ import { VoiceModule } from './voice/voice.module';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
     SystemModule,
     PrismaModule,
+    LlmModule,
     AuthModule,
     ContentModule,
     LibraryModule,

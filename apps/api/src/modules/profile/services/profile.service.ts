@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type {
   TasteProfileDto,
   TasteProfileUpdateResponseDto,
@@ -6,6 +6,7 @@ import type {
   UpdateTasteTagsDto,
 } from '@music-ai/shared';
 import { ContentType, Prisma, SourceType } from '@prisma/client';
+import { LlmService } from '../../llm/services/llm.service';
 import { PrismaService } from '../../prisma/prisma.service';
 
 type ProfileState = Prisma.TasteProfileGetPayload<{
@@ -21,7 +22,12 @@ type TagAccumulator = {
 
 @Injectable()
 export class ProfileService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ProfileService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly llmService: LlmService,
+  ) {}
 
   async getTasteReport(userId: string): Promise<TasteProfileDto> {
     const state = await this.getOrCreateProfileState(userId);
@@ -112,7 +118,7 @@ export class ProfileService {
       weight: tag.weight,
       isNegative: tag.isNegative,
     }));
-    const summary = this.buildSummary(normalizedTags);
+    const summary = await this.buildSummary(normalizedTags);
     const explorationLevel = this.deriveExplorationLevel(normalizedTags);
     const familiarityLevel = this.deriveFamiliarityLevel(normalizedTags);
 
@@ -318,7 +324,7 @@ export class ProfileService {
     }
 
     return {
-      summary: this.buildSummary(tags),
+      summary: await this.buildSummary(tags),
       explorationLevel: this.deriveExplorationLevel(tags),
       familiarityLevel: this.deriveFamiliarityLevel(tags),
       tags,
@@ -360,7 +366,57 @@ export class ProfileService {
     };
   }
 
-  private buildSummary(
+  private async buildSummary(
+    tags: Array<{ type: string; value: string; isNegative: boolean }>,
+  ): Promise<string> {
+    const llmAvailable = await this.llmService.isAvailable();
+
+    if (llmAvailable) {
+      try {
+        return await this.llmProfileSummary(tags);
+      } catch (error) {
+        this.logger.warn(`LLM profile summary failed: ${String(error)}`);
+      }
+    }
+
+    return this.buildSummaryFallback(tags);
+  }
+
+  private async llmProfileSummary(
+    tags: Array<{ type: string; value: string; isNegative: boolean }>,
+  ): Promise<string> {
+    const positive = tags
+      .filter((tag) => !tag.isNegative)
+      .slice(0, 4)
+      .map((tag) => `${tag.type}: ${tag.value}`)
+      .join(', ');
+    const negative = tags
+      .filter((tag) => tag.isNegative)
+      .slice(0, 2)
+      .map((tag) => `${tag.type}: ${tag.value}`)
+      .join(', ');
+
+    const systemPrompt = `You are a music taste profiler for Cusic. Given a user's profile tags, generate a natural 1-2 sentence summary of their listening personality.
+
+Positive preferences: ${positive || 'no strong signals yet'}
+${negative ? `Aversions: ${negative}` : ''}
+
+Use warm, personal language. Mention top preferences first, then any notable aversions. Keep it concise and natural, not a robotic tag list. Reply in English. Return only the summary text, no JSON wrapper.`;
+
+    return this.llmService.chat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: 'Summarize this listener taste profile in 1-2 natural sentences.' },
+      ],
+      {
+        temperature: 0.6,
+        maxTokens: 256,
+        timeoutMs: 5_000,
+      },
+    );
+  }
+
+  private buildSummaryFallback(
     tags: Array<{ type: string; value: string; isNegative: boolean }>,
   ) {
     const positive = tags.filter((tag) => !tag.isNegative).slice(0, 3);

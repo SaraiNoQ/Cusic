@@ -6,6 +6,9 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { RecommendationModule } from '../recommendation/recommendation.module';
 import { AiDjController } from './controllers/ai-dj.controller';
 import { AiDjService } from './services/ai-dj.service';
+import { ContentSelectorService } from './services/content-selector.service';
+import { IntentClassifierService } from './services/intent-classifier.service';
+import { ReplyGeneratorService } from './services/reply-generator.service';
 
 @Module({
   imports: [
@@ -16,6 +19,11 @@ import { AiDjService } from './services/ai-dj.service';
     LibraryModule,
   ],
   controllers: [AiDjController],
-  providers: [AiDjService],
+  providers: [
+    AiDjService,
+    IntentClassifierService,
+    ContentSelectorService,
+    ReplyGeneratorService,
+  ],
 })
 export class AiDjModule {}

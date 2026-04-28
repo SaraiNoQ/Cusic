@@ -3,6 +3,7 @@ import {
   Injectable,
   MessageEvent,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import type {
   AiDjActionDto,
@@ -30,6 +31,12 @@ import { ContentService } from '../../content/services/content.service';
 import { LibraryService } from '../../library/services/library.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RecommendationService } from '../../recommendation/services/recommendation.service';
+import { IntentClassifierService } from './intent-classifier.service';
+import { ContentSelectorService } from './content-selector.service';
+import {
+  ReplyGeneratorService,
+  type ReplyContext,
+} from './reply-generator.service';
 
 type ReplyInput = ChatTurnRequestDto & {
   user?: AuthenticatedUser;
@@ -45,6 +52,18 @@ type ReplyPlan = {
   trace: Record<string, unknown>;
 };
 
+type StreamPlan = {
+  intent: ResolvedIntent;
+  actions: AiDjActionDto[];
+  contentIds: string[];
+  trace: Record<string, unknown>;
+  trackDescriptions: string;
+  tasteSummary?: string;
+  timeOfDay?: string;
+  currentTrackTitle?: string;
+  currentTrackLanguage?: string;
+};
+
 type StreamPayload = {
   sessionId: string;
   messageId: string;
@@ -56,6 +75,7 @@ type StreamPayload = {
 
 @Injectable()
 export class AiDjService {
+  private readonly logger = new Logger(AiDjService.name);
   private readonly streamPayloads = new Map<string, StreamPayload>();
 
   constructor(
@@ -63,6 +83,9 @@ export class AiDjService {
     private readonly contentService: ContentService,
     private readonly recommendationService: RecommendationService,
     private readonly libraryService: LibraryService,
+    private readonly intentClassifier: IntentClassifierService,
+    private readonly contentSelector: ContentSelectorService,
+    private readonly replyGenerator: ReplyGeneratorService,
   ) {}
 
   async reply(input: ReplyInput): Promise<ChatTurnResponseDto> {
@@ -72,6 +95,19 @@ export class AiDjService {
     }
     this.pruneAnonymousStreamPayloads();
 
+    const isStream = input.responseMode === 'stream';
+
+    if (isStream) {
+      return this.replyStreamMode(message, input);
+    }
+
+    return this.replySyncMode(message, input);
+  }
+
+  private async replySyncMode(
+    message: string,
+    input: ReplyInput,
+  ): Promise<ChatTurnResponseDto> {
     const plan = await this.composeReplyPlan(
       message,
       input.surfaceContext,
@@ -112,6 +148,72 @@ export class AiDjService {
       messageId: persisted.messageId,
       intent: plan.intent,
       replyText: plan.replyText,
+      actions: plan.actions,
+    };
+
+    this.registerStreamPayload({
+      ...response,
+      userId: input.user.id,
+      createdAt: Date.now(),
+    });
+
+    return response;
+  }
+
+  private async replyStreamMode(
+    message: string,
+    input: ReplyInput,
+  ): Promise<ChatTurnResponseDto> {
+    const plan = await this.composeStreamPlan(
+      message,
+      input.surfaceContext,
+      input.user?.id,
+      input.timezoneHeader,
+    );
+
+    if (!input.user?.id) {
+      const response = {
+        sessionId: input.sessionId ?? this.createAnonymousSessionId(),
+        messageId: this.createAnonymousMessageId(),
+        intent: plan.intent,
+        replyText: '',
+        actions: plan.actions,
+      };
+      this.registerStreamPayload({
+        ...response,
+        createdAt: Date.now(),
+      });
+      return response;
+    }
+
+    const trace = {
+      ...plan.trace,
+      streamPhase: 1,
+      contentIds: plan.contentIds,
+      trackDescriptions: plan.trackDescriptions,
+      tasteSummary: plan.tasteSummary,
+      timeOfDay: plan.timeOfDay,
+      currentTrackTitle: plan.currentTrackTitle,
+      currentTrackLanguage: plan.currentTrackLanguage,
+      userMessage: message,
+      surfaceContext: input.surfaceContext ?? {},
+    };
+
+    const persisted = await this.persistTurn({
+      userId: input.user.id,
+      sessionId: input.sessionId,
+      userMessage: message,
+      assistantReply: '',
+      assistantActions: plan.actions,
+      trace,
+      timezoneHeader: input.timezoneHeader,
+    });
+
+    const response = {
+      sessionId: persisted.sessionId,
+      messageId: persisted.messageId,
+      intent: plan.intent,
+      replyText: '',
       actions: plan.actions,
     };
 
@@ -268,78 +370,489 @@ export class AiDjService {
     userId?: string;
   }): Observable<MessageEvent> {
     return new Observable<MessageEvent>((subscriber) => {
-      const timers = new Set<ReturnType<typeof setTimeout>>();
+      const abortController = new AbortController();
 
-      const queueEvent = (
-        event:
-          | AiDjStreamChunkEventDto
-          | AiDjStreamActionsEventDto
-          | AiDjStreamDoneEventDto,
-        delayMs: number,
-      ) => {
-        const timer = setTimeout(() => {
-          const { event: eventType, ...data } = event;
-          subscriber.next({
-            type: eventType,
-            data,
-          });
-          timers.delete(timer);
-        }, delayMs);
-        timers.add(timer);
-      };
-
-      void this.resolveStreamPayload(input)
-        .then((payload) => {
-          const chunks = this.chunkReplyText(payload.replyText);
-          chunks.forEach((delta, index) => {
-            queueEvent(
-              {
-                event: 'chunk',
-                sessionId: payload.sessionId,
-                messageId: payload.messageId,
-                delta,
-              },
-              index * 60,
-            );
-          });
-
-          const lastDelay = chunks.length * 60;
-          if (payload.actions.length > 0) {
-            queueEvent(
-              {
-                event: 'actions',
-                sessionId: payload.sessionId,
-                messageId: payload.messageId,
-                actions: payload.actions,
-              },
-              lastDelay + 40,
-            );
-          }
-
-          const doneTimer = setTimeout(() => {
-            subscriber.next({
-              type: 'done',
-              data: {
-                sessionId: payload.sessionId,
-                messageId: payload.messageId,
-                replyText: payload.replyText,
-                actions: payload.actions,
-              },
-            });
-            this.streamPayloads.delete(payload.messageId);
-            subscriber.complete();
-            timers.delete(doneTimer);
-          }, lastDelay + 100);
-          timers.add(doneTimer);
-        })
+      void this.executeStreamReply(input, subscriber, abortController.signal)
         .catch((error) => subscriber.error(error));
 
       return () => {
-        for (const timer of timers) {
-          clearTimeout(timer);
-        }
+        abortController.abort();
       };
     });
+  }
+
+  private async executeStreamReply(
+    input: {
+      sessionId?: string;
+      messageId: string;
+      userId?: string;
+    },
+    subscriber: {
+      next: (event: MessageEvent) => void;
+      complete: () => void;
+    },
+    signal: AbortSignal,
+  ): Promise<void> {
+    const payload = await this.resolveStreamPayload(input);
+    const sessionId = payload.sessionId;
+    const messageId = payload.messageId;
+
+    const streamContext = await this.buildStreamContext(
+      input.messageId,
+      input.userId,
+    );
+
+    if (streamContext) {
+      this.logger.log(`Streaming LLM reply for message ${messageId}`);
+
+      let fullText = '';
+
+      try {
+        fullText = await this.replyGenerator.generateStreamReply(
+          {
+            message: streamContext.userMessage,
+            intent: streamContext.intent,
+            contentIds: streamContext.contentIds,
+            trackDescriptions: streamContext.trackDescriptions,
+            tasteProfileSummary: streamContext.tasteSummary,
+            timeOfDay: streamContext.timeOfDay,
+            currentTrackTitle: streamContext.currentTrackTitle,
+            currentTrackLanguage: streamContext.currentTrackLanguage,
+          },
+          (delta) => {
+            subscriber.next({
+              type: 'chunk',
+              data: {
+                sessionId,
+                messageId,
+                delta,
+              },
+            });
+          },
+          signal,
+        );
+      } catch (error) {
+        this.logger.warn(`LLM streaming failed, using fallback: ${String(error)}`);
+
+        if (signal.aborted) {
+          return;
+        }
+
+        const fallbackPlan: ReplyContext = {
+          message: streamContext.userMessage,
+          intent: streamContext.intent,
+          contentIds: streamContext.contentIds,
+          trackDescriptions: streamContext.trackDescriptions,
+          tasteProfileSummary: streamContext.tasteSummary,
+          timeOfDay: streamContext.timeOfDay,
+          currentTrackTitle: streamContext.currentTrackTitle,
+          currentTrackLanguage: streamContext.currentTrackLanguage,
+        };
+
+        fullText = this.replyGenerator.fallbackGenerate(fallbackPlan);
+        const chars = this.chunkReplyText(fullText);
+        for (const char of chars) {
+          if (signal.aborted) {
+            return;
+          }
+          subscriber.next({
+            type: 'chunk',
+            data: {
+              sessionId,
+              messageId,
+              delta: char,
+            },
+          });
+        }
+      }
+
+      if (signal.aborted) {
+        return;
+      }
+
+      if (payload.actions.length > 0) {
+        subscriber.next({
+          type: 'actions',
+          data: {
+            sessionId,
+            messageId,
+            actions: payload.actions,
+          },
+        });
+      }
+
+      subscriber.next({
+        type: 'done',
+        data: {
+          sessionId,
+          messageId,
+          replyText: fullText,
+          actions: payload.actions,
+        },
+      });
+
+      await this.updatePersistedReply(messageId, fullText);
+
+      this.streamPayloads.delete(messageId);
+      subscriber.complete();
+    } else {
+      const chunks = this.chunkReplyText(payload.replyText);
+
+      let delay = 0;
+      for (const delta of chunks) {
+        if (signal.aborted) {
+          return;
+        }
+        subscriber.next({
+          type: 'chunk',
+          data: {
+            sessionId,
+            messageId,
+            delta,
+          },
+        });
+
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, 60);
+          signal.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer);
+              resolve();
+            },
+            { once: true },
+          );
+        });
+
+        if (signal.aborted) {
+          return;
+        }
+      }
+
+      if (payload.actions.length > 0) {
+        subscriber.next({
+          type: 'actions',
+          data: {
+            sessionId,
+            messageId,
+            actions: payload.actions,
+          },
+        });
+      }
+
+      subscriber.next({
+        type: 'done',
+        data: {
+          sessionId,
+          messageId,
+          replyText: payload.replyText,
+          actions: payload.actions,
+        },
+      });
+
+      this.streamPayloads.delete(messageId);
+      subscriber.complete();
+    }
+  }
+
+  private async buildStreamContext(
+    messageId: string,
+    userId?: string,
+  ): Promise<{
+    userMessage: string;
+    intent: AiDjIntent;
+    contentIds: string[];
+    trackDescriptions: string;
+    tasteSummary?: string;
+    timeOfDay?: string;
+    currentTrackTitle?: string;
+    currentTrackLanguage?: string;
+  } | null> {
+    if (!userId) {
+      return null;
+    }
+
+    const message = await this.prisma.chatMessage.findFirst({
+      where: {
+        id: messageId,
+        role: ChatRole.ASSISTANT,
+        chatSession: {
+          userId,
+          deletedAt: null,
+        },
+      },
+    });
+
+    if (!message) {
+      return null;
+    }
+
+    const trace = this.readJsonObject(message.traceJson);
+    if (!trace) {
+      return null;
+    }
+
+    const userMessage =
+      typeof trace.userMessage === 'string' ? trace.userMessage : '';
+    const intent = this.readIntentFromTrace(trace);
+    const contentIds = Array.isArray(trace.contentIds)
+      ? trace.contentIds.filter(
+          (item): item is string => typeof item === 'string',
+        )
+      : [];
+    const trackDescriptions =
+      typeof trace.trackDescriptions === 'string'
+        ? trace.trackDescriptions
+        : '';
+    const tasteSummary =
+      typeof trace.tasteSummary === 'string'
+        ? trace.tasteSummary
+        : undefined;
+    const timeOfDay =
+      typeof trace.timeOfDay === 'string' ? trace.timeOfDay : undefined;
+    const currentTrackTitle =
+      typeof trace.currentTrackTitle === 'string'
+        ? trace.currentTrackTitle
+        : undefined;
+    const currentTrackLanguage =
+      typeof trace.currentTrackLanguage === 'string'
+        ? trace.currentTrackLanguage
+        : undefined;
+
+    if (!intent || !userMessage) {
+      return null;
+    }
+
+    return {
+      userMessage,
+      intent,
+      contentIds,
+      trackDescriptions,
+      tasteSummary,
+      timeOfDay,
+      currentTrackTitle,
+      currentTrackLanguage,
+    };
+  }
+
+  private async updatePersistedReply(
+    messageId: string,
+    fullText: string,
+  ): Promise<void> {
+    try {
+      await this.prisma.chatMessage.update({
+        where: { id: messageId },
+        data: { contentText: fullText },
+      });
+    } catch (error) {
+      this.logger.error(`Failed to update persisted reply for ${messageId}: ${String(error)}`);
+    }
+  }
+
+  private async composeReplyPlan(
+    message: string,
+    surfaceContext: ChatSurfaceContextDto | undefined,
+    userId?: string,
+    timezoneHeader?: string,
+  ): Promise<ReplyPlan> {
+    const normalized = message.trim().toLowerCase();
+    const intent = await this.intentClassifier.classify(message);
+    const queueIds = surfaceContext?.queueContentIds ?? [];
+
+    const count =
+      intent === 'queue_append' ? 2 : intent === 'theme_playlist_preview' ? 3 : 3;
+    const contentIds = await this.contentSelector.selectContent(message, count);
+
+    const filtered =
+      intent === 'queue_append'
+        ? contentIds.filter((id) => !queueIds.includes(id))
+        : contentIds;
+
+    const picks = filtered.slice(
+      0,
+      intent === 'queue_append' ? 2 : 3,
+    );
+
+    const actions: AiDjActionDto[] =
+      picks.length > 0
+        ? [
+            {
+              type:
+                intent === 'queue_append' ? 'queue_append' : 'queue_replace',
+              payload: { contentIds: picks },
+            },
+          ]
+        : [];
+
+    const trackItems = await this.contentService.getByIds(picks);
+    const trackDescriptions = trackItems
+      .map(
+        (t) =>
+          `"${t.title}" by ${(t.artists ?? []).join(', ')} [${t.language ?? 'en'}, ${t.type}]`,
+      )
+      .join('\n');
+
+    const currentTrackTitle = surfaceContext?.currentTrackId
+      ? (await this.contentService.getById(surfaceContext.currentTrackId))
+          ?.title ?? undefined
+      : undefined;
+
+    const currentTrack = surfaceContext?.currentTrackId
+      ? await this.contentService.getById(surfaceContext.currentTrackId)
+      : null;
+
+    let tasteSummary: string | undefined;
+    let timeOfDay: string | undefined;
+
+    if (userId) {
+      try {
+        const recommendation =
+          await this.recommendationService.getNowRecommendation(
+            userId,
+            timezoneHeader,
+          );
+        tasteSummary = recommendation.explanation;
+
+        const hour = new Date().getHours();
+        timeOfDay =
+          hour < 6
+            ? 'late-night'
+            : hour < 11
+              ? 'morning'
+              : hour < 17
+                ? 'daytime'
+                : hour < 21
+                  ? 'evening'
+                  : 'late-night';
+      } catch {
+        // Non-critical — reply still works without taste context
+      }
+    }
+
+    const replyContext: ReplyContext = {
+      message,
+      intent,
+      contentIds: picks,
+      trackDescriptions,
+      tasteProfileSummary: tasteSummary,
+      timeOfDay,
+      currentTrackTitle,
+      currentTrackLanguage: currentTrack?.language ?? undefined,
+    };
+
+    const replyText = await this.replyGenerator.generateReply(replyContext);
+
+    return {
+      intent,
+      replyText,
+      actions,
+      trace: {
+        intent,
+        matchedContentIds: picks,
+        mode: 'llm_v1',
+        ...(intent === 'theme_playlist_preview'
+          ? {
+              playlistDraft: this.buildPlaylistDraft(message, picks),
+            }
+          : {}),
+      },
+    };
+  }
+
+  private async composeStreamPlan(
+    message: string,
+    surfaceContext: ChatSurfaceContextDto | undefined,
+    userId?: string,
+    timezoneHeader?: string,
+  ): Promise<StreamPlan> {
+    const intent = await this.intentClassifier.classify(message);
+    const queueIds = surfaceContext?.queueContentIds ?? [];
+
+    const count =
+      intent === 'queue_append' ? 2 : intent === 'theme_playlist_preview' ? 3 : 3;
+    const contentIds = await this.contentSelector.selectContent(message, count);
+
+    const filtered =
+      intent === 'queue_append'
+        ? contentIds.filter((id) => !queueIds.includes(id))
+        : contentIds;
+
+    const picks = filtered.slice(
+      0,
+      intent === 'queue_append' ? 2 : 3,
+    );
+
+    const actions: AiDjActionDto[] =
+      picks.length > 0
+        ? [
+            {
+              type:
+                intent === 'queue_append' ? 'queue_append' : 'queue_replace',
+              payload: { contentIds: picks },
+            },
+          ]
+        : [];
+
+    const trackItems = await this.contentService.getByIds(picks);
+    const trackDescriptions = trackItems
+      .map(
+        (t) =>
+          `"${t.title}" by ${(t.artists ?? []).join(', ')} [${t.language ?? 'en'}, ${t.type}]`,
+      )
+      .join('\n');
+
+    const currentTrack = surfaceContext?.currentTrackId
+      ? await this.contentService.getById(surfaceContext.currentTrackId)
+      : null;
+
+    let tasteSummary: string | undefined;
+    let timeOfDay: string | undefined;
+
+    if (userId) {
+      try {
+        const recommendation =
+          await this.recommendationService.getNowRecommendation(
+            userId,
+            timezoneHeader,
+          );
+        tasteSummary = recommendation.explanation;
+
+        const hour = new Date().getHours();
+        timeOfDay =
+          hour < 6
+            ? 'late-night'
+            : hour < 11
+              ? 'morning'
+              : hour < 17
+                ? 'daytime'
+                : hour < 21
+                  ? 'evening'
+                  : 'late-night';
+      } catch {
+        // Non-critical
+      }
+    }
+
+    return {
+      intent,
+      actions,
+      contentIds: picks,
+      trackDescriptions,
+      tasteSummary,
+      timeOfDay,
+      currentTrackTitle: currentTrack?.title ?? undefined,
+      currentTrackLanguage: currentTrack?.language ?? undefined,
+      trace: {
+        intent,
+        matchedContentIds: picks,
+        mode: 'llm_stream_v1',
+        ...(intent === 'theme_playlist_preview'
+          ? {
+              playlistDraft: this.buildPlaylistDraft(message, picks),
+            }
+          : {}),
+      },
+    };
   }
 
   private async persistTurn(input: {
@@ -424,253 +937,6 @@ export class AiDjService {
         messageId: assistantMessage.id,
       };
     });
-  }
-
-  private async composeReplyPlan(
-    message: string,
-    surfaceContext: ChatSurfaceContextDto | undefined,
-    userId?: string,
-    timezoneHeader?: string,
-  ): Promise<ReplyPlan> {
-    const normalized = message.trim().toLowerCase();
-    const intent = this.detectIntent(normalized);
-    const queueIds = surfaceContext?.queueContentIds ?? [];
-
-    switch (intent) {
-      case 'queue_append': {
-        const contentIds = (await this.resolveContentIds(normalized)).filter(
-          (contentId) => !queueIds.includes(contentId),
-        );
-        const picks = contentIds.slice(0, 2);
-        return {
-          intent,
-          replyText:
-            picks.length > 0
-              ? '我在当前队列后面补两段相近但不抢戏的内容，让这条听感线继续往前走。'
-              : '这轮我没有找到适合继续追加的内容，先保持当前队列不动。',
-          actions:
-            picks.length > 0
-              ? [
-                  {
-                    type: 'queue_append',
-                    payload: { contentIds: picks },
-                  },
-                ]
-              : [],
-          trace: {
-            intent,
-            matchedContentIds: picks,
-          },
-        };
-      }
-      case 'recommend_explain': {
-        const replyText = await this.buildExplanationReply(
-          normalized,
-          surfaceContext,
-          userId,
-          timezoneHeader,
-        );
-        return {
-          intent,
-          replyText,
-          actions: [],
-          trace: {
-            intent,
-            currentTrackId: surfaceContext?.currentTrackId ?? null,
-          },
-        };
-      }
-      case 'theme_playlist_preview': {
-        const picks = (await this.resolveContentIds(normalized)).slice(0, 3);
-        const playlistDraft = this.buildPlaylistDraft(message, picks);
-        return {
-          intent,
-          replyText:
-            picks.length > 0
-              ? '我先把这个主题压成一组可直接上机的预览队列，你先听走向，再决定要不要继续扩写。'
-              : '这轮主题还不够清晰，我先保留当前频道。你可以补一句语种、场景或时间段。',
-          actions:
-            picks.length > 0
-              ? [
-                  {
-                    type: 'queue_replace',
-                    payload: { contentIds: picks },
-                  },
-                ]
-              : [],
-          trace: {
-            intent,
-            matchedContentIds: picks,
-            playlistDraft,
-          },
-        };
-      }
-      case 'queue_replace':
-      default: {
-        const picks = (await this.resolveContentIds(normalized)).slice(0, 3);
-        return {
-          intent: 'queue_replace',
-          replyText:
-            picks.length > 0
-              ? '收到。我把主频道切到更贴近你这句指令的航线，先用三段内容把新的听感重心立住。'
-              : '我还没锁定足够明确的方向，先不动当前队列。你可以再补一句语种、场景或风格。',
-          actions:
-            picks.length > 0
-              ? [
-                  {
-                    type: 'queue_replace',
-                    payload: { contentIds: picks },
-                  },
-                ]
-              : [],
-          trace: {
-            intent: 'queue_replace',
-            matchedContentIds: picks,
-          },
-        };
-      }
-    }
-  }
-
-  private async buildExplanationReply(
-    normalizedMessage: string,
-    surfaceContext: ChatSurfaceContextDto | undefined,
-    userId?: string,
-    timezoneHeader?: string,
-  ) {
-    if (surfaceContext?.currentTrackId) {
-      const currentTrack = await this.contentService.getById(
-        surfaceContext.currentTrackId,
-      );
-      if (currentTrack) {
-        const languageCue =
-          currentTrack.language === 'zh'
-            ? '中文声线把夜色拉近'
-            : currentTrack.language === 'instrumental'
-              ? '没有人声会让专注区更稳定'
-              : '英文词面留白更多，适合做背景而不抢注意力';
-
-        return `这首 ${currentTrack.title} 现在成立，主要是因为它的速度和密度都比较克制，${languageCue}。如果你想，我下一轮可以按它继续往更冷、更亮或者更城市化的方向扩。`;
-      }
-    }
-
-    if (userId) {
-      const recommendation =
-        await this.recommendationService.getNowRecommendation(
-          userId,
-          timezoneHeader,
-        );
-      const lead = recommendation.items[0];
-      if (lead) {
-        return `当前这组推荐的核心判断是：${recommendation.explanation}。我把第一首先落在 ${lead.title}，因为它最能把现在这条收听轨道定住。`;
-      }
-    }
-
-    if (normalizedMessage.includes('推荐')) {
-      return '这轮推荐的逻辑更偏向当前时间段和你最近的收听走向，所以我会优先给出稳定、可连续播放的内容，而不是一次性把探索幅度拉得太大。';
-    }
-
-    return '我现在更看重的是当前频道的连续性，所以会优先解释这条听感线为什么成立，再决定要不要整体切换。';
-  }
-
-  private detectIntent(normalizedMessage: string): ResolvedIntent {
-    if (
-      normalizedMessage.includes('为什么') ||
-      normalizedMessage.includes('why') ||
-      normalizedMessage.includes('解释') ||
-      normalizedMessage.includes('背后')
-    ) {
-      return 'recommend_explain';
-    }
-
-    if (
-      normalizedMessage.includes('加') ||
-      normalizedMessage.includes('再来') ||
-      normalizedMessage.includes('append') ||
-      normalizedMessage.includes('补')
-    ) {
-      return 'queue_append';
-    }
-
-    if (
-      normalizedMessage.includes('歌单') ||
-      normalizedMessage.includes('playlist') ||
-      normalizedMessage.includes('来几首') ||
-      normalizedMessage.includes('一组') ||
-      normalizedMessage.includes('做一份')
-    ) {
-      return 'theme_playlist_preview';
-    }
-
-    return 'queue_replace';
-  }
-
-  private async resolveContentIds(normalizedMessage: string) {
-    const pools: string[][] = [];
-
-    if (
-      normalizedMessage.includes('粤语') ||
-      normalizedMessage.includes('cantopop') ||
-      normalizedMessage.includes('港')
-    ) {
-      pools.push(['cnt_canton_midnight', 'cnt_canto_neon', 'cnt_city_rain']);
-    }
-
-    if (
-      normalizedMessage.includes('podcast') ||
-      normalizedMessage.includes('播客') ||
-      normalizedMessage.includes('brief')
-    ) {
-      pools.push(['cnt_podcast_brief', 'cnt_editorial_dusk', 'cnt_focus_fm']);
-    }
-
-    if (
-      normalizedMessage.includes('morning') ||
-      normalizedMessage.includes('早') ||
-      normalizedMessage.includes('通勤')
-    ) {
-      pools.push(['cnt_morning_wire', 'cnt_editorial_dusk', 'cnt_city_rain']);
-    }
-
-    if (
-      normalizedMessage.includes('focus') ||
-      normalizedMessage.includes('工作') ||
-      normalizedMessage.includes('写') ||
-      normalizedMessage.includes('code') ||
-      normalizedMessage.includes('专注')
-    ) {
-      pools.push(['cnt_focus_fm', 'cnt_afterhours_loop', 'cnt_editorial_dusk']);
-    }
-
-    if (
-      normalizedMessage.includes('夜') ||
-      normalizedMessage.includes('late') ||
-      normalizedMessage.includes('深夜') ||
-      normalizedMessage.includes('midnight')
-    ) {
-      pools.push([
-        'cnt_canton_midnight',
-        'cnt_afterhours_loop',
-        'cnt_city_rain',
-      ]);
-    }
-
-    if (
-      normalizedMessage.includes('radio') ||
-      normalizedMessage.includes('电台') ||
-      normalizedMessage.includes('signal')
-    ) {
-      pools.push(['cnt_focus_fm', 'cnt_podcast_brief', 'cnt_editorial_dusk']);
-    }
-
-    pools.push(['cnt_editorial_dusk', 'cnt_focus_fm', 'cnt_afterhours_loop']);
-
-    const merged = [...new Set(pools.flat())];
-    const validIds = (await this.contentService.getByIds(merged)).map(
-      (item) => item.id,
-    );
-
-    return validIds;
   }
 
   private toSessionMessageDto(message: ChatMessage): ChatSessionMessageDto {

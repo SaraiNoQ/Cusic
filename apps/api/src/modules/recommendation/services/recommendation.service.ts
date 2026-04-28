@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import type {
@@ -22,6 +23,7 @@ import {
   SourceType,
 } from '@prisma/client';
 import { ContentService } from '../../content/services/content.service';
+import { LlmService } from '../../llm/services/llm.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ProfileService } from '../../profile/services/profile.service';
 
@@ -54,10 +56,13 @@ export class RecommendationService {
     'cnt_podcast_brief',
   ];
 
+  private readonly logger = new Logger(RecommendationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly contentService: ContentService,
     private readonly profileService: ProfileService,
+    private readonly llmService: LlmService,
   ) {}
 
   async getNowRecommendation(
@@ -73,7 +78,7 @@ export class RecommendationService {
     const profile = await this.profileService.getOrCreateProfileState(userId);
     const ranked = await this.rankCandidates(userId, profile.tags, stamp.hour);
     const top = ranked.slice(0, 3);
-    const explanation = this.buildRecommendationExplanation(
+    const explanation = await this.buildRecommendationExplanation(
       profile.tags,
       stamp.hour,
     );
@@ -161,7 +166,7 @@ export class RecommendationService {
     const profile = await this.profileService.getOrCreateProfileState(userId);
     const ranked = await this.rankCandidates(userId, profile.tags, stamp.hour);
     const picks = ranked.slice(0, 5);
-    const explanation = this.buildDailyExplanation(profile.tags, stamp.hour);
+    const explanation = await this.buildDailyExplanation(profile.tags, stamp.hour);
 
     const playlist = await this.prisma.$transaction(async (tx) => {
       const contextSnapshot = await tx.contextSnapshot.create({
@@ -577,7 +582,69 @@ export class RecommendationService {
     return unique.join(' ');
   }
 
-  private buildRecommendationExplanation(
+  private async buildRecommendationExplanation(
+    tags: Array<{
+      tagType: string;
+      tagValue: string;
+      weight: number;
+      isNegative: boolean;
+    }>,
+    hour: number,
+  ): Promise<string> {
+    const llmAvailable = await this.llmService.isAvailable();
+
+    if (llmAvailable) {
+      try {
+        return await this.llmRecommendationExplanation(tags, hour);
+      } catch (error) {
+        this.logger.warn(`LLM recommendation explanation failed: ${String(error)}`);
+      }
+    }
+
+    return this.buildRecommendationExplanationFallback(tags, hour);
+  }
+
+  private async llmRecommendationExplanation(
+    tags: Array<{
+      tagType: string;
+      tagValue: string;
+      weight: number;
+      isNegative: boolean;
+    }>,
+    hour: number,
+  ): Promise<string> {
+    const segment = this.describeDaySegment(hour);
+    const positive = tags
+      .filter((tag) => !tag.isNegative)
+      .sort((left, right) => right.weight - left.weight)
+      .slice(0, 3);
+
+    const tagDescriptions = positive
+      .map((tag) => `${this.describeTag(tag.tagType, tag.tagValue)} (weight: ${tag.weight.toFixed(2)})`)
+      .join(', ');
+
+    const systemPrompt = `You are Cusic's recommendation engine. Generate a natural 1-2 sentence explanation for why specific tracks were recommended.
+
+Context:
+- Time of day: ${segment}
+- Top user taste tags: ${tagDescriptions || 'new listener, no strong signals yet'}
+
+Write a concise, warm explanation that connects the user's taste profile with the time-of-day context. Do not list tags — weave them into a natural sentence. Reply in English. Return only the explanation text, no JSON wrapper.`;
+
+    return this.llmService.chat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: 'Generate a brief, warm recommendation explanation.' },
+      ],
+      {
+        temperature: 0.7,
+        maxTokens: 256,
+        timeoutMs: 5_000,
+      },
+    );
+  }
+
+  private buildRecommendationExplanationFallback(
     tags: Array<{
       tagType: string;
       tagValue: string;
@@ -600,7 +667,69 @@ export class RecommendationService {
     return `Built for your ${segment} window, leaning on ${this.joinPhrases(topTags)} from your recent profile and playback signals.`;
   }
 
-  private buildDailyExplanation(
+  private async buildDailyExplanation(
+    tags: Array<{
+      tagType: string;
+      tagValue: string;
+      weight: number;
+      isNegative: boolean;
+    }>,
+    hour: number,
+  ): Promise<string> {
+    const llmAvailable = await this.llmService.isAvailable();
+
+    if (llmAvailable) {
+      try {
+        return await this.llmDailyExplanation(tags, hour);
+      } catch (error) {
+        this.logger.warn(`LLM daily explanation failed: ${String(error)}`);
+      }
+    }
+
+    return this.buildDailyExplanationFallback(tags, hour);
+  }
+
+  private async llmDailyExplanation(
+    tags: Array<{
+      tagType: string;
+      tagValue: string;
+      weight: number;
+      isNegative: boolean;
+    }>,
+    hour: number,
+  ): Promise<string> {
+    const segment = this.describeDaySegment(hour);
+    const positive = tags
+      .filter((tag) => !tag.isNegative)
+      .sort((left, right) => right.weight - left.weight)
+      .slice(0, 3);
+
+    const tagDescriptions = positive
+      .map((tag) => `${this.describeTag(tag.tagType, tag.tagValue)} (weight: ${tag.weight.toFixed(2)})`)
+      .join(', ');
+
+    const systemPrompt = `You are Cusic's daily playlist curator. Generate a natural 1-2 sentence description for a daily playlist tailored to the user.
+
+Context:
+- Time of day: ${segment}
+- User taste signals: ${tagDescriptions || 'new listener, no strong signals yet'}
+
+Write a warm, inviting description that captures the mood and the listening arc. Mention the time-of-day context naturally. Reply in English. Return only the description text, no JSON wrapper.`;
+
+    return this.llmService.chat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: 'Describe this daily playlist in 1-2 natural sentences.' },
+      ],
+      {
+        temperature: 0.7,
+        maxTokens: 256,
+        timeoutMs: 5_000,
+      },
+    );
+  }
+
+  private buildDailyExplanationFallback(
     tags: Array<{
       tagType: string;
       tagValue: string;
