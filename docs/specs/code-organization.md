@@ -1,8 +1,8 @@
 # 代码组织规范
 
-- 文档版本：v0.2
+- 文档版本：v0.3
 - 文档状态：生效
-- 更新时间：2026-04-29
+- 更新时间：2026-04-30
 - 关联文档：`docs/specs/engineering-playbook.md`、`docs/specs/api-design.md`
 
 ## 1. 目标
@@ -18,15 +18,18 @@
 
 ## 2. 前端目录规则
 
-前端按“路由装配、feature、状态、API”分层，不按页面堆逻辑。
+前端按"路由装配、feature、状态、API"分层，不按页面堆逻辑。
 
 推荐结构：
 
 1. `apps/web/src/app`
    只放 Next.js 路由、布局和 providers。`theme-sync.tsx` 为客户端组件负责将 `uiStore.theme` 同步到 `document.documentElement.dataset.theme`。`globals.css` 存放全部 CSS 自定义属性（主题 token），按 `:root`（深色默认值）和 `[data-theme='light']`（浅色覆盖值）两层组织。
 2. `apps/web/src/features`
-   按业务能力拆分，如 `player`、`chat`、`search`、`profile`、`atmosphere`。
+   按业务能力拆分，如 `player`、`chat`、`search`、`profile`、`atmosphere`、`settings`。
    - `features/atmosphere`：WebGL 氛围背景着色器（`AtmosphereCanvas.tsx`），深色/浅色双分支渲染，通过 `u_theme` uniform 切换。
+   - `features/settings`：设置页面，包含主题切换（theme toggle）、LLM 开关（LLM toggle）、语音选择器（voice selector）。
+   - `features/chat`：包含 `KnowledgeCard.tsx`（音乐知识响应卡片）和 `VoiceRecordButton.tsx`（按住说话 MediaRecorder 按钮）。
+   - `features/player`：包含 `CusicLogo.tsx`（SVG 金色金属质感 C + USIC 文字 logo）。
    - 各 feature 的 `*.module.css` 中如需针对浅色模式调整装饰层，使用 `:global([data-theme='light']) .className` 选择器穿透模块作用域。
 3. `apps/web/src/lib/api`
    API client、请求封装、模块级 API 方法。
@@ -68,6 +71,14 @@
 5. `types/`
    模块私有类型，不对外暴露。
 
+当前各模块目录结构：
+
+- Knowledge 模块：`controllers/knowledge.controller.ts`、`services/knowledge.service.ts`、`dto/knowledge-query.dto.ts`、`providers/web-search.provider.ts`
+- Voice 模块：`voice.controller.ts`、`voice.service.ts`、`interfaces/voice-provider.interface.ts`、`providers/mimo-voice.provider.ts`、`providers/aliyun-voice.provider.ts`、`providers/stub-voice.provider.ts`
+- Content 模块：`services/embedding.service.ts`
+- Prisma 模块：`vector-search.service.ts`
+- Context 模块：`context.service.ts`
+
 硬约束：
 
 1. controller 不直接拼业务规则。
@@ -98,6 +109,10 @@
 5. API 请求拆到 `lib/api`
 6. 播放器、UI、聊天状态拆到 `store`
 7. `content`、`library`、`events`、`ai-dj` 模块拆出 `dto/controller/service/provider`
+8. Knowledge 模块含 controller/service/provider ✓
+9. Voice 模块含多 Provider ✓
+10. 向量搜索基础设施 ✓
+11. 设置页面 ✓
 
 ## 7. 验收标准
 

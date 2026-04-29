@@ -1,8 +1,8 @@
 # 音乐 AI App 架构设计文档
 
-- 文档版本：v0.1
+- 文档版本：v0.2
 - 文档状态：初版
-- 更新时间：2026-04-23
+- 更新时间：2026-04-30
 - 对齐文档：`docs/RPD.md`
 
 ## 1. 架构目标与约束
@@ -117,6 +117,27 @@
 3. 深色/浅色主题各自拥有独立渲染分支，通过 `u_theme` uniform 切换。
 4. 作为 `PlayerScreen` 的底层 canvas 子组件，不参与 DOM 布局流。
 
+#### 3.2.6 Voice Module
+
+负责语音输入/输出层，支持按键式语音对话。
+
+主要职责：
+
+1. 通过 MediaRecorder API 实现按键式语音录制与上传。
+2. 接收并播放 TTS 音频回放。
+3. 多 Provider 支持：MiMo TTS（mimo-v2.5-tts，支持 VoiceDesign 与 VoiceClone）、阿里云 ASR/TTS、stub 降级。
+4. 在设置页提供语音选择器，内置 8 款 MiMo 预设音色。
+
+#### 3.2.7 Knowledge Module
+
+负责音乐知识问答，以 KnowledgeCard 形式在对话中展示。
+
+主要职责：
+
+1. 接收用户音乐知识问题，通过 LLM 结合内容目录检索生成回答。
+2. 以 KnowledgeCard 组件在前端对话中渲染知识内容。
+3. 展示信息来源引用。
+
 ### 3.3 前端状态分层
 
 前端状态应分为三层：
@@ -192,17 +213,13 @@
 
 职责：
 
-1. 执行外部检索。
-2. 整理艺人、专辑、流派、音乐文化背景资料。
-3. 生成适合播报的讲解文本。
+KnowledgeService with content catalog search + LLM explanation, KnowledgeController with /knowledge/query and /knowledge/traces endpoints, knowledge_query intent integration with AI DJ
 
 #### 4.1.9 VoiceModule
 
 职责：
 
-1. 对接 ASR 与 TTS Provider。
-2. 管理语音输入转写和语音回复生成。
-3. 统一音频格式、超时、重试和错误处理。
+VoiceService with pluggable VoiceProvider (MiMo, Aliyun, Stub), VoiceController with /voice/asr, /voice/tts, /voice/voices, voice-enabled AI DJ chat endpoint
 
 #### 4.1.10 EventModule
 
@@ -242,10 +259,11 @@
 2. `EmbeddingProvider`
 3. `ASRProvider`
 4. `TTSProvider`
-5. `SearchProvider`
-6. `ContentProvider`
-7. `CalendarProvider`
-8. `WeatherProvider`
+5. `VoiceProvider`
+6. `SearchProvider`
+7. `ContentProvider`
+8. `CalendarProvider`
+9. `WeatherProvider`
 
 这样做的目标：
 
@@ -469,6 +487,8 @@ ContentProvider 对外统一返回如下最小字段：
 4. `CSS Modules + CSS Custom Properties`
 5. `TanStack Query`
 6. `Zustand`
+7. Settings page (/settings)
+8. CusicLogo (SVG with gold metallic effect)
 
 ### 8.2 后端
 
@@ -490,14 +510,15 @@ ContentProvider 对外统一返回如下最小字段：
 
 1. `阿里云 Model Studio / Qwen` 作为 LLM 主接入
 2. 使用 OpenAI-compatible 接口封装模型调用
-3. `阿里云 ASR` 处理语音转文本
-4. `阿里云 TTS` 处理中英文语音播报
+3. `阿里云 ASR` 处理语音转文本（备用降级通道）
+4. `小米 MiMo TTS (mimo-v2.5-tts 系列)` 作为主 TTS，备用 `阿里云 TTS`
 
 原因：
 
 1. 中国大陆优先，更便于访问与合规。
 2. 支持中英文和部分方言。
 3. 能减少首版自建模型与语音服务的复杂度。
+4. MiMo TTS 提供更自然的语音合成效果与音色定制能力。
 
 ### 8.5 部署
 

@@ -1,8 +1,8 @@
 # Cusic 开发路线图
 
-- 文档版本：v0.4
+- 文档版本：v0.5
 - 文档状态：持续更新
-- 更新时间：2026-04-29
+- 更新时间：2026-04-30
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`
 
 ## 1. 目标与当前状态
@@ -18,21 +18,18 @@
 5. 第一轮播放器 Demo 闭环。
 6. Phase 2 产品级播放器视觉基线。
 7. 首页信息架构首轮减负：推荐模块从主屏常驻区调整为 Queue 区域入口触发的浮窗，首页继续聚焦播放与 AI DJ 主任务。
+8. 语音与知识模块（VoiceModule: MiMo/阿里云 TTS/ASR, KnowledgeModule: LLM + 内容目录音乐知识问答, ContextModule: 播放事件情绪推导）。
+9. 向量搜索服务（pgvector cosine similarity 候选召回，Taste Profile embedding 生成）。
+10. 设置页面（settings page）、品牌 CusicLogo、语音选择器 UI（voice selector）、知识卡片组件（knowledge cards）。
 
 当前未完成重点：
 
 1. 真实用户体系与真实持久化。
 2. AI DJ 的真实对话与工具编排。
-3. 画像、推荐、导入、语音与知识系统。
 
 当前推进中：
 
-1. `Phase 4` 首轮 AI DJ 闭环已完成，DeepSeek V4 Flash 已接入（LLM Provider 抽象 + 熔断/重试/回退）。意图分类器已加固：LLM 优先分类 + 规则回退 + `mapToValidIntent()` 非标准意图映射，匿名用户已可用 LLM 流式回复。
-2. `Phase 5` imports 已接入首个真实 provider（Jamendo），画像与推荐已集成 LLM 解释生成。Taste Profile 页面已上线（`apps/web/src/features/profile`）。
-3. 前端 UX 已继续收敛：首页字号已上调，顶部 header/hero 纵向占比已压缩，AI DJ 首页空态改为单入口按钮，音量滑杆视觉进度与拖点位置已重新对齐。
-4. 浅色/深色主题系统已上线：通过 CSS 自定义属性 + `data-theme` 属性切换，`DeviceHeader` 中提供 DARK/LIGHT 按钮。
-5. 前端 API 代理已切换为 Next.js rewrites 方案，浏览器端使用同源 `/api/v1/*` 路径，不再直接向 API 域发请求。
-6. 服务器已迁移至 `10.132.166.83`，Docker registry mirror 已配置。
+1. `Phase 7` 加固与上线准备：性能优化、错误监控与日志完善、数据备份与恢复、发布与回滚流程。
 
 ## 2. 阶段规划总览
 
@@ -146,7 +143,9 @@
 
 ### Phase 5：Taste Profile + Recommendation
 
-目标：让产品从”能聊天”升级到”懂用户”。
+目标：让产品从"能聊天"升级到"懂用户"。
+
+状态：**Done**。
 
 核心工作：
 
@@ -154,7 +153,14 @@
 2. 构建用户听歌画像。
 3. 生成此刻推荐与今日歌单。
 
-当前状态：imports 已接入首个真实 provider（Jamendo API），可直接导入 Jamendo 歌单/专辑；内容目录已从 demo mock 升级为真实 Jamendo 曲目库。画像与推荐仍为规则型 baseline，尚未引入向量召回或 LLM 画像分析。
+完成内容：
+
+1. Vector-based candidate recall via pgvector cosine similarity。
+2. Taste profile embedding 生成。
+3. LLM-driven per-item recommendation reasons（推荐解释生成）。
+4. Feedback-to-embedding nudge loop（反馈驱动 embedding 微调循环）。
+5. Mood-aware context scoring（energetic / focused / restless / neutral 情绪感知上下文评分）。
+6. imports 已接入首个真实 provider（Jamendo API），可直接导入 Jamendo 歌单/专辑；内容目录已从 demo mock 升级为真实 Jamendo 曲目库。
 
 交付产物：
 
@@ -169,11 +175,19 @@
 
 目标：把 AI DJ 扩展到语音与音乐知识探索。
 
+状态：**Done**。
+
 核心工作：
 
 1. ASR/TTS。
 2. 艺人、专辑、流派知识讲解。
 3. 主题探索与专题歌单。
+
+完成内容：
+
+1. **VoiceModule**：MiMo TTS provider（mimo-v2.5-tts, VoiceDesign, VoiceClone），Aliyun TTS/ASR provider，Stub fallback，`GET /voice/voices` endpoint。
+2. **KnowledgeModule**：Music knowledge Q&A via LLM + content catalog，KnowledgeTrace / KnowledgeSource 持久化，AI DJ 中新增 `knowledge_query` intent。
+3. **ContextModule**：Mood derivation from playback events（从播放事件推导用户情绪），enriched snapshots（上下文富化快照）。
 
 交付产物：
 
@@ -187,6 +201,8 @@
 ### Phase 7：Hardening & Launch Prep
 
 目标：从可用原型进入可稳定交付阶段。
+
+当前状态：当前阶段 —— 从可用原型进入可稳定交付阶段。
 
 核心工作：
 

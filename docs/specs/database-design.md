@@ -1,8 +1,8 @@
 # 音乐 AI App 数据库设计文档
 
-- 文档版本：v0.2
+- 文档版本：v0.3
 - 文档状态：初版
-- 更新时间：2026-04-27
+- 更新时间：2026-04-30
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`
 
 ## 1. 设计目标与约束
@@ -233,6 +233,10 @@
 2. `index(language, release_date)`
 3. `gin(metadata_json)`
 4. `ivfflat/hnsw(embedding)` 视 pgvector 策略而定
+
+实现记录：
+
+1. `embedding` 向量由 `EmbeddingService.generateForAll()` 通过 LLM embedding API 批量生成，并通过 raw SQL 写入 pgvector 列。
 
 #### 3.3.2 `content_provider_mappings`
 
@@ -467,6 +471,7 @@
 
 1. Phase 3 首版在首次访问 `/profile/taste-report` 时同步生成 baseline profile。
 2. baseline profile 当前基于 `playback_events`、`favorites`、`playlists` 聚合，不依赖导入数据或外部 provider。
+3. `embedding` 向量在向量召回阶段填充，并通过用户反馈 nudge 持续更新。
 
 #### 3.6.2 `taste_profile_tags`
 
@@ -534,7 +539,8 @@
 实现记录：
 
 1. Phase 3 推荐基线会在 `GET /recommend/now` 和首次生成 `GET /playlist/daily` 时落上下文快照。
-2. 首版仅保证 `timezone` 与 `local_time` 真实；`location_text`、`weather_json`、`calendar_summary_json`、`task_label`、`mood_label` 暂为空。
+2. 首版仅保证 `timezone` 与 `local_time` 真实；`location_text`、`weather_json`、`calendar_summary_json`、`task_label` 暂为空。
+3. `mood_label` 现已由 `ContextService.deriveMoodFromRecentEvents()` 填充，基于近期播放事件进行启发式推导，可选值包括 `energetic`、`focused`、`restless`、`neutral`。
 
 ### 3.7 推荐域
 
