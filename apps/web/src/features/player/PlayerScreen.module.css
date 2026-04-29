@@ -567,11 +567,17 @@
   height: 12px;
   border-radius: 50%;
   background: #fff6df;
+  opacity: 0;
   box-shadow:
     0 0 9px 4px rgba(255, 234, 201, 0.9),
     0 0 34px 16px rgba(255, 157, 74, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.72),
     0 0 110px 38px rgba(255, 133, 48, 0.2);
+  transition: opacity 0.8s ease;
+}
+
+.heroPanel:hover .heroSun {
+  opacity: 1;
 }
 
 .heroSun::before {

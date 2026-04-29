@@ -135,90 +135,179 @@ vec3 darkTheme(vec2 uv, vec2 centered, vec2 parallax, float aspect) {
   return color;
 }
 
-/* ── Light theme: NASA-punk editorial space ── */
+/* ── Light theme: NASA-punk cosmic editorial ── */
 vec3 lightTheme(vec2 uv, vec2 centered, vec2 parallax, float aspect) {
-  vec2 p = centered * 1.8;
+  /* ── palette ── */
+  vec3 paper    = vec3(0.961, 0.941, 0.906);
+  vec3 ink      = vec3(0.18, 0.16, 0.13);
+  vec3 amber    = vec3(0.82, 0.56, 0.22);
+  vec3 amberDim = vec3(0.62, 0.38, 0.14);
+  vec3 teal     = vec3(0.34, 0.62, 0.68);
+  vec3 rose     = vec3(0.72, 0.34, 0.28);
+  vec3 gold     = vec3(0.88, 0.68, 0.28);
 
-  /* warm parchment base */
-  vec3 paper = vec3(0.961, 0.941, 0.906);
-  vec3 ink = vec3(0.18, 0.16, 0.13);
-  vec3 amber = vec3(0.82, 0.56, 0.22);
-  vec3 teal = vec3(0.34, 0.62, 0.68);
+  /* ── paper grain ── */
+  float grain  = fbm(uv * 340.0 + parallax * 14.0) * 0.022;
+  float grain2 = fbm(uv * 190.0 - parallax * 9.0 + u_time * 0.002) * 0.012;
+  vec3 color   = paper - grain - grain2;
 
-  /* subtle noise texture — like aged paper grain */
-  float grain = fbm(uv * 280.0 + parallax * 20.0) * 0.03;
-  vec3 color = paper - grain;
+  /* ── animated nebula ribbons ── */
+  float nebA = fbm(uv * 1.6 + parallax * 1.4 + vec2(u_time * 0.014, 0.0));
+  float nebB = fbm(uv * 2.2 - parallax * 0.7 + vec2(0.0, u_time * 0.011));
+  float nebC = fbm(uv * 3.0 + parallax * 0.5 + vec2(u_time * 0.009, -u_time * 0.006));
+  color += amber * nebA * 0.06;
+  color += teal  * nebB * 0.044;
+  color += rose  * nebC * 0.028;
 
-  /* warm nebula wash — very subtle */
-  float nebulaA = fbm(uv * 1.8 + parallax + vec2(u_time * 0.008, 0.0));
-  float nebulaB = fbm(uv * 2.4 - parallax * 0.6 + vec2(0.0, u_time * 0.005));
-  color += amber * nebulaA * 0.045;
-  color += teal * nebulaB * 0.03;
+  /* ── grand sun with solar corona ── */
+  vec2 sunCenter = vec2(0.5, -0.28);
+  float sunDist  = length(uv - sunCenter);
+  float sunBody  = 1.0 - smoothstep(0.18, 0.42, sunDist);
+  color += gold  * sunBody * 0.18;
+  color += amber * sunBody * 0.12;
 
-  /* constellation star dots — tiny dark ink points */
-  float dotA = stars(uv + parallax * 0.3, 60.0, 0.975, 0.8);
-  float dotB = stars(uv + parallax * 0.6 + vec2(u_time * 0.001, 0.0), 100.0, 0.985, 1.2);
-  color = mix(color, ink, dotA * 0.55);
-  color = mix(color, amber * 0.6, dotB * 0.35);
-
-  /* constellation lines — connect nearby bright stars */
-  vec2 s1 = vec2(0.15, 0.32) + parallax * 0.3;
-  vec2 s2 = vec2(0.28, 0.22) + parallax * 0.3;
-  vec2 s3 = vec2(0.38, 0.38) + parallax * 0.3;
-  vec2 s4 = vec2(0.22, 0.48) + parallax * 0.3;
-  vec2 s5 = vec2(0.72, 0.65) + parallax * 0.5;
-  vec2 s6 = vec2(0.82, 0.55) + parallax * 0.5;
-  vec2 s7 = vec2(0.78, 0.72) + parallax * 0.5;
-
-  float line = 0.0;
-  line += constellationLine(s1, s2, uv, 0.0008);
-  line += constellationLine(s2, s3, uv, 0.0008);
-  line += constellationLine(s2, s4, uv, 0.0008);
-  line += constellationLine(s5, s6, uv, 0.0006);
-  line += constellationLine(s6, s7, uv, 0.0006);
-  line += constellationLine(s5, s7, uv, 0.0006);
-  color = mix(color, ink * 0.5, line * 0.18);
-
-  /* star dots at constellation vertices */
-  vec2 verts[7];
-  verts[0] = s1; verts[1] = s2; verts[2] = s3; verts[3] = s4;
-  verts[4] = s5; verts[5] = s6; verts[6] = s7;
-  for (int i = 0; i < 7; i++) {
-    float d = length(uv - verts[i]);
-    float dot = smoothstep(0.006, 0.001, d);
-    float glow = smoothstep(0.04, 0.0, d);
-    color = mix(color, ink, dot * 0.7);
-    color += amber * glow * 0.06;
+  /* solar corona wisps */
+  for (int i = 0; i < 5; i++) {
+    float a = float(i) * 1.256 + u_time * 0.04;
+    float coronaArm = sunBody * smoothstep(0.44, 0.18, sunDist) *
+      (0.28 + 0.72 * (sin(atan(uv.y - sunCenter.y, uv.x - sunCenter.x) * 3.0 + a) * 0.5 + 0.5));
+    color += gold * coronaArm * 0.07;
   }
 
-  /* orbital arcs — NASA-punk geometric overlay */
-  float arc1 = orbitalArc(uv, vec2(0.5, 0.5), 0.38, 0.0012, 0.8, 2.2);
-  float arc2 = orbitalArc(uv, vec2(0.5, 0.5), 0.52, 0.0008, -0.4, 1.6);
-  float arc3 = orbitalArc(uv, vec2(0.3, 0.3), 0.22, 0.001, 1.2, 1.8);
-  color = mix(color, teal * 0.7, arc1 * 0.12);
-  color = mix(color, amber * 0.7, arc2 * 0.1);
-  color = mix(color, ink * 0.6, arc3 * 0.08);
+  /* solar halo rings */
+  float halo1 = smoothstep(0.006, 0.001, abs(sunDist - 0.26));
+  float halo2 = smoothstep(0.008, 0.002, abs(sunDist - 0.34));
+  float halo3 = smoothstep(0.01, 0.003, abs(sunDist - 0.44));
+  color = mix(color, gold * 1.2,  halo1 * 0.16);
+  color = mix(color, amber * 0.8, halo2 * 0.11);
+  color = mix(color, amber * 0.4, halo3 * 0.06);
 
-  /* subtle cross-hairs at center — mission control aesthetic */
-  float crossH = smoothstep(0.0008, 0.0002, abs(uv.y - 0.5)) * smoothstep(0.18, 0.0, abs(uv.x - 0.5));
-  float crossV = smoothstep(0.0008, 0.0002, abs(uv.x - 0.5)) * smoothstep(0.18, 0.0, abs(uv.y - 0.5));
-  color = mix(color, ink * 0.4, (crossH + crossV) * 0.06);
+  /* ── star field — two layers ── */
+  float starsA = stars(uv + parallax * 0.5 + vec2(u_time * 0.004, 0.0), 130.0, 0.968, 2.4);
+  float starsB = stars(uv + parallax * 0.8 + vec2(-u_time * 0.003, u_time * 0.002), 200.0, 0.978, 3.6);
+  color = mix(color, ink, starsA * 0.48);
+  color = mix(color, amberDim, starsB * 0.3);
+  color += gold * starsA * 0.04;
 
-  /* faint ring — planetary orbit */
-  float ring = smoothstep(0.003, 0.0005, abs(length(uv - vec2(0.5, 0.5)) - 0.31));
-  color = mix(color, amber * 0.5, ring * 0.06);
+  /* ── constellation network ── */
+  vec2 c[10];
+  c[0] = vec2(0.08, 0.25) + parallax * 0.2;   c[1] = vec2(0.18, 0.14) + parallax * 0.2;
+  c[2] = vec2(0.14, 0.36) + parallax * 0.2;   c[3] = vec2(0.26, 0.22) + parallax * 0.2;
+  c[4] = vec2(0.34, 0.42) + parallax * 0.2;   c[5] = vec2(0.68, 0.58) + parallax * 0.4;
+  c[6] = vec2(0.82, 0.48) + parallax * 0.4;   c[7] = vec2(0.76, 0.38) + parallax * 0.4;
+  c[8] = vec2(0.86, 0.64) + parallax * 0.4;   c[9] = vec2(0.74, 0.74) + parallax * 0.4;
 
-  /* warm corner glow — like sunlight on parchment */
-  float cornerGlow = 1.0 / (1.0 + dot(uv - vec2(0.12, 0.85), uv - vec2(0.12, 0.85)) * 18.0);
-  color += amber * cornerGlow * 0.08;
+  float lines = 0.0;
+  lines += constellationLine(c[0], c[1], uv, 0.0006);
+  lines += constellationLine(c[1], c[3], uv, 0.0006);
+  lines += constellationLine(c[0], c[2], uv, 0.0006);
+  lines += constellationLine(c[2], c[3], uv, 0.0006);
+  lines += constellationLine(c[3], c[4], uv, 0.0006);
+  lines += constellationLine(c[5], c[6], uv, 0.0005);
+  lines += constellationLine(c[6], c[7], uv, 0.0005);
+  lines += constellationLine(c[5], c[8], uv, 0.0005);
+  lines += constellationLine(c[8], c[9], uv, 0.0005);
+  lines += constellationLine(c[7], c[9], uv, 0.0005);
+  color = mix(color, ink * 0.55, lines * 0.22);
 
-  /* energy-reactive subtle pulse */
-  float pulse = sin(u_time * 1.8) * 0.5 + 0.5;
-  color += amber * u_energy * pulse * 0.015;
+  /* constellation vertices with glow */
+  for (int ii = 0; ii < 10; ii++) {
+    float d = length(uv - c[ii]);
+    float dot = smoothstep(0.005, 0.0008, d);
+    float glow = smoothstep(0.045, 0.0, d);
+    color = mix(color, ink, dot * 0.65);
+    color += gold * glow * 0.07;
+  }
 
-  /* vignette — like an old photograph */
-  float vignette = smoothstep(0.95, 0.35, length(centered));
-  color = mix(color * 0.88, color, vignette);
+  /* ── orbital mechanics — animated ── */
+  vec2 orbCenter = vec2(0.5, 0.55);
+  float orbAngle  = u_time * 0.06;    /* slow rotation */
+  float orbAngle2 = u_time * 0.093;
+
+  float orb1 = orbitalArc(uv, orbCenter, 0.28, 0.001, orbAngle, 2.5);
+  float orb2 = orbitalArc(uv, orbCenter, 0.38, 0.0008, orbAngle2 + 1.4, 2.0);
+  float orb3 = orbitalArc(uv, orbCenter, 0.48, 0.001, orbAngle - 0.7, 3.0);
+  float orb4 = orbitalArc(uv, orbCenter, 0.22, 0.0006, orbAngle2 + 2.8, 1.5);
+
+  color = mix(color, teal * 0.7,  orb1 * 0.14);
+  color = mix(color, amber * 0.65, orb2 * 0.12);
+  color = mix(color, ink * 0.5,   orb3 * 0.09);
+  color = mix(color, gold * 0.5,  orb4 * 0.1);
+
+  /* ── planet transit silhouette ── */
+  vec2 planetCenter = vec2(0.3 + u_time * 0.015, 0.68);
+  float planetDist = length(uv - planetCenter);
+  float planetBody = 1.0 - smoothstep(0.08, 0.12, planetDist);
+  color = mix(color, ink * 0.5, planetBody * 0.3);
+
+  /* planetary ring */
+  float ringDist = abs(length(uv - planetCenter) - 0.13);
+  float ringMask = smoothstep(0.006, 0.001, ringDist);
+  /* tilt the ring */
+  float ringTilt = smoothstep(0.0, 0.04, abs((uv.y - planetCenter.y) * 0.7 - (uv.x - planetCenter.x) * 0.3));
+  color = mix(color, gold * 0.7, ringMask * ringTilt * 0.25);
+
+  /* subtle planet detail — bands */
+  float band = planetBody * smoothstep(0.0, 0.04, abs(uv.y - planetCenter.y) - 0.03);
+  color = mix(color, ink * 0.3, band * 0.4);
+
+  /* ── cross-hairs — mission control ── */
+  float cx = smoothstep(0.0006, 0.0001, abs(uv.y - 0.44)) * smoothstep(0.16, 0.0, abs(uv.x - 0.5));
+  float cy = smoothstep(0.0006, 0.0001, abs(uv.x - 0.5)) * smoothstep(0.16, 0.0, abs(uv.y - 0.44));
+  float cross = cx + cy;
+
+  /* concentric pairs */
+  float ch2 = smoothstep(0.0006, 0.0001, abs(uv.y - 0.56)) * smoothstep(0.16, 0.0, abs(uv.x - 0.5))
+             + smoothstep(0.0006, 0.0001, abs(uv.x - 0.5)) * smoothstep(0.16, 0.0, abs(uv.y - 0.56));
+  color = mix(color, ink * 0.35, cross * 0.07);
+  color = mix(color, ink * 0.2, ch2 * 0.04);
+
+  /* ── radiation rings pulsing from solar center ── */
+  float radPulse = sin(u_time * 0.8) * 0.5 + 0.5;
+  float dashMod = sin(atan(uv.y - sunCenter.y, uv.x - sunCenter.x) * 36.0 + u_time * 1.2) * 0.5 + 0.5;
+  float radR1 = smoothstep(0.012, 0.002, abs(sunDist - 0.52)) * (0.4 + 0.6 * radPulse);
+  float radR2 = smoothstep(0.014, 0.003, abs(sunDist - 0.62)) * (0.3 + 0.7 * dashMod);
+  color = mix(color, amber * 0.45, radR1 * dashMod * 0.08);
+  color = mix(color, gold * 0.35,  radR2 * 0.06);
+
+  /* ── comets ── */
+  float comet1 = 0.0;
+  {
+    vec2 head = vec2(0.72 + u_time * 0.022, 0.78 + sin(2.9 + u_time * 0.03) * 0.12);
+    float dist = length(uv - head);
+    float t = dot(uv - head, vec2(-0.82, -0.34)) / max(length(uv - head), 0.001);
+    float tail = smoothstep(0.002, 0.0, dist) * smoothstep(0.28, 0.0, t) * smoothstep(-0.0, 0.02, t);
+    float headMask = smoothstep(0.006, 0.001, dist);
+    comet1 = headMask + tail * 0.3;
+  }
+
+  float comet2 = 0.0;
+  {
+    vec2 h2 = vec2(0.18 - u_time * 0.017, 0.32 + cos(4.2 + u_time * 0.025) * 0.09);
+    float d2 = length(uv - h2);
+    float t2 = dot(uv - h2, vec2(0.78, 0.42)) / max(length(uv - h2), 0.001);
+    float tail2 = smoothstep(0.0015, 0.0, d2) * smoothstep(0.22, 0.0, t2) * smoothstep(-0.0, 0.02, t2);
+    float head2 = smoothstep(0.005, 0.0008, d2);
+    comet2 = head2 + tail2 * 0.25;
+  }
+
+  color = mix(color, gold * 0.9,  comet1 * 0.4);
+  color = mix(color, amber * 0.7, comet2 * 0.32);
+
+  /* ── subtle isometric grid — NASA-punk blueprint feel ── */
+  float gridX = abs(fract(uv.x * 24.0 + uv.y * 12.0) - 0.5) * 2.0;
+  float gridY = abs(fract(uv.y * 24.0 + uv.x * 12.0) - 0.5) * 2.0;
+  float grid = smoothstep(0.92, 0.98, gridX) * smoothstep(0.92, 0.98, gridY);
+  color = mix(color, ink * 0.18, grid * 0.03);
+
+  /* ── energy-reactive pulse ── */
+  float pulse = sin(u_time * 2.4) * 0.5 + 0.5;
+  color += gold * u_energy * pulse * 0.018;
+  color += amber * u_energy * (1.0 - pulse) * 0.01;
+
+  /* ── vignette — vintage photograph edge ── */
+  float vignette = smoothstep(0.96, 0.3, length(centered));
+  color = mix(color * 0.9, color, vignette);
 
   return color;
 }
