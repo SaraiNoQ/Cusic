@@ -19,6 +19,7 @@ uniform vec2 u_resolution;
 uniform vec2 u_mouse;
 uniform float u_time;
 uniform float u_energy;
+uniform float u_theme;
 
 varying vec2 v_uv;
 
@@ -72,12 +73,27 @@ float stars(vec2 uv, float scale, float threshold, float speed) {
   return starShape * step(threshold, rnd) * twinkle * brightness;
 }
 
-void main() {
-  vec2 uv = v_uv;
-  float aspect = u_resolution.x / max(u_resolution.y, 1.0);
-  vec2 centered = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
-  vec2 parallax = (u_mouse - 0.5) * 0.035;
+/* ── Light theme: constellation lines between nearby stars ── */
+float constellationLine(vec2 a, vec2 b, vec2 uv, float thickness) {
+  vec2 pa = uv - a;
+  vec2 ba = b - a;
+  float t = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+  float d = length(pa - ba * t);
+  return smoothstep(thickness, thickness * 0.3, d);
+}
 
+/* ── Light theme: orbital arc ── */
+float orbitalArc(vec2 uv, vec2 center, float radius, float thickness, float startAngle, float sweep) {
+  vec2 d = uv - center;
+  float angle = atan(d.y, d.x);
+  float r = length(d);
+  float arc = smoothstep(thickness, thickness * 0.2, abs(r - radius));
+  float mask = smoothstep(startAngle - 0.02, startAngle, angle) * smoothstep(startAngle + sweep + 0.02, startAngle + sweep, angle);
+  return arc * mask;
+}
+
+/* ── Dark theme (original) ── */
+vec3 darkTheme(vec2 uv, vec2 centered, vec2 parallax, float aspect) {
   vec3 color = mix(vec3(0.006, 0.014, 0.024), vec3(0.018, 0.038, 0.062), uv.y);
   color += vec3(0.015, 0.034, 0.058) * fbm(centered * 2.4 + parallax + vec2(0.0, u_time * 0.015));
 
@@ -115,6 +131,107 @@ void main() {
 
   float vignette = smoothstep(0.88, 0.24, length(centered));
   color *= 0.68 + vignette * 0.42;
+
+  return color;
+}
+
+/* ── Light theme: NASA-punk editorial space ── */
+vec3 lightTheme(vec2 uv, vec2 centered, vec2 parallax, float aspect) {
+  vec2 p = centered * 1.8;
+
+  /* warm parchment base */
+  vec3 paper = vec3(0.961, 0.941, 0.906);
+  vec3 ink = vec3(0.18, 0.16, 0.13);
+  vec3 amber = vec3(0.82, 0.56, 0.22);
+  vec3 teal = vec3(0.34, 0.62, 0.68);
+
+  /* subtle noise texture — like aged paper grain */
+  float grain = fbm(uv * 280.0 + parallax * 20.0) * 0.03;
+  vec3 color = paper - grain;
+
+  /* warm nebula wash — very subtle */
+  float nebulaA = fbm(uv * 1.8 + parallax + vec2(u_time * 0.008, 0.0));
+  float nebulaB = fbm(uv * 2.4 - parallax * 0.6 + vec2(0.0, u_time * 0.005));
+  color += amber * nebulaA * 0.045;
+  color += teal * nebulaB * 0.03;
+
+  /* constellation star dots — tiny dark ink points */
+  float dotA = stars(uv + parallax * 0.3, 60.0, 0.975, 0.8);
+  float dotB = stars(uv + parallax * 0.6 + vec2(u_time * 0.001, 0.0), 100.0, 0.985, 1.2);
+  color = mix(color, ink, dotA * 0.55);
+  color = mix(color, amber * 0.6, dotB * 0.35);
+
+  /* constellation lines — connect nearby bright stars */
+  vec2 s1 = vec2(0.15, 0.32) + parallax * 0.3;
+  vec2 s2 = vec2(0.28, 0.22) + parallax * 0.3;
+  vec2 s3 = vec2(0.38, 0.38) + parallax * 0.3;
+  vec2 s4 = vec2(0.22, 0.48) + parallax * 0.3;
+  vec2 s5 = vec2(0.72, 0.65) + parallax * 0.5;
+  vec2 s6 = vec2(0.82, 0.55) + parallax * 0.5;
+  vec2 s7 = vec2(0.78, 0.72) + parallax * 0.5;
+
+  float line = 0.0;
+  line += constellationLine(s1, s2, uv, 0.0008);
+  line += constellationLine(s2, s3, uv, 0.0008);
+  line += constellationLine(s2, s4, uv, 0.0008);
+  line += constellationLine(s5, s6, uv, 0.0006);
+  line += constellationLine(s6, s7, uv, 0.0006);
+  line += constellationLine(s5, s7, uv, 0.0006);
+  color = mix(color, ink * 0.5, line * 0.18);
+
+  /* star dots at constellation vertices */
+  vec2 verts[7];
+  verts[0] = s1; verts[1] = s2; verts[2] = s3; verts[3] = s4;
+  verts[4] = s5; verts[5] = s6; verts[6] = s7;
+  for (int i = 0; i < 7; i++) {
+    float d = length(uv - verts[i]);
+    float dot = smoothstep(0.006, 0.001, d);
+    float glow = smoothstep(0.04, 0.0, d);
+    color = mix(color, ink, dot * 0.7);
+    color += amber * glow * 0.06;
+  }
+
+  /* orbital arcs — NASA-punk geometric overlay */
+  float arc1 = orbitalArc(uv, vec2(0.5, 0.5), 0.38, 0.0012, 0.8, 2.2);
+  float arc2 = orbitalArc(uv, vec2(0.5, 0.5), 0.52, 0.0008, -0.4, 1.6);
+  float arc3 = orbitalArc(uv, vec2(0.3, 0.3), 0.22, 0.001, 1.2, 1.8);
+  color = mix(color, teal * 0.7, arc1 * 0.12);
+  color = mix(color, amber * 0.7, arc2 * 0.1);
+  color = mix(color, ink * 0.6, arc3 * 0.08);
+
+  /* subtle cross-hairs at center — mission control aesthetic */
+  float crossH = smoothstep(0.0008, 0.0002, abs(uv.y - 0.5)) * smoothstep(0.18, 0.0, abs(uv.x - 0.5));
+  float crossV = smoothstep(0.0008, 0.0002, abs(uv.x - 0.5)) * smoothstep(0.18, 0.0, abs(uv.y - 0.5));
+  color = mix(color, ink * 0.4, (crossH + crossV) * 0.06);
+
+  /* faint ring — planetary orbit */
+  float ring = smoothstep(0.003, 0.0005, abs(length(uv - vec2(0.5, 0.5)) - 0.31));
+  color = mix(color, amber * 0.5, ring * 0.06);
+
+  /* warm corner glow — like sunlight on parchment */
+  float cornerGlow = 1.0 / (1.0 + dot(uv - vec2(0.12, 0.85), uv - vec2(0.12, 0.85)) * 18.0);
+  color += amber * cornerGlow * 0.08;
+
+  /* energy-reactive subtle pulse */
+  float pulse = sin(u_time * 1.8) * 0.5 + 0.5;
+  color += amber * u_energy * pulse * 0.015;
+
+  /* vignette — like an old photograph */
+  float vignette = smoothstep(0.95, 0.35, length(centered));
+  color = mix(color * 0.88, color, vignette);
+
+  return color;
+}
+
+void main() {
+  vec2 uv = v_uv;
+  float aspect = u_resolution.x / max(u_resolution.y, 1.0);
+  vec2 centered = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
+  vec2 parallax = (u_mouse - 0.5) * 0.035;
+
+  vec3 color = mix(darkTheme(uv, centered, parallax, aspect),
+                   lightTheme(uv, centered, parallax, aspect),
+                   u_theme);
 
   gl_FragColor = vec4(color, 1.0);
 }
@@ -169,9 +286,11 @@ function createProgram(gl: WebGLRenderingContext) {
 export function AtmosphereCanvas({
   className,
   isPlaying = false,
+  theme = 'dark',
 }: Readonly<{
   className?: string;
   isPlaying?: boolean;
+  theme?: 'dark' | 'light';
 }>) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -202,6 +321,7 @@ export function AtmosphereCanvas({
     const mouseLocation = gl.getUniformLocation(program, 'u_mouse');
     const timeLocation = gl.getUniformLocation(program, 'u_time');
     const energyLocation = gl.getUniformLocation(program, 'u_energy');
+    const themeLocation = gl.getUniformLocation(program, 'u_theme');
     const positionBuffer = gl.createBuffer();
 
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -250,6 +370,9 @@ export function AtmosphereCanvas({
       if (energyLocation) {
         gl.uniform1f(energyLocation, isPlaying ? 1 : 0);
       }
+      if (themeLocation) {
+        gl.uniform1f(themeLocation, theme === 'light' ? 1.0 : 0.0);
+      }
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       animationFrame = window.requestAnimationFrame(draw);
@@ -267,7 +390,7 @@ export function AtmosphereCanvas({
       gl.deleteBuffer(positionBuffer);
       gl.deleteProgram(program);
     };
-  }, [isPlaying]);
+  }, [isPlaying, theme]);
 
   return <canvas ref={canvasRef} className={className} aria-hidden="true" />;
 }

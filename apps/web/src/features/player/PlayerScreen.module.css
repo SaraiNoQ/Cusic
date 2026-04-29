@@ -1329,7 +1329,7 @@
 }
 
 .dailySummary strong {
-  color: rgba(239, 228, 212, 0.92);
+  color: var(--text-primary);
   font-size: 16px;
   font-weight: 500;
 }
@@ -2110,7 +2110,7 @@
 }
 
 .importFormFooter p {
-  color: rgba(238, 225, 207, 0.72);
+  color: var(--text-fade);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -2355,7 +2355,7 @@
   padding: 0 14px;
   border: 1px solid var(--border-warm-strong);
   border-radius: 999px;
-  color: rgba(238, 225, 207, 0.86);
+  color: var(--text-primary);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -3097,7 +3097,7 @@
   border: 1px solid var(--border-warm-strong);
   border-radius: 999px;
   background: var(--bg-button);
-  color: rgba(235, 224, 208, 0.78);
+  color: var(--text-primary);
   font-size: 12px;
   letter-spacing: 0.1em;
   transition:
@@ -3219,31 +3219,26 @@
 
 /* ── Light theme overrides ── */
 
-:global([data-theme='light']) .canvas {
-  opacity: 0.06;
-  mix-blend-mode: multiply;
-}
-
 :global([data-theme='light']) .noise {
-  opacity: 0.15;
+  opacity: 0.1;
+  mix-blend-mode: multiply;
 }
 
 :global([data-theme='light']) .backgroundBloom {
   mix-blend-mode: multiply;
-  opacity: 0.4;
+  opacity: 0.3;
 }
 
 :global([data-theme='light']) .scanlines {
-  opacity: 0.04;
+  opacity: 0.03;
 }
 
 :global([data-theme='light']) .heroPanel::before {
-  opacity: 0.2;
+  opacity: 0.15;
 }
 
 :global([data-theme='light']) .heroSun {
-  opacity: 0.3;
-  filter: saturate(0.6);
+  display: none;
 }
 
 :global([data-theme='light']) .heroEarth {

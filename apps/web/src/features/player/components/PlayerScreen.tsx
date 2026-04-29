@@ -37,6 +37,7 @@ export function PlayerScreen() {
   const chat = useChatController(player);
   const imports = useImportsController();
   const search = useSearchController();
+  const theme = useUiStore((state) => state.theme);
   const isRecommendationOpen = useUiStore(
     (state) => state.isRecommendationOpen,
   );
@@ -198,6 +199,7 @@ export function PlayerScreen() {
       <AtmosphereCanvas
         className={styles.canvas}
         isPlaying={player.isPlaying}
+        theme={theme}
       />
       <div className={styles.backgroundBloom} />
       <div className={styles.noise} />
