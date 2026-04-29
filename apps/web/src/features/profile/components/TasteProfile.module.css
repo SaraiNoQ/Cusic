@@ -398,6 +398,67 @@
   color: #b08070;
 }
 
+/* ── Pending action bar ── */
+
+.pendingBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-accent);
+  border-radius: 14px;
+  background: var(--accent-orange-glow);
+}
+
+.pendingLabel {
+  color: var(--accent-orange-light);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.undoBtn {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border-warm-strong);
+  border-radius: 999px;
+  background: var(--bg-button);
+  color: var(--text-primary);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.undoBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.applyBtn {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--border-accent);
+  border-radius: 999px;
+  background: var(--accent-orange-glow);
+  color: var(--accent-orange-lighter);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.applyBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.emptyText {
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+  padding: 32px 16px;
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 560px) {

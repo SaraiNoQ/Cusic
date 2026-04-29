@@ -242,62 +242,22 @@ function TasteProfileContent() {
 
         {/* Pending action bar */}
         {pending.size > 0 && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-              marginBottom: 20,
-              padding: '12px 16px',
-              border: '1px solid rgba(246, 158, 63, 0.42)',
-              borderRadius: 14,
-              background: 'rgba(255, 146, 47, 0.08)',
-            }}
-          >
-            <span
-              style={{
-                color: '#ffaf68',
-                fontSize: 12,
-                letterSpacing: '0.1em',
-              }}
-            >
+          <div className={styles.pendingBar}>
+            <span className={styles.pendingLabel}>
               {pending.size} change{pending.size !== 1 ? 's' : ''} pending
             </span>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
+                className={styles.undoBtn}
                 onClick={handleUndo}
                 disabled={updateMutation.isPending}
-                style={{
-                  height: 34,
-                  padding: '0 14px',
-                  border: '1px solid rgba(184, 139, 101, 0.42)',
-                  borderRadius: 999,
-                  background: 'rgba(8, 15, 23, 0.88)',
-                  color: 'rgba(235, 224, 208, 0.78)',
-                  fontSize: 12,
-                  letterSpacing: '0.08em',
-                  cursor: updateMutation.isPending ? 'not-allowed' : 'pointer',
-                  opacity: updateMutation.isPending ? 0.5 : 1,
-                }}
               >
                 Undo
               </button>
               <button
+                className={styles.applyBtn}
                 onClick={handleApply}
                 disabled={updateMutation.isPending}
-                style={{
-                  height: 34,
-                  padding: '0 14px',
-                  border: '1px solid rgba(246, 158, 63, 0.72)',
-                  borderRadius: 999,
-                  background: 'rgba(255, 146, 47, 0.14)',
-                  color: '#ffe1b9',
-                  fontSize: 12,
-                  letterSpacing: '0.08em',
-                  cursor: updateMutation.isPending ? 'not-allowed' : 'pointer',
-                  opacity: updateMutation.isPending ? 0.5 : 1,
-                }}
               >
                 {updateMutation.isPending ? 'Applying...' : 'Apply'}
               </button>
@@ -307,14 +267,7 @@ function TasteProfileContent() {
 
         {/* Tag cloud by type */}
         {sectionTypes.length === 0 && (
-          <div
-            style={{
-              color: 'rgba(190, 198, 201, 0.56)',
-              fontSize: 14,
-              textAlign: 'center',
-              padding: '32px 16px',
-            }}
-          >
+          <div className={styles.emptyText}>
             No taste tags have been collected yet. Keep listening and they will
             appear here.
           </div>

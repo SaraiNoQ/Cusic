@@ -30,6 +30,45 @@
   --bg-chat-mini-assistant: rgba(42, 74, 86, 0.22);
   --bg-chat-mini-user: rgba(190, 143, 93, 0.12);
   --bg-import-active: rgba(255, 146, 47, 0.14);
+  --bg-overlay-fog: rgba(1, 4, 8, 0.72);
+  --bg-overlay-card-start: rgba(8, 16, 24, 0.96);
+  --bg-overlay-card-end: rgba(4, 9, 14, 0.98);
+  --bg-card-dark: rgba(6, 14, 21, 0.86);
+  --bg-dj-bubble-start: rgba(15, 24, 30, 0.85);
+  --bg-dj-bubble-end: rgba(9, 15, 21, 0.92);
+  --bg-footer: rgba(4, 9, 14, 0.68);
+  --bg-hero-start: rgba(2, 7, 13, 0.18);
+  --bg-hero-end: rgba(3, 8, 12, 0.42);
+  --bg-hero-glow: rgba(12, 22, 30, 0.64);
+  --bg-queue-channel-start: rgba(8, 18, 27, 0.86);
+  --bg-queue-channel-end: rgba(4, 11, 17, 0.94);
+  --bg-search-badge-start: rgba(20, 38, 48, 0.95);
+  --bg-search-badge-end: rgba(5, 11, 17, 1);
+  --bg-queue-overlay-start: rgba(8, 18, 27, 0.78);
+  --bg-queue-overlay-end: rgba(4, 11, 17, 0.9);
+  --bg-queue-overlay-active-start: rgba(22, 32, 40, 0.88);
+  --bg-queue-overlay-active-end: rgba(10, 18, 26, 0.94);
+  --bg-import-field: rgba(8, 16, 24, 0.92);
+  --bg-import-job-start: rgba(11, 22, 31, 0.9);
+  --bg-import-job-end: rgba(5, 12, 18, 0.96);
+
+  /* Decorative */
+  --decorative-bloom-warm: rgba(255, 182, 105, 0.05);
+  --decorative-bloom-teal: rgba(27, 124, 120, 0.12);
+  --decorative-scanline: rgba(255, 255, 255, 0.045);
+
+  /* Device shell */
+  --device-border: rgba(198, 162, 126, 0.32);
+  --device-glow-orange: rgba(255, 174, 94, 0.09);
+  --device-glow-teal: rgba(77, 190, 178, 0.09);
+  --device-inner-border: rgba(110, 145, 170, 0.12);
+  --device-inner-border-alt: rgba(112, 143, 163, 0.24);
+  --device-inner-shadow: rgba(0, 0, 0, 0.17);
+  --device-shadow-main: rgba(0, 0, 0, 0.68);
+  --device-shadow-accent: rgba(255, 159, 76, 0.08);
+  --device-mouse-light: rgba(255, 207, 157, 0.12);
+  --device-shine-start: rgba(255, 255, 255, 0.04);
+  --device-shine-end: rgba(255, 255, 255, 0.025);
 
   /* Text */
   --text-primary: rgba(238, 225, 207, 0.96);
@@ -182,6 +221,47 @@
   --bg-chat-mini-assistant: rgba(180, 200, 210, 0.25);
   --bg-chat-mini-user: rgba(210, 185, 145, 0.18);
   --bg-import-active: rgba(200, 100, 20, 0.14);
+  --bg-brand-glow: rgba(200, 140, 60, 0.12);
+  --bg-brand-dot: #c09850;
+  --bg-overlay-fog: rgba(235, 228, 217, 0.72);
+  --bg-overlay-card-start: rgba(255, 255, 255, 0.97);
+  --bg-overlay-card-end: rgba(248, 244, 236, 0.98);
+  --bg-card-dark: rgba(240, 234, 224, 0.9);
+  --bg-dj-bubble-start: rgba(245, 238, 228, 0.92);
+  --bg-dj-bubble-end: rgba(238, 230, 218, 0.95);
+  --bg-footer: rgba(242, 235, 224, 0.8);
+  --bg-hero-start: rgba(240, 232, 218, 0.15);
+  --bg-hero-end: rgba(235, 228, 214, 0.3);
+  --bg-hero-glow: rgba(235, 228, 214, 0.4);
+  --bg-queue-channel-start: rgba(248, 242, 232, 0.85);
+  --bg-queue-channel-end: rgba(240, 234, 222, 0.92);
+  --bg-search-badge-start: rgba(240, 235, 225, 0.95);
+  --bg-search-badge-end: rgba(235, 228, 218, 0.98);
+  --bg-queue-overlay-start: rgba(248, 242, 232, 0.85);
+  --bg-queue-overlay-end: rgba(240, 234, 222, 0.92);
+  --bg-queue-overlay-active-start: rgba(242, 235, 224, 0.92);
+  --bg-queue-overlay-active-end: rgba(235, 228, 218, 0.96);
+  --bg-import-field: rgba(248, 244, 236, 0.95);
+  --bg-import-job-start: rgba(245, 238, 228, 0.92);
+  --bg-import-job-end: rgba(238, 230, 218, 0.96);
+
+  /* Decorative */
+  --decorative-bloom-warm: rgba(200, 130, 60, 0.04);
+  --decorative-bloom-teal: rgba(60, 130, 120, 0.06);
+  --decorative-scanline: rgba(0, 0, 0, 0.02);
+
+  /* Device shell */
+  --device-border: rgba(160, 140, 120, 0.35);
+  --device-glow-orange: rgba(200, 120, 40, 0.04);
+  --device-glow-teal: rgba(60, 140, 130, 0.04);
+  --device-inner-border: rgba(140, 130, 120, 0.15);
+  --device-inner-border-alt: rgba(140, 130, 120, 0.2);
+  --device-inner-shadow: rgba(0, 0, 0, 0.04);
+  --device-shadow-main: rgba(0, 0, 0, 0.1);
+  --device-shadow-accent: rgba(200, 100, 20, 0.04);
+  --device-mouse-light: rgba(200, 160, 100, 0.06);
+  --device-shine-start: rgba(255, 255, 255, 0.5);
+  --device-shine-end: rgba(255, 255, 255, 0.3);
 
   /* Text */
   --text-primary: rgba(30, 25, 18, 0.96);
