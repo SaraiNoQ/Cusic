@@ -34,7 +34,7 @@
 1. `Next.js`
 2. `React`
 3. `TypeScript`
-4. `Tailwind CSS`
+4. `CSS Modules + CSS Custom Properties`
 5. `TanStack Query`
 6. `Zustand`
 
@@ -180,27 +180,65 @@
 1. 浅色主题（默认跟随系统偏好，可手动切换）
 2. 深色主题
 
-实现方式：
+#### 实现方式
 
-1. 所有颜色定义为 CSS 自定义属性（CSS Custom Properties），统一在 `apps/web/src/app/globals.css` 的 `:root` 和 `[data-theme='light']` 两个选择器中。
-2. 主题切换通过 `document.documentElement.dataset.theme` 属性控制，由 `ThemeInitializer`（`apps/web/src/app/theme-sync.tsx`）在客户端同步 `ui-store` 中的 `theme` 状态。
-3. `DeviceHeader` 中提供 DARK/LIGHT 按钮直连 `uiStore.setTheme()`。
+1. 所有颜色定义为 CSS 自定义属性（CSS Custom Properties），统一在 `apps/web/src/app/globals.css` 的 `:root`（深色默认值）和 `[data-theme='light']`（浅色覆盖）两个选择器中声明。
+2. 主题切换通过 `document.documentElement.dataset.theme` 属性控制，由 `ThemeInitializer`（`apps/web/src/app/theme-sync.tsx`）在客户端同步 `ui-store`（`apps/web/src/store/ui-store.ts`）中的 `theme` 状态。
+3. `DeviceHeader` 中提供 DARK/LIGHT 分段按钮直连 `uiStore.setTheme()`。
+4. 组件 CSS 中统一使用 `var(--token)` 引用变量，禁止硬编码颜色值。
 
-Token 分类：
+#### CSS Module 中的浅色覆盖
 
-- 背景色：`--bg-screen`、`--bg-body`、`--bg-surface`、`--bg-card`、`--bg-input`、`--bg-button` 等
-- 文字色：`--text-primary`、`--text-secondary`、`--text-muted`、`--text-label` 等
-- 强调色：`--accent-orange`、`--accent-gold`、`--accent-teal`、`--accent-green` 等
-- 边框色：`--border-standard`、`--border-warm`、`--border-accent`、`--border-subtle` 等
-- 渐变：`--gradient-card-start/end`、`--gradient-button-start/end` 等
-- 阴影：`--shadow-device`、`--shadow-card`、`--shadow-panel` 等
+当 Module CSS 内无法完全通过变量覆盖实现效果时，使用 `:global([data-theme='light'])` 选择器穿透模块作用域进行针对性调整。`[data-theme='light']` 位于 `<html>` 全局作用域，`className` 保持模块作用域：
 
-约束：
+```css
+/* PlayerScreen.module.css */
+:global([data-theme='light']) .heroSun {
+  display: none;
+}
+:global([data-theme='light']) .noise {
+  opacity: 0.1;
+  mix-blend-mode: multiply;
+}
+```
+
+适用场景：在浅色模式下需要隐藏暗色装饰元素、调低装饰层不透明度、或切换合成模式时使用。
+
+#### WebGL 氛围背景层（AtmosphereCanvas）
+
+项目使用 WebGL 片段着色器渲染全屏氛围背景（星空、星云、太阳、行星）。着色器通过 `u_theme` uniform 接收主题状态（`0.0` = 深色，`1.0` = 浅色），在 `main()` 中混合两套渲染分支：
+
+```glsl
+vec3 color = mix(darkTheme(uv, ...), lightTheme(uv, ...), u_theme);
+```
+
+- **深色分支出**：深空渐变、三层星场、太阳光晕、行星剪影、星云噪声
+- **浅色分支出**：暖色羊皮纸颗粒底、日光光环与日冕、星座连线、旋转轨道弧线、行星凌日、彗星轨迹、等距蓝图网格
+
+组件位于 `apps/web/src/features/atmosphere/components/AtmosphereCanvas.tsx`，通过 `PlayerScreen` 从 `uiStore` 读取并传入 `theme` prop。
+
+当引入新的 WebGL 装饰元素时，需要同时提供深浅两套分支实现。
+
+#### Token 分类
+
+- 背景色：`--bg-screen`、`--bg-body`、`--bg-surface`、`--bg-surface-deep`、`--bg-card`、`--bg-card-base`、`--bg-card-dark`、`--bg-input`、`--bg-button`、`--bg-header`、`--bg-segmented`、`--bg-footer`、`--bg-overlay`、`--bg-overlay-fog`
+- 卡片与面板背景：`--bg-overlay-card-start/end`、`--bg-card-hover-start/end`、`--bg-dj-bubble-start/end`、`--bg-hero-start/end`、`--bg-queue-channel-start/end`、`--bg-queue-overlay-*`、`--bg-search-badge-*`、`--bg-import-*`
+- 文字色：`--text-primary`、`--text-body`、`--text-heading`、`--text-chat`、`--text-secondary`、`--text-muted`、`--text-label`、`--text-button`、`--text-queue-name` 等
+- 强调色：`--accent-orange`、`--accent-gold`、`--accent-teal`、`--accent-green` 及各级变体
+- 边框色：`--border-standard`、`--border-warm`、`--border-accent`、`--border-subtle`、`--border-faint`、`--border-warm-strong` 等
+- 装饰层：`--decorative-bloom-warm`、`--decorative-bloom-teal`、`--decorative-scanline`
+- 设备外壳：`--device-border`、`--device-glow-orange`、`--device-glow-teal`、`--device-inner-border`、`--device-inner-shadow`、`--device-shadow-main`、`--device-shadow-accent`、`--device-mouse-light`、`--device-shine-*`
+- 渐变：`--gradient-card-start/end`、`--gradient-button-start/end`、`--gradient-header-shadow-*`、`--gradient-elevated-*` 等
+- 阴影：`--shadow-device`、`--shadow-card`、`--shadow-panel`、`--shadow-segment-glow`、`--shadow-btn-hover` 等
+
+#### 约束
 
 1. 所有颜色先定义 token，再落到组件。
-2. 不允许页面内硬编码品牌色。
-3. 深浅主题必须共享同一套语义 token 命名。
-4. 组件 CSS 中统一使用 `var(--token)` 引用，不可直接写颜色值。
+2. 不允许组件内硬编码品牌色或 `rgba()` 颜色值。
+3. 深浅主题必须共享同一套语义 token 命名，分别定义在 `:root` 和 `[data-theme='light']`。
+4. 新增语义 token 时，必须同时在两个主题下定义对应值。
+5. 装饰性 CSS 元素（星点、扫描线、辉光叠加层）在浅色模式下需要降低不透明度或切换合成模式，使用 `:global([data-theme='light'])` 覆盖。
+6. WebGL 着色器元素在浅色模式下需要提供独立的渲染分支，而非直接降级为不可见。
 
 ### 5.3 页面原型策略
 
@@ -230,6 +268,8 @@ Token 分类：
 
 ### 5.5 动效规范
 
+#### 界面动效
+
 界面动效采用强氛围策略，但必须集中在关键节点：
 
 1. 页面转场
@@ -243,6 +283,32 @@ Token 分类：
 1. 全局无意义 hover 动画
 2. 高频闪烁
 3. 影响可读性的持续运动背景
+
+#### WebGL 氛围背景
+
+全屏氛围背景由 `AtmosphereCanvas`（`apps/web/src/features/atmosphere/components/AtmosphereCanvas.tsx`）负责渲染，是一个独立的 WebGL 片段着色器层，位于页面最底层（`z-index` 0 级以下）。
+
+着色器支持深色/浅色两套视觉分支，通过 `u_theme` uniform 在 `main()` 中混合切换。统一接口为：
+
+```tsx
+<AtmosphereCanvas className={styles.canvas} isPlaying={boolean} theme="dark" | "light" />
+```
+
+关键行为：
+
+- **鼠标视差**：星场和星云层随鼠标位置产生微小位移（`u_mouse` uniform）
+- **播放响应**：播放时星场亮度增强（`u_energy` uniform）
+- **时间驱动**：星体闪烁、彗星移动、轨道旋转由 `u_time` 驱动，保持稳定帧率动画
+- **深色场景**：深空渐变、三层星斑闪烁、太阳光晕与透镜耀斑、星云 FBM 噪声、地球剪影
+- **浅色场景**：暖色羊皮纸颗粒、日光晕与光环、旋转轨道弧线、星座连线网络、行星凌日与土星环、双彗星拖尾、脉冲辐射环、等距蓝图网格
+
+当向着色器引入新的视觉元素时，必须：
+
+1. 同时提供深色（`darkTheme()`）和浅色（`lightTheme()`）两分支
+2. 在 `main()` 中通过 `mix(dark, light, u_theme)` 混合
+3. 新元素不得影响核心界面可读性
+
+CSS 装饰叠加层（`.backgroundBloom`、`.noise`、`.scanlines`）作为着色器之上的轻量静态层，通过 `var(--decorative-*)` token 保持主题感知。
 
 ### 5.6 组件规范
 

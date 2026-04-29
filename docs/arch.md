@@ -106,6 +106,17 @@
 2. 支持用户修正偏好标签。
 3. 管理外部歌单导入和上下文授权。
 
+#### 3.2.5 Atmosphere 模块
+
+负责全屏氛围背景渲染，提升 NASA 朋克式视觉沉浸感。
+
+主要职责：
+
+1. 通过 WebGL 片段着色器渲染实时星空、星云、行星、日晕等全屏背景元素。
+2. 响应鼠标视差和播放状态（`u_mouse`、`u_energy` uniform）。
+3. 深色/浅色主题各自拥有独立渲染分支，通过 `u_theme` uniform 切换。
+4. 作为 `PlayerScreen` 的底层 canvas 子组件，不参与 DOM 布局流。
+
 ### 3.3 前端状态分层
 
 前端状态应分为三层：
@@ -455,9 +466,9 @@ ContentProvider 对外统一返回如下最小字段：
 1. `Next.js`
 2. `React`
 3. `TypeScript`
-4. `TanStack Query`
-5. `Zustand`
-6. `Tailwind CSS`
+4. `CSS Modules + CSS Custom Properties`
+5. `TanStack Query`
+6. `Zustand`
 
 ### 8.2 后端
 

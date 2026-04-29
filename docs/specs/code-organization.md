@@ -23,9 +23,11 @@
 推荐结构：
 
 1. `apps/web/src/app`
-   只放 Next.js 路由、布局和 providers。`theme-sync.tsx` 为客户端组件负责将 `uiStore.theme` 同步到 `document.documentElement.dataset.theme`。
+   只放 Next.js 路由、布局和 providers。`theme-sync.tsx` 为客户端组件负责将 `uiStore.theme` 同步到 `document.documentElement.dataset.theme`。`globals.css` 存放全部 CSS 自定义属性（主题 token），按 `:root`（深色默认值）和 `[data-theme='light']`（浅色覆盖值）两层组织。
 2. `apps/web/src/features`
    按业务能力拆分，如 `player`、`chat`、`search`、`profile`、`atmosphere`。
+   - `features/atmosphere`：WebGL 氛围背景着色器（`AtmosphereCanvas.tsx`），深色/浅色双分支渲染，通过 `u_theme` uniform 切换。
+   - 各 feature 的 `*.module.css` 中如需针对浅色模式调整装饰层，使用 `:global([data-theme='light']) .className` 选择器穿透模块作用域。
 3. `apps/web/src/lib/api`
    API client、请求封装、模块级 API 方法。
 4. `apps/web/src/lib/query`
