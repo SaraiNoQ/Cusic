@@ -26,7 +26,9 @@ export class ReplyGeneratorService {
       try {
         return await this.llmGenerate(context);
       } catch (error) {
-        this.logger.warn(`LLM reply generation failed, using fallback: ${String(error)}`);
+        this.logger.warn(
+          `LLM reply generation failed, using fallback: ${String(error)}`,
+        );
       }
     }
 
@@ -44,7 +46,9 @@ export class ReplyGeneratorService {
       try {
         return await this.llmStreamGenerate(context, onChunk, signal);
       } catch (error) {
-        this.logger.warn(`LLM stream reply failed, using fallback: ${String(error)}`);
+        this.logger.warn(
+          `LLM stream reply failed, using fallback: ${String(error)}`,
+        );
       }
     }
 
@@ -103,6 +107,8 @@ export class ReplyGeneratorService {
     userMessage: string;
   } {
     const intentDescriptions: Record<AiDjIntent, string> = {
+      conversation:
+        'The user is chatting casually or asking a question. Respond helpfully as a knowledgeable music companion — answer their question, share musical insight, or offer suggestions. Do NOT act like you have already queued or changed anything. You can suggest songs or directions, but always invite the user to confirm before taking action.',
       queue_replace:
         'The user wants to switch to new music. Suggest the selected tracks naturally.',
       queue_append:
@@ -148,6 +154,26 @@ Guidelines:
     const { intent, contentIds } = context;
 
     switch (intent) {
+      case 'conversation':
+        if (context.message) {
+          const isAskingForRec =
+            /推荐|recommend|建议|suggest|有什么|what.*(song|music|track|listen)/i;
+          const isAskingAboutGenre = /genre|风格|流派|type of music/i;
+          const isAskingAboutArtist = /artist|歌手|who.*sing|谁.*唱/i;
+
+          if (isAskingForRec.test(context.message)) {
+            return '我听到了你的请求。目前我的推荐引擎正在冷却中，请稍等片刻再试，或者直接用「来一首」「换歌」「做个歌单」这样的指令告诉我你想怎么调整队列。';
+          }
+          if (isAskingAboutGenre.test(context.message)) {
+            return '这个问题我需要一点时间整理答案。你可以先用「来一首」或「换歌」试试队列操作，或者稍等片刻再问我。';
+          }
+          if (isAskingAboutArtist.test(context.message)) {
+            return '关于这个艺人我需要更多时间检索信息。你可以试试用「放点」、「换歌」等指令调整当前播放，或者稍后再问我。';
+          }
+          return '我暂时没法深入回答这个问题，但你可以试试直接指令我：比如「来一首 + 风格」、「换歌」、「加歌」或者「做个歌单」。播放器本身还在正常运行。';
+        }
+        return '这个问题我暂时没办法给出很具体的答案，你可以试试问我推荐、点歌或者调整当前播放队列。';
+
       case 'queue_append':
         return contentIds.length > 0
           ? '我在当前队列后面补两段相近但不抢戏的内容，让这条听感线继续往前走。'

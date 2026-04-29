@@ -1,4 +1,8 @@
-import type { ApiSuccessEnvelope, AuthTokenPairDto } from '@music-ai/shared';
+import type {
+  ApiErrorEnvelope,
+  ApiSuccessEnvelope,
+  AuthTokenPairDto,
+} from '@music-ai/shared';
 import {
   clearAuthSession,
   readAuthSession,
@@ -41,6 +45,30 @@ export function getApiBaseUrl() {
   return 'http://localhost:3001/api/v1';
 }
 
+async function raiseForStatus(response: Response): Promise<never> {
+  let body: ApiErrorEnvelope | Record<string, unknown> | undefined;
+  try {
+    body = (await response.json()) as Record<string, unknown>;
+  } catch {
+    // body could not be parsed as JSON
+    throw new Error(`Request failed: ${response.status}`);
+  }
+
+  if (
+    body &&
+    body.success === false &&
+    typeof body.error === 'object' &&
+    body.error !== null &&
+    'code' in (body.error as Record<string, unknown>) &&
+    'message' in (body.error as Record<string, unknown>)
+  ) {
+    const err = body.error as { code: string; message: string };
+    throw new Error(err.message);
+  }
+
+  throw new Error(`Request failed: ${response.status}`);
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
@@ -59,12 +87,12 @@ export async function apiFetch<T>(
       if (retryResponse.ok) {
         return (await retryResponse.json()) as T;
       }
-      throw new Error(`Request failed: ${retryResponse.status}`);
+      await raiseForStatus(retryResponse);
     }
   }
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    await raiseForStatus(response);
   }
 
   return (await response.json()) as T;

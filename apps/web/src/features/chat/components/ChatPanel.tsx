@@ -1,5 +1,6 @@
 'use client';
 
+import type { ChatMessageVm } from '@music-ai/shared';
 import { initialChatMessages, useChatStore } from '../../../store/chat-store';
 import styles from '../../player/PlayerScreen.module.css';
 import { ChatComposer } from './ChatComposer';
@@ -13,7 +14,7 @@ export function ChatPanel({
   onSubmit,
   onOpenConversation,
 }: Readonly<{
-  messages: import('@music-ai/shared').ChatMessageVm[];
+  messages: ChatMessageVm[];
   input: string;
   isPending: boolean;
   currentTrackTitle: string | null;
@@ -23,9 +24,8 @@ export function ChatPanel({
 }>) {
   const streamingMessageId = useChatStore((state) => state.streamingMessageId);
   const bootMessageId = initialChatMessages[0]?.id;
-  const hasConversation = messages.some(
-    (message) => message.id !== bootMessageId,
-  );
+  const visibleMessages = messages.filter((m) => m.id !== bootMessageId);
+  const hasConversation = visibleMessages.length > 0;
   const isSessionActive =
     hasConversation || isPending || Boolean(streamingMessageId);
 
@@ -40,61 +40,66 @@ export function ChatPanel({
       <div className={styles.chatSurface}>
         {isSessionActive ? (
           <>
-            <div className={styles.djMessageRow}>
-              <div className={styles.djAvatar} aria-hidden="true">
-                <span className={styles.djHelmet} />
-              </div>
-
-              <div className={styles.djCopy}>
-                <span className={styles.djName}>CUSIC</span>
-                <article className={styles.djBubble}>
-                  {(() => {
-                    const visibleMessages = messages.filter(
-                      (m) => m.id !== bootMessageId,
-                    );
-                    if (visibleMessages.length === 0) {
-                      return (
-                        <p>
-                          {streamingMessageId
-                            ? 'Transmitting your live DJ reply...'
-                            : isPending
-                              ? 'Calibrating a new transmission path through the current queue...'
-                              : 'AI DJ session live. Open the conversation deck to continue with requests, explanations, and queue changes.'}
-                        </p>
-                      );
-                    }
-                    return visibleMessages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={
-                          message.role === 'assistant'
-                            ? `${styles.djMiniMessage} ${styles.djMiniAssistant}`
-                            : `${styles.djMiniMessage} ${styles.djMiniUser}`
-                        }
-                      >
-                        <span className={styles.djMiniRole}>
-                          {message.role === 'assistant' ? 'CUSIC' : 'YOU'}
-                        </span>
-                        <span className={styles.djMiniText}>
-                          {message.text}
-                        </span>
-                      </div>
-                    ));
-                  })()}
-                </article>
-                <div className={styles.replyRail}>
-                  <button type="button" onClick={onOpenConversation}>
-                    OPEN AI DJ
-                  </button>
-                </div>
-              </div>
-            </div>
-
             {currentTrackTitle ? (
               <div className={styles.nowPlayingLine}>
                 Now playing: {currentTrackTitle}
               </div>
             ) : null}
+
+            <div className={styles.messageList}>
+              {visibleMessages.map((message) => {
+                const hasActions = (message.actions?.length ?? 0) > 0;
+
+                return (
+                  <article
+                    key={message.id}
+                    className={
+                      message.role === 'assistant'
+                        ? `${styles.chatBubble} ${styles.chatBubbleAssistant}`
+                        : `${styles.chatBubble} ${styles.chatBubbleUser}`
+                    }
+                  >
+                    <div className={styles.chatBubbleTopline}>
+                      <span className={styles.chatRole}>
+                        {message.role === 'assistant' ? 'AI DJ' : 'YOU'}
+                      </span>
+                      {message.intent ? (
+                        <span className={styles.chatBubbleIndex}>
+                          {message.intent.toUpperCase()}
+                        </span>
+                      ) : (
+                        <span className={styles.chatBubbleIndex}>TX</span>
+                      )}
+                    </div>
+                    <p>{message.text}</p>
+                    {message.role === 'assistant' && hasActions ? (
+                      <div className={styles.chatBubbleActions}>
+                        <span>
+                          {message.actions
+                            ? `${message.actions.length} track${message.actions.length > 1 ? 's' : ''} queued`
+                            : null}
+                        </span>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+
+              {isPending ? (
+                <article
+                  className={`${styles.chatBubble} ${styles.chatBubbleAssistant}`}
+                >
+                  <div className={styles.chatBubbleTopline}>
+                    <span className={styles.chatRole}>AI DJ</span>
+                    <span className={styles.chatBubbleIndex}>LIVE</span>
+                  </div>
+                  <p>
+                    Calibrating a new transmission path through the current
+                    library…
+                  </p>
+                </article>
+              ) : null}
+            </div>
           </>
         ) : (
           <div className={styles.chatIdleState}>

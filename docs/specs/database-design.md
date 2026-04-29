@@ -292,7 +292,7 @@
 
 实现记录：
 
-1. `generated_context_json` 用于记录 AI 生成歌单的来源上下文；Phase 4 第二步会写入 `source=ai_dj`、`source_session_id`、`source_message_id` 和对应 `intent`。
+1. `generated_context_json` 用于记录 AI 生成歌单的来源上下文；Phase 4 第二步会写入 `source=ai_dj`、`source_session_id`、`source_message_id` 和对应 `intent`（当前仅 `theme_playlist_preview` 意图会生成可保存歌单）。
 2. 同一条 AI DJ 主题预览消息保存为歌单时，服务端会优先按 `generated_context_json.source_message_id` 做幂等返回，避免重复创建内容相同的 AI 歌单。
 
 #### 3.4.2 `playlist_items`

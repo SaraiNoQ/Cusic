@@ -23,7 +23,22 @@ export async function fetchPlaylists() {
   return response.data.items;
 }
 
-export type PlaylistDetailResponse = ApiSuccessEnvelope<PlaylistDetailDto | null>;
+export type PlaylistDetailResponse =
+  ApiSuccessEnvelope<PlaylistDetailDto | null>;
+
+export async function createPlaylist(payload: {
+  title: string;
+  description: string;
+}) {
+  const response = await apiFetch<ApiSuccessEnvelope<PlaylistSummaryDto>>(
+    '/library/playlists',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  );
+  return response.data;
+}
 
 export async function fetchPlaylistDetail(playlistId: string) {
   const response = await apiFetch<PlaylistDetailResponse>(

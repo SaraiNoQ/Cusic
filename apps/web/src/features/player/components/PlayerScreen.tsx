@@ -12,6 +12,10 @@ import { SearchOverlay } from '../../search/components/SearchOverlay';
 import { useSearchController } from '../../search/hooks/useSearchController';
 import { useAuthStore } from '../../../store/auth-store';
 import { useUiStore } from '../../../store/ui-store';
+import {
+  saveDailyPlaylist,
+  submitFeedback,
+} from '../../../lib/api/recommendation-api';
 import styles from '../PlayerScreen.module.css';
 import { usePlayerController } from '../hooks/usePlayerController';
 import { ControlStrip } from './ControlStrip';
@@ -348,6 +352,29 @@ export function PlayerScreen() {
         onLoadDaily={() => {
           void player.loadDailyPlaylist();
           closeRecommendation();
+        }}
+        onFeedback={(contentId, feedbackType) => {
+          if (!authUser) return;
+          const item = player.nowRecommendation?.items.find(
+            (i) => i.contentId === contentId,
+          );
+          void submitFeedback({
+            targetType: item?.content.type ?? 'track',
+            targetId: contentId,
+            feedbackType,
+            recommendationResultId:
+              player.nowRecommendation?.recommendationId ?? undefined,
+          });
+        }}
+        onSaveDaily={() => {
+          if (!authUser) return;
+          if (!player.dailyPlaylist) return;
+          void saveDailyPlaylist(player.dailyPlaylist).then((playlist) => {
+            if (playlist?.title) {
+              player.setStatusText(`Saved ${playlist.title} to your library.`);
+            }
+            void player.refreshPlaylists();
+          });
         }}
       />
 

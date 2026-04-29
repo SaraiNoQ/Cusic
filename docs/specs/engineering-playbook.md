@@ -1,8 +1,8 @@
 # 音乐 AI App 开发总规范
 
-- 文档版本：v0.1
-- 文档状态：初版
-- 更新时间：2026-04-23
+- 文档版本：v0.2
+- 文档状态：持续更新
+- 更新时间：2026-04-29
 - 关联文档：`docs/RPD.md`、`docs/arch.md`
 
 ## 1. 目标与适用范围
@@ -177,14 +177,30 @@
 
 从第一阶段开始同时支持：
 
-1. 浅色主题
+1. 浅色主题（默认跟随系统偏好，可手动切换）
 2. 深色主题
+
+实现方式：
+
+1. 所有颜色定义为 CSS 自定义属性（CSS Custom Properties），统一在 `apps/web/src/app/globals.css` 的 `:root` 和 `[data-theme='light']` 两个选择器中。
+2. 主题切换通过 `document.documentElement.dataset.theme` 属性控制，由 `ThemeInitializer`（`apps/web/src/app/theme-sync.tsx`）在客户端同步 `ui-store` 中的 `theme` 状态。
+3. `DeviceHeader` 中提供 DARK/LIGHT 按钮直连 `uiStore.setTheme()`。
+
+Token 分类：
+
+- 背景色：`--bg-screen`、`--bg-body`、`--bg-surface`、`--bg-card`、`--bg-input`、`--bg-button` 等
+- 文字色：`--text-primary`、`--text-secondary`、`--text-muted`、`--text-label` 等
+- 强调色：`--accent-orange`、`--accent-gold`、`--accent-teal`、`--accent-green` 等
+- 边框色：`--border-standard`、`--border-warm`、`--border-accent`、`--border-subtle` 等
+- 渐变：`--gradient-card-start/end`、`--gradient-button-start/end` 等
+- 阴影：`--shadow-device`、`--shadow-card`、`--shadow-panel` 等
 
 约束：
 
 1. 所有颜色先定义 token，再落到组件。
 2. 不允许页面内硬编码品牌色。
 3. 深浅主题必须共享同一套语义 token 命名。
+4. 组件 CSS 中统一使用 `var(--token)` 引用，不可直接写颜色值。
 
 ### 5.3 页面原型策略
 
@@ -314,7 +330,7 @@
 
 ### 8.1 服务器角色
 
-当前服务器 `10.132.155.6` 在首阶段同时承担：
+当前服务器 `10.132.166.83` 在首阶段同时承担：
 
 1. 开发环境
 2. 测试环境

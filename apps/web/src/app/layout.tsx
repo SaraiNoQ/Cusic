@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import './globals.css';
 import { AppProviders } from './providers';
+import { ThemeInitializer } from './theme-sync';
 
 export const metadata: Metadata = {
   title: 'Cusic',
@@ -14,7 +15,10 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body>
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <ThemeInitializer />
+          {children}
+        </AppProviders>
       </body>
     </html>
   );

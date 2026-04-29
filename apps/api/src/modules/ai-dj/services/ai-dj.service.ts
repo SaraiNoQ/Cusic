@@ -67,10 +67,18 @@ type StreamPlan = {
 type StreamPayload = {
   sessionId: string;
   messageId: string;
+  intent: ResolvedIntent;
   replyText: string;
   actions: AiDjActionDto[];
   userId?: string;
   createdAt: number;
+  userMessage?: string;
+  contentIds?: string[];
+  trackDescriptions?: string;
+  tasteSummary?: string;
+  timeOfDay?: string;
+  currentTrackTitle?: string;
+  currentTrackLanguage?: string;
 };
 
 @Injectable()
@@ -171,17 +179,35 @@ export class AiDjService {
       input.timezoneHeader,
     );
 
+    const fallbackText = this.replyGenerator.fallbackGenerate({
+      message,
+      intent: plan.intent,
+      contentIds: plan.contentIds,
+      trackDescriptions: plan.trackDescriptions,
+      tasteProfileSummary: plan.tasteSummary,
+      timeOfDay: plan.timeOfDay,
+      currentTrackTitle: plan.currentTrackTitle,
+      currentTrackLanguage: plan.currentTrackLanguage,
+    });
+
     if (!input.user?.id) {
       const response = {
         sessionId: input.sessionId ?? this.createAnonymousSessionId(),
         messageId: this.createAnonymousMessageId(),
         intent: plan.intent,
-        replyText: '',
+        replyText: fallbackText,
         actions: plan.actions,
       };
       this.registerStreamPayload({
         ...response,
         createdAt: Date.now(),
+        userMessage: message,
+        contentIds: plan.contentIds,
+        trackDescriptions: plan.trackDescriptions,
+        tasteSummary: plan.tasteSummary,
+        timeOfDay: plan.timeOfDay,
+        currentTrackTitle: plan.currentTrackTitle,
+        currentTrackLanguage: plan.currentTrackLanguage,
       });
       return response;
     }
@@ -213,7 +239,7 @@ export class AiDjService {
       sessionId: persisted.sessionId,
       messageId: persisted.messageId,
       intent: plan.intent,
-      replyText: '',
+      replyText: fallbackText,
       actions: plan.actions,
     };
 
@@ -221,6 +247,13 @@ export class AiDjService {
       ...response,
       userId: input.user.id,
       createdAt: Date.now(),
+      userMessage: message,
+      contentIds: plan.contentIds,
+      trackDescriptions: plan.trackDescriptions,
+      tasteSummary: plan.tasteSummary,
+      timeOfDay: plan.timeOfDay,
+      currentTrackTitle: plan.currentTrackTitle,
+      currentTrackLanguage: plan.currentTrackLanguage,
     });
 
     return response;
@@ -372,8 +405,11 @@ export class AiDjService {
     return new Observable<MessageEvent>((subscriber) => {
       const abortController = new AbortController();
 
-      void this.executeStreamReply(input, subscriber, abortController.signal)
-        .catch((error) => subscriber.error(error));
+      void this.executeStreamReply(
+        input,
+        subscriber,
+        abortController.signal,
+      ).catch((error) => subscriber.error(error));
 
       return () => {
         abortController.abort();
@@ -402,23 +438,43 @@ export class AiDjService {
       input.userId,
     );
 
-    if (streamContext) {
-      this.logger.log(`Streaming LLM reply for message ${messageId}`);
+    // Use cached payload as fallback context for anonymous users
+    const replyContext: ReplyContext | null = streamContext
+      ? {
+          message: streamContext.userMessage,
+          intent: streamContext.intent,
+          contentIds: streamContext.contentIds,
+          trackDescriptions: streamContext.trackDescriptions,
+          tasteProfileSummary: streamContext.tasteSummary,
+          timeOfDay: streamContext.timeOfDay,
+          currentTrackTitle: streamContext.currentTrackTitle,
+          currentTrackLanguage: streamContext.currentTrackLanguage,
+        }
+      : payload.userMessage
+        ? {
+            message: payload.userMessage,
+            intent: payload.intent,
+            contentIds:
+              payload.contentIds ??
+              payload.actions.flatMap((a) => a.payload.contentIds),
+            trackDescriptions: payload.trackDescriptions ?? '',
+            tasteProfileSummary: payload.tasteSummary,
+            timeOfDay: payload.timeOfDay,
+            currentTrackTitle: payload.currentTrackTitle,
+            currentTrackLanguage: payload.currentTrackLanguage,
+          }
+        : null;
+
+    if (replyContext) {
+      this.logger.log(
+        `Streaming LLM reply for message ${messageId} (${streamContext ? 'db' : 'cached'} context)`,
+      );
 
       let fullText = '';
 
       try {
         fullText = await this.replyGenerator.generateStreamReply(
-          {
-            message: streamContext.userMessage,
-            intent: streamContext.intent,
-            contentIds: streamContext.contentIds,
-            trackDescriptions: streamContext.trackDescriptions,
-            tasteProfileSummary: streamContext.tasteSummary,
-            timeOfDay: streamContext.timeOfDay,
-            currentTrackTitle: streamContext.currentTrackTitle,
-            currentTrackLanguage: streamContext.currentTrackLanguage,
-          },
+          replyContext,
           (delta) => {
             subscriber.next({
               type: 'chunk',
@@ -432,24 +488,15 @@ export class AiDjService {
           signal,
         );
       } catch (error) {
-        this.logger.warn(`LLM streaming failed, using fallback: ${String(error)}`);
+        this.logger.warn(
+          `LLM streaming failed, using fallback: ${String(error)}`,
+        );
 
         if (signal.aborted) {
           return;
         }
 
-        const fallbackPlan: ReplyContext = {
-          message: streamContext.userMessage,
-          intent: streamContext.intent,
-          contentIds: streamContext.contentIds,
-          trackDescriptions: streamContext.trackDescriptions,
-          tasteProfileSummary: streamContext.tasteSummary,
-          timeOfDay: streamContext.timeOfDay,
-          currentTrackTitle: streamContext.currentTrackTitle,
-          currentTrackLanguage: streamContext.currentTrackLanguage,
-        };
-
-        fullText = this.replyGenerator.fallbackGenerate(fallbackPlan);
+        fullText = this.replyGenerator.fallbackGenerate(replyContext);
         const chars = this.chunkReplyText(fullText);
         for (const char of chars) {
           if (signal.aborted) {
@@ -488,7 +535,7 @@ export class AiDjService {
           messageId,
           replyText: fullText,
           actions: payload.actions,
-          intent: streamContext.intent,
+          intent: replyContext.intent,
         },
       });
 
@@ -497,9 +544,25 @@ export class AiDjService {
       this.streamPayloads.delete(messageId);
       subscriber.complete();
     } else {
-      const chunks = this.chunkReplyText(payload.replyText);
+      let replyText = payload.replyText;
 
-      let delay = 0;
+      if (!replyText) {
+        this.logger.log(
+          `No replyText in stream payload for ${messageId}, generating fallback`,
+        );
+        const contentIds = payload.actions.flatMap(
+          (action) => action.payload.contentIds,
+        );
+        replyText = this.replyGenerator.fallbackGenerate({
+          message: '',
+          intent: payload.intent,
+          contentIds,
+          trackDescriptions: '',
+        });
+      }
+
+      const chunks = this.chunkReplyText(replyText);
+
       for (const delta of chunks) {
         if (signal.aborted) {
           return;
@@ -546,8 +609,9 @@ export class AiDjService {
         data: {
           sessionId,
           messageId,
-          replyText: payload.replyText,
+          replyText,
           actions: payload.actions,
+          intent: payload.intent,
         },
       });
 
@@ -606,9 +670,7 @@ export class AiDjService {
         ? trace.trackDescriptions
         : '';
     const tasteSummary =
-      typeof trace.tasteSummary === 'string'
-        ? trace.tasteSummary
-        : undefined;
+      typeof trace.tasteSummary === 'string' ? trace.tasteSummary : undefined;
     const timeOfDay =
       typeof trace.timeOfDay === 'string' ? trace.timeOfDay : undefined;
     const currentTrackTitle =
@@ -646,7 +708,9 @@ export class AiDjService {
         data: { contentText: fullText },
       });
     } catch (error) {
-      this.logger.error(`Failed to update persisted reply for ${messageId}: ${String(error)}`);
+      this.logger.error(
+        `Failed to update persisted reply for ${messageId}: ${String(error)}`,
+      );
     }
   }
 
@@ -656,46 +720,57 @@ export class AiDjService {
     userId?: string,
     timezoneHeader?: string,
   ): Promise<ReplyPlan> {
-    const normalized = message.trim().toLowerCase();
     const intent = await this.intentClassifier.classify(message);
+
+    const isConversation = intent === 'conversation';
     const queueIds = surfaceContext?.queueContentIds ?? [];
 
-    const count =
-      intent === 'queue_append' ? 2 : intent === 'theme_playlist_preview' ? 3 : 3;
-    const contentIds = await this.contentSelector.selectContent(message, count);
+    let picks: string[] = [];
+    let trackDescriptions = '';
+    let actions: AiDjActionDto[] = [];
 
-    const filtered =
-      intent === 'queue_append'
-        ? contentIds.filter((id) => !queueIds.includes(id))
-        : contentIds;
+    if (!isConversation) {
+      const count =
+        intent === 'queue_append'
+          ? 2
+          : intent === 'theme_playlist_preview'
+            ? 3
+            : 3;
+      const contentIds = await this.contentSelector.selectContent(
+        message,
+        count,
+      );
 
-    const picks = filtered.slice(
-      0,
-      intent === 'queue_append' ? 2 : 3,
-    );
+      const filtered =
+        intent === 'queue_append'
+          ? contentIds.filter((id) => !queueIds.includes(id))
+          : contentIds;
 
-    const actions: AiDjActionDto[] =
-      picks.length > 0
-        ? [
-            {
-              type:
-                intent === 'queue_append' ? 'queue_append' : 'queue_replace',
-              payload: { contentIds: picks },
-            },
-          ]
-        : [];
+      picks = filtered.slice(0, intent === 'queue_append' ? 2 : 3);
 
-    const trackItems = await this.contentService.getByIds(picks);
-    const trackDescriptions = trackItems
-      .map(
-        (t) =>
-          `"${t.title}" by ${(t.artists ?? []).join(', ')} [${t.language ?? 'en'}, ${t.type}]`,
-      )
-      .join('\n');
+      actions =
+        picks.length > 0
+          ? [
+              {
+                type:
+                  intent === 'queue_append' ? 'queue_append' : 'queue_replace',
+                payload: { contentIds: picks },
+              },
+            ]
+          : [];
+
+      const trackItems = await this.contentService.getByIds(picks);
+      trackDescriptions = trackItems
+        .map(
+          (t) =>
+            `"${t.title}" by ${(t.artists ?? []).join(', ')} [${t.language ?? 'en'}, ${t.type}]`,
+        )
+        .join('\n');
+    }
 
     const currentTrackTitle = surfaceContext?.currentTrackId
-      ? (await this.contentService.getById(surfaceContext.currentTrackId))
-          ?.title ?? undefined
+      ? ((await this.contentService.getById(surfaceContext.currentTrackId))
+          ?.title ?? undefined)
       : undefined;
 
     const currentTrack = surfaceContext?.currentTrackId
@@ -767,40 +842,52 @@ export class AiDjService {
     timezoneHeader?: string,
   ): Promise<StreamPlan> {
     const intent = await this.intentClassifier.classify(message);
+
+    const isConversation = intent === 'conversation';
     const queueIds = surfaceContext?.queueContentIds ?? [];
 
-    const count =
-      intent === 'queue_append' ? 2 : intent === 'theme_playlist_preview' ? 3 : 3;
-    const contentIds = await this.contentSelector.selectContent(message, count);
+    let picks: string[] = [];
+    let trackDescriptions = '';
+    let actions: AiDjActionDto[] = [];
 
-    const filtered =
-      intent === 'queue_append'
-        ? contentIds.filter((id) => !queueIds.includes(id))
-        : contentIds;
+    if (!isConversation) {
+      const count =
+        intent === 'queue_append'
+          ? 2
+          : intent === 'theme_playlist_preview'
+            ? 3
+            : 3;
+      const contentIds = await this.contentSelector.selectContent(
+        message,
+        count,
+      );
 
-    const picks = filtered.slice(
-      0,
-      intent === 'queue_append' ? 2 : 3,
-    );
+      const filtered =
+        intent === 'queue_append'
+          ? contentIds.filter((id) => !queueIds.includes(id))
+          : contentIds;
 
-    const actions: AiDjActionDto[] =
-      picks.length > 0
-        ? [
-            {
-              type:
-                intent === 'queue_append' ? 'queue_append' : 'queue_replace',
-              payload: { contentIds: picks },
-            },
-          ]
-        : [];
+      picks = filtered.slice(0, intent === 'queue_append' ? 2 : 3);
 
-    const trackItems = await this.contentService.getByIds(picks);
-    const trackDescriptions = trackItems
-      .map(
-        (t) =>
-          `"${t.title}" by ${(t.artists ?? []).join(', ')} [${t.language ?? 'en'}, ${t.type}]`,
-      )
-      .join('\n');
+      actions =
+        picks.length > 0
+          ? [
+              {
+                type:
+                  intent === 'queue_append' ? 'queue_append' : 'queue_replace',
+                payload: { contentIds: picks },
+              },
+            ]
+          : [];
+
+      const trackItems = await this.contentService.getByIds(picks);
+      trackDescriptions = trackItems
+        .map(
+          (t) =>
+            `"${t.title}" by ${(t.artists ?? []).join(', ')} [${t.language ?? 'en'}, ${t.type}]`,
+        )
+        .join('\n');
+    }
 
     const currentTrack = surfaceContext?.currentTrackId
       ? await this.contentService.getById(surfaceContext.currentTrackId)
@@ -847,7 +934,7 @@ export class AiDjService {
         intent,
         matchedContentIds: picks,
         mode: 'llm_stream_v1',
-        ...(intent === 'theme_playlist_preview'
+        ...(intent === 'theme_playlist_preview' && picks.length > 0
           ? {
               playlistDraft: this.buildPlaylistDraft(message, picks),
             }
@@ -992,6 +1079,7 @@ export class AiDjService {
 
     const value = trace.intent;
     if (
+      value === 'conversation' ||
       value === 'queue_replace' ||
       value === 'queue_append' ||
       value === 'recommend_explain' ||
@@ -1077,9 +1165,13 @@ export class AiDjService {
       throw new NotFoundException('Stream payload was not found');
     }
 
+    const trace = this.readJsonObject(assistantMessage.traceJson);
+    const intent = this.readIntentFromTrace(trace) ?? 'conversation';
+
     const payload: StreamPayload = {
       sessionId: assistantMessage.chatSessionId,
       messageId: assistantMessage.id,
+      intent,
       replyText: assistantMessage.contentText ?? '',
       actions: this.readActionsFromContentJson(assistantMessage.contentJson),
       userId: input.userId,

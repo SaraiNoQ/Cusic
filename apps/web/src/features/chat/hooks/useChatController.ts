@@ -292,7 +292,7 @@ export function useChatController(playerController: PlayerController) {
         upsertMessage({
           id: assistantMsgId,
           role: 'assistant',
-          text: response.data.replyText,
+          text: response.data.replyText || '我暂时没能收到完整的回复，请重试。',
           intent: response.data.intent,
           actions: response.data.actions,
         });

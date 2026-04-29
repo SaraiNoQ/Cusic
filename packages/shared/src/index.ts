@@ -237,6 +237,7 @@ export interface ChatTurnRequestDto {
 }
 
 export type AiDjIntent =
+  | 'conversation'
   | 'queue_replace'
   | 'queue_append'
   | 'recommend_explain'
@@ -334,7 +335,10 @@ export type ImportJobStatus =
 
 export type ImportJobType = 'playlist_import' | 'history_import';
 
-export type ImportJobExecutionMode = 'baseline_stub' | 'worker_stub' | 'provider_live';
+export type ImportJobExecutionMode =
+  | 'baseline_stub'
+  | 'worker_stub'
+  | 'provider_live';
 
 export type ImportJobExecutionPhase =
   | 'accepted'

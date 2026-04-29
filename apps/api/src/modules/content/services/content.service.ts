@@ -54,7 +54,10 @@ export class ContentService implements OnModuleInit {
 
   private async seedJamendoCatalog() {
     try {
-      const tracks = await this.jamendoContentProvider.listPopularTracks(100, 0);
+      const tracks = await this.jamendoContentProvider.listPopularTracks(
+        100,
+        0,
+      );
       for (const track of tracks) {
         await this.upsertJamendoTrack(track);
       }
@@ -71,6 +74,13 @@ export class ContentService implements OnModuleInit {
   private async upsertJamendoTrack(track: JamendoTrackInfo) {
     const contentId = `jamendo_track_${track.jamendoId}`;
 
+    const metadata = {
+      audioUrl: track.audioUrl,
+      genres: track.genres ?? [],
+      styles: track.styles ?? [],
+      moods: track.moods ?? [],
+    };
+
     const contentItem = await this.prisma.contentItem.upsert({
       where: { id: contentId },
       create: {
@@ -83,7 +93,10 @@ export class ContentService implements OnModuleInit {
         language: track.language,
         coverUrl: track.coverUrl,
         playable: true,
-        metadataJson: { audioUrl: track.audioUrl },
+        ...(track.releaseDate
+          ? { releaseDate: new Date(track.releaseDate) }
+          : {}),
+        metadataJson: metadata,
       },
       update: {
         canonicalTitle: track.title,
@@ -93,7 +106,10 @@ export class ContentService implements OnModuleInit {
         language: track.language,
         coverUrl: track.coverUrl,
         playable: true,
-        metadataJson: { audioUrl: track.audioUrl },
+        ...(track.releaseDate
+          ? { releaseDate: new Date(track.releaseDate) }
+          : {}),
+        metadataJson: metadata,
       },
     });
 
@@ -118,6 +134,9 @@ export class ContentService implements OnModuleInit {
           audioUrl: track.audioUrl,
           coverUrl: track.coverUrl,
           releaseDate: track.releaseDate,
+          genres: track.genres ?? [],
+          styles: track.styles ?? [],
+          moods: track.moods ?? [],
         },
         syncStatus: 'READY',
         lastSyncedAt: new Date(),
@@ -134,6 +153,9 @@ export class ContentService implements OnModuleInit {
           audioUrl: track.audioUrl,
           coverUrl: track.coverUrl,
           releaseDate: track.releaseDate,
+          genres: track.genres ?? [],
+          styles: track.styles ?? [],
+          moods: track.moods ?? [],
         },
         syncStatus: 'READY',
         lastSyncedAt: new Date(),

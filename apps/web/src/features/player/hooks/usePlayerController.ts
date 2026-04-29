@@ -583,6 +583,7 @@ export function usePlayerController() {
     volume,
     setVolume,
     setSelectedPlaylistId,
+    setStatusText,
     refreshPlaylists: () => playlistsQuery.refetch(),
     playTrack,
     addToQueue,

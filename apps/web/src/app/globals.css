@@ -1,5 +1,307 @@
+/* ── CSS Custom Properties (Dark theme = default) ── */
 :root {
   color-scheme: dark;
+
+  /* Backgrounds */
+  --bg-screen: #010307;
+  --bg-body: #020509;
+  --bg-surface: rgba(5, 10, 16, 0.58);
+  --bg-surface-deep: rgba(3, 8, 13, 0.58);
+  --bg-surface-panel: rgba(4, 9, 14, 0.64);
+  --bg-elevated-base: rgba(8, 16, 24, 0.97);
+  --bg-elevated-alt: rgba(4, 9, 14, 0.985);
+  --bg-input: rgba(6, 14, 21, 0.9);
+  --bg-button: rgba(8, 15, 23, 0.88);
+  --bg-button-hover-start: rgba(20, 28, 35, 0.9);
+  --bg-button-hover-end: rgba(7, 12, 17, 0.96);
+  --bg-card: rgba(5, 11, 17, 0.44);
+  --bg-card-elevated: rgba(11, 22, 31, 0.9);
+  --bg-card-base: rgba(5, 12, 18, 0.96);
+  --bg-card-hover-start: rgba(8, 18, 27, 0.78);
+  --bg-card-hover-end: rgba(4, 11, 17, 0.9);
+  --bg-overlay: rgba(1, 4, 8, 0.72);
+  --bg-header: rgba(5, 10, 16, 0.58);
+  --bg-segmented: rgba(4, 9, 15, 0.72);
+  --bg-segment-active-start: rgba(44, 29, 18, 0.84);
+  --bg-segment-active-end: rgba(13, 13, 17, 0.86);
+  --bg-brand-glow: rgba(255, 226, 176, 0.2);
+  --bg-brand-dot: #ffd99a;
+  --bg-user-bubble: rgba(28, 21, 13, 0.88);
+  --bg-chat-mini-assistant: rgba(42, 74, 86, 0.22);
+  --bg-chat-mini-user: rgba(190, 143, 93, 0.12);
+  --bg-import-active: rgba(255, 146, 47, 0.14);
+
+  /* Text */
+  --text-primary: rgba(238, 225, 207, 0.96);
+  --text-primary-solid: #efe3d1;
+  --text-body: #f0e6d8;
+  --text-heading: rgba(240, 229, 213, 0.92);
+  --text-chat: rgba(236, 226, 213, 0.9);
+  --text-button: rgba(231, 218, 201, 0.64);
+  --text-button-solid: rgba(241, 221, 199, 0.9);
+  --text-secondary: rgba(190, 198, 201, 0.62);
+  --text-muted: rgba(196, 201, 204, 0.42);
+  --text-fade: rgba(218, 213, 204, 0.58);
+  --text-label: rgba(230, 222, 207, 0.64);
+  --text-label-dim: rgba(219, 212, 201, 0.76);
+  --text-progress: rgba(203, 209, 213, 0.74);
+  --text-queue-name: rgba(235, 224, 208, 0.88);
+  --text-queue-meta: rgba(119, 169, 180, 0.82);
+  --text-recommend-body: rgba(229, 219, 203, 0.72);
+  --text-recommend-meta: rgba(128, 176, 188, 0.74);
+  --text-recommend-summary-label: rgba(104, 170, 184, 0.75);
+  --text-recommend-item-heading: rgba(240, 229, 213, 0.92);
+  --text-import-label: rgba(137, 182, 190, 0.8);
+  --text-import-error: #ffb16c;
+  --text-search-card-meta: rgba(137, 182, 190, 0.76);
+  --text-chat-bubble-index: rgba(230, 219, 203, 0.44);
+  --text-dj-name: #ff9834;
+
+  /* Accent colors */
+  --accent-orange: #ff9834;
+  --accent-orange-bright: #ff8b18;
+  --accent-orange-glow: rgba(255, 147, 45, 0.16);
+  --accent-orange-hover: #ffd59c;
+  --accent-orange-light: #ffb365;
+  --accent-orange-pale: #f2d3a4;
+  --accent-orange-lighter: #ffe1b9;
+  --accent-gold: #d4a862;
+  --accent-gold-text: #ffd59c;
+  --accent-gold-cta: #ffd099;
+  --accent-brand: #f3c083;
+  --accent-teal: #58aebb;
+  --accent-teal-dark: #48a7b4;
+  --accent-teal-light: #a6d8e6;
+  --accent-teal-pale: #85c7ce;
+  --accent-teal-bright: #52a7bc;
+  --accent-teal-muted: #75b5ba;
+  --accent-teal-echo: #72aeb9;
+  --accent-green: #47d89d;
+  --accent-green-bright: #3ed0a5;
+  --accent-green-intense: #50df94;
+  --accent-green-success: #53cca6;
+  --accent-green-dot: #4ed19b;
+  --accent-green-vivid: #37ce94;
+  --accent-warm-light: #ffc183;
+  --accent-cyan-pale: #d2f0f8;
+  --accent-badge-warm: #f1d5b5;
+  --accent-teal-alt: #7ec8d4;
+  --accent-gold-light-alt: #f0c078;
+  --accent-grade-negative-start: #6e8a94;
+  --accent-grade-negative-end: #8da7b2;
+
+  /* Borders */
+  --border-standard: rgba(93, 147, 169, 0.28);
+  --border-standard-subtle: rgba(89, 144, 164, 0.24);
+  --border-standard-faint: rgba(82, 132, 150, 0.18);
+  --border-warm: rgba(184, 139, 101, 0.36);
+  --border-warm-strong: rgba(184, 139, 101, 0.42);
+  --border-warm-btn: rgba(191, 139, 101, 0.52);
+  --border-warm-alt: rgba(187, 137, 99, 0.52);
+  --border-accent: rgba(255, 153, 44, 0.82);
+  --border-accent-hover: rgba(255, 146, 44, 0.72);
+  --border-control: rgba(191, 139, 101, 0.52);
+  --border-subtle: rgba(119, 142, 158, 0.22);
+  --border-subtle-mid: rgba(112, 142, 159, 0.34);
+  --border-subtle-warm: rgba(198, 162, 126, 0.32);
+  --border-faint: rgba(110, 145, 170, 0.12);
+  --border-hr: rgba(186, 141, 104, 0.22);
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(80, 120, 160, 0.2);
+  --scrollbar-thumb-hover: rgba(80, 120, 160, 0.35);
+
+  /* Focus */
+  --focus-ring: rgba(255, 180, 100, 0.5);
+
+  /* Gradients */
+  --gradient-panel-start: rgba(10, 19, 28, 0.88);
+  --gradient-panel-end: rgba(5, 10, 16, 0.94);
+  --gradient-elevated-start: rgba(8, 16, 24, 0.97);
+  --gradient-elevated-end: rgba(4, 9, 14, 0.985);
+  --gradient-card-start: rgba(8, 18, 27, 0.86);
+  --gradient-card-end: rgba(4, 11, 17, 0.94);
+  --gradient-card-hover-start: rgba(11, 22, 31, 0.9);
+  --gradient-card-hover-end: rgba(5, 12, 18, 0.96);
+  --gradient-surface-start: rgba(4, 10, 16, 0.78);
+  --gradient-surface-end: rgba(3, 8, 13, 0.88);
+  --gradient-button-start: rgba(20, 28, 35, 0.9);
+  --gradient-button-end: rgba(7, 12, 17, 0.96);
+  --gradient-orange-btn-start: rgba(77, 57, 39, 0.94);
+  --gradient-orange-btn-end: rgba(18, 15, 14, 0.98);
+  --gradient-orange-highlight: rgba(255, 218, 170, 0.22);
+  --gradient-progress-start: #ff8b18;
+  --gradient-progress-end: #ffd19a;
+  --gradient-brand-start: rgba(255, 174, 94, 0.09);
+  --gradient-brand-end: rgba(77, 190, 178, 0.09);
+  --gradient-header-shadow-start: rgba(5, 12, 19, 0.86);
+  --gradient-header-shadow-end: rgba(3, 8, 13, 0.94);
+
+  /* Selection */
+  --selection-bg: rgba(255, 180, 100, 0.2);
+  --selection-fg: #fff8ec;
+
+  /* Shadows */
+  --shadow-device: 0 34px 90px rgba(0, 0, 0, 0.68);
+  --shadow-device-live: 0 38px 100px rgba(0, 0, 0, 0.7);
+  --shadow-device-accent: 0 0 72px rgba(255, 159, 76, 0.08);
+  --shadow-device-accent-live: 0 0 90px rgba(255, 165, 82, 0.13);
+  --shadow-card: 0 24px 70px rgba(0, 0, 0, 0.58);
+  --shadow-panel: 0 10px 26px rgba(0, 0, 0, 0.24);
+  --shadow-segment-glow: 0 0 18px rgba(255, 143, 44, 0.12);
+  --shadow-btn-hover: 0 0 18px rgba(255, 147, 45, 0.16);
+}
+
+/* ── Light theme overrides ── */
+[data-theme='light'] {
+  color-scheme: light;
+
+  /* Backgrounds */
+  --bg-screen: #f5f0e8;
+  --bg-body: #faf7f2;
+  --bg-surface: rgba(240, 233, 222, 0.78);
+  --bg-surface-deep: rgba(235, 228, 217, 0.78);
+  --bg-surface-panel: rgba(242, 235, 224, 0.78);
+  --bg-elevated-base: rgba(255, 255, 255, 0.98);
+  --bg-elevated-alt: rgba(252, 249, 244, 0.99);
+  --bg-input: rgba(250, 247, 242, 0.98);
+  --bg-button: rgba(245, 238, 228, 0.92);
+  --bg-button-hover-start: rgba(240, 232, 222, 0.95);
+  --bg-button-hover-end: rgba(235, 226, 215, 0.98);
+  --bg-card: rgba(248, 242, 232, 0.65);
+  --bg-card-elevated: rgba(245, 238, 226, 0.95);
+  --bg-card-base: rgba(243, 236, 224, 0.96);
+  --bg-card-hover-start: rgba(242, 234, 222, 0.85);
+  --bg-card-hover-end: rgba(237, 229, 217, 0.92);
+  --bg-overlay: rgba(235, 228, 217, 0.78);
+  --bg-header: rgba(242, 235, 224, 0.85);
+  --bg-segmented: rgba(242, 235, 224, 0.9);
+  --bg-segment-active-start: rgba(220, 180, 120, 0.35);
+  --bg-segment-active-end: rgba(240, 230, 215, 0.85);
+  --bg-user-bubble: rgba(235, 225, 210, 0.88);
+  --bg-chat-mini-assistant: rgba(180, 200, 210, 0.25);
+  --bg-chat-mini-user: rgba(210, 185, 145, 0.18);
+  --bg-import-active: rgba(200, 100, 20, 0.14);
+
+  /* Text */
+  --text-primary: rgba(30, 25, 18, 0.96);
+  --text-primary-solid: #2a2520;
+  --text-body: #333028;
+  --text-heading: rgba(30, 25, 18, 0.92);
+  --text-chat: rgba(35, 30, 22, 0.92);
+  --text-button: rgba(80, 70, 60, 0.7);
+  --text-button-solid: rgba(60, 50, 38, 0.88);
+  --text-secondary: rgba(80, 70, 60, 0.62);
+  --text-muted: rgba(120, 110, 100, 0.45);
+  --text-fade: rgba(100, 90, 80, 0.58);
+  --text-label: rgba(80, 70, 60, 0.7);
+  --text-label-dim: rgba(100, 90, 78, 0.72);
+  --text-progress: rgba(100, 90, 80, 0.7);
+  --text-queue-name: rgba(40, 35, 28, 0.88);
+  --text-queue-meta: rgba(90, 80, 65, 0.78);
+  --text-recommend-body: rgba(70, 60, 48, 0.78);
+  --text-recommend-meta: rgba(90, 80, 65, 0.72);
+  --text-recommend-summary-label: rgba(80, 70, 58, 0.7);
+  --text-recommend-item-heading: rgba(30, 25, 18, 0.92);
+  --text-import-label: rgba(90, 80, 65, 0.75);
+  --text-import-error: #c06030;
+  --text-search-card-meta: rgba(90, 80, 65, 0.72);
+  --text-chat-bubble-index: rgba(100, 90, 80, 0.5);
+  --text-dj-name: #d47820;
+
+  /* Accent colors */
+  --accent-orange: #d47820;
+  --accent-orange-bright: #c06810;
+  --accent-orange-glow: rgba(200, 100, 20, 0.12);
+  --accent-orange-hover: #c06818;
+  --accent-orange-light: #c06018;
+  --accent-orange-pale: #c09050;
+  --accent-orange-lighter: #d4a060;
+  --accent-gold: #a87838;
+  --accent-gold-text: #b08038;
+  --accent-gold-cta: #c09040;
+  --accent-brand: #b87828;
+  --accent-teal: #3a7a88;
+  --accent-teal-dark: #306878;
+  --accent-teal-light: #5a9aa8;
+  --accent-teal-pale: #4a8a98;
+  --accent-teal-bright: #3a7a84;
+  --accent-teal-muted: #4a7a80;
+  --accent-teal-echo: #4a7880;
+  --accent-green: #389e6a;
+  --accent-green-bright: #2e8e5a;
+  --accent-green-intense: #38ae68;
+  --accent-green-success: #389e60;
+  --accent-green-dot: #3a9e62;
+  --accent-green-vivid: #2e9e58;
+  --accent-warm-light: #c08030;
+  --accent-cyan-pale: #4a8a9a;
+  --accent-badge-warm: #c09868;
+  --accent-teal-alt: #4a8a98;
+  --accent-gold-light-alt: #c0a058;
+  --accent-grade-negative-start: #8a9298;
+  --accent-grade-negative-end: #a0a8b0;
+
+  /* Borders */
+  --border-standard: rgba(140, 130, 120, 0.25);
+  --border-standard-subtle: rgba(140, 130, 118, 0.22);
+  --border-standard-faint: rgba(150, 140, 128, 0.18);
+  --border-warm: rgba(160, 140, 120, 0.35);
+  --border-warm-strong: rgba(160, 140, 120, 0.42);
+  --border-warm-btn: rgba(170, 140, 115, 0.48);
+  --border-warm-alt: rgba(170, 140, 115, 0.48);
+  --border-accent: rgba(200, 100, 20, 0.7);
+  --border-accent-hover: rgba(200, 100, 20, 0.65);
+  --border-control: rgba(170, 140, 115, 0.48);
+  --border-subtle: rgba(150, 140, 130, 0.2);
+  --border-subtle-mid: rgba(150, 140, 128, 0.3);
+  --border-subtle-warm: rgba(160, 140, 125, 0.3);
+  --border-faint: rgba(150, 140, 130, 0.12);
+  --border-hr: rgba(160, 140, 120, 0.22);
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(120, 110, 100, 0.22);
+  --scrollbar-thumb-hover: rgba(120, 110, 100, 0.38);
+
+  /* Focus */
+  --focus-ring: rgba(200, 120, 40, 0.5);
+
+  /* Gradients */
+  --gradient-panel-start: rgba(250, 244, 236, 0.95);
+  --gradient-panel-end: rgba(242, 235, 224, 0.98);
+  --gradient-elevated-start: rgba(255, 255, 255, 0.98);
+  --gradient-elevated-end: rgba(252, 249, 244, 0.99);
+  --gradient-card-start: rgba(248, 240, 230, 0.92);
+  --gradient-card-end: rgba(240, 232, 220, 0.96);
+  --gradient-card-hover-start: rgba(245, 236, 224, 0.95);
+  --gradient-card-hover-end: rgba(238, 230, 218, 0.98);
+  --gradient-surface-start: rgba(250, 244, 236, 0.92);
+  --gradient-surface-end: rgba(242, 235, 224, 0.95);
+  --gradient-button-start: rgba(240, 232, 222, 0.95);
+  --gradient-button-end: rgba(232, 223, 212, 0.98);
+  --gradient-orange-btn-start: rgba(220, 170, 110, 0.45);
+  --gradient-orange-btn-end: rgba(210, 170, 120, 0.38);
+  --gradient-orange-highlight: rgba(220, 170, 110, 0.25);
+  --gradient-progress-start: #d06808;
+  --gradient-progress-end: #d09030;
+  --gradient-brand-start: rgba(200, 120, 40, 0.06);
+  --gradient-brand-end: rgba(60, 140, 130, 0.06);
+  --gradient-header-shadow-start: rgba(240, 232, 218, 0.92);
+  --gradient-header-shadow-end: rgba(235, 228, 214, 0.96);
+
+  /* Selection */
+  --selection-bg: rgba(200, 140, 60, 0.18);
+  --selection-fg: #4a3828;
+
+  /* Shadows */
+  --shadow-device: 0 34px 90px rgba(0, 0, 0, 0.12);
+  --shadow-device-live: 0 38px 100px rgba(0, 0, 0, 0.14);
+  --shadow-device-accent: 0 0 72px rgba(200, 100, 20, 0.06);
+  --shadow-device-accent-live: 0 0 90px rgba(200, 100, 20, 0.08);
+  --shadow-card: 0 24px 70px rgba(0, 0, 0, 0.1);
+  --shadow-panel: 0 10px 26px rgba(0, 0, 0, 0.06);
+  --shadow-segment-glow: 0 0 18px rgba(200, 100, 20, 0.1);
+  --shadow-btn-hover: 0 0 18px rgba(200, 100, 20, 0.12);
 }
 
 * {
@@ -11,8 +313,8 @@
 html,
 body {
   min-height: 100%;
-  background: #020509;
-  color: #f0e6d8;
+  background: var(--bg-body);
+  color: var(--text-body);
   font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
   font-size: 16px;
   line-height: 1.4;
@@ -44,8 +346,8 @@ a {
 
 /* Selection */
 ::selection {
-  background: rgba(255, 180, 100, 0.2);
-  color: #fff8ec;
+  background: var(--selection-bg);
+  color: var(--selection-fg);
 }
 
 /* Scrollbar */
@@ -58,16 +360,16 @@ a {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(80, 120, 160, 0.2);
+  background: var(--scrollbar-thumb);
   border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(80, 120, 160, 0.35);
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Focus styles */
 :focus-visible {
-  outline: 1px solid rgba(255, 180, 100, 0.5);
+  outline: 1px solid var(--focus-ring);
   outline-offset: 2px;
 }

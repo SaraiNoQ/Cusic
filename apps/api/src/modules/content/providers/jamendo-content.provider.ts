@@ -12,6 +12,13 @@ interface JamendoTrackResult {
   shorturl?: string;
   shareurl?: string;
   license_ccurl?: string;
+  musicinfo?: {
+    tags?: {
+      genres?: string[];
+      styles?: string[];
+      moods?: string[];
+    };
+  };
 }
 
 interface JamendoHeaders {
@@ -37,6 +44,9 @@ export interface JamendoTrackInfo {
   coverUrl: string;
   language: string;
   releaseDate: string | null;
+  genres?: string[];
+  styles?: string[];
+  moods?: string[];
 }
 
 @Injectable()
@@ -88,6 +98,7 @@ export class JamendoContentProvider {
 
   mapToTrackInfo(track: JamendoTrackResult): JamendoTrackInfo {
     const lang = this.inferLanguage(track.name, track.artist_name);
+    const tags = track.musicinfo?.tags;
 
     return {
       jamendoId: track.id,
@@ -96,9 +107,12 @@ export class JamendoContentProvider {
       albumName: track.album_name,
       durationMs: Math.round(track.duration * 1000),
       audioUrl: track.audio,
-      coverUrl: track.image || null as unknown as string,
+      coverUrl: track.image || (null as unknown as string),
       language: lang,
       releaseDate: track.releasedate ?? null,
+      genres: tags?.genres ?? [],
+      styles: tags?.styles ?? [],
+      moods: tags?.moods ?? [],
     };
   }
 

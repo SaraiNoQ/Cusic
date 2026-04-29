@@ -25,13 +25,9 @@ import { LlmService } from './services/llm.service';
             'LLM_BASE_URL',
             'https://api.deepseek.com/v1',
           ),
-          model: config.get<string>('LLM_MODEL', 'deepseek-v4-pro'),
-          temperature: Number(
-            config.get<string>('LLM_TEMPERATURE', '0.7'),
-          ),
-          maxTokens: Number(
-            config.get<string>('LLM_MAX_TOKENS', '1024'),
-          ),
+          model: config.get<string>('LLM_MODEL', 'deepseek-v4-flash'),
+          temperature: Number(config.get<string>('LLM_TEMPERATURE', '0.7')),
+          maxTokens: Number(config.get<string>('LLM_MAX_TOKENS', '1024')),
           requestTimeoutMs: Number(
             config.get<string>('LLM_REQUEST_TIMEOUT_MS', '15000'),
           ),

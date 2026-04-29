@@ -1,8 +1,8 @@
 # 音乐 AI App API 设计文档
 
-- 文档版本：v0.2
-- 文档状态：初版
-- 更新时间：2026-04-27
+- 文档版本：v0.3
+- 文档状态：持续更新
+- 更新时间：2026-04-29
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`、`docs/specs/database-design.md`
 
 ## 1. 设计目标与约束
@@ -39,6 +39,14 @@ Content-Type: application/json
 2. API 域名为 `https://api.sarainoq.cn/api/v1`。
 3. API CORS 通过 `API_CORS_ORIGINS` 配置，生产默认包含 `https://web.sarainoq.cn`。
 4. 浏览器端不得通过 `web.sarainoq.cn:3001` 访问 API。
+
+### 2.1.1 前端 API 代理策略
+
+为消除跨域问题，前端采用了 Next.js rewrites 将同源 `/api/v1/*` 请求代理到 API 后端：
+
+- `NEXT_PUBLIC_API_BASE_URL=/api/v1`：浏览器端 JS 使用相对路径发起请求，请求到达同源的 Next.js 服务器。
+- `API_INTERNAL_URL`：Next.js 服务端将 `/api/v1/*` 代理转发的目标地址。Docker Compose 部署时设为 `http://api:3001`（Docker 网络内部地址），本地开发时默认 `http://localhost:3001`。
+- 浏览器只与 Web 域通信，不再直接访问 API 域。这消除了对 CORS 配置的浏览器端依赖，也避免了将 API 内部地址暴露到前端 JS bundle 中。
 
 ### 2.2 成功响应结构
 
@@ -723,11 +731,18 @@ Content-Type: application/json
 2. `responseMode=stream` 仍先返回完整 `sessionId/messageId/replyText/actions`，随后前端再通过 `GET /dj/chat/stream` 消费增量 token。
 3. 已登录用户会创建或续写 `chat_sessions/chat_messages`，匿名用户只返回临时 `sessionId`，不落库。
 4. `surfaceContext` 由前端附带当前曲目和当前队列，用于解释当前播放和编排队列动作。
-5. 首版只做规则型意图识别与内部工具编排，不接外部 LLM 或知识检索。
-6. 当前支持动作：
+5. LLM 驱动的意图识别（`IntentClassifierService`），支持以下意图：
+   - `conversation`：一般性对话、音乐知识提问、推荐咨询（不触发自动操作，仅文本回复）
+   - `recommend_explain`：解释当前推荐的理由
+   - `queue_append`：显式要求向当前队列追加曲目
+   - `queue_replace`：显式要求替换整个播放队列
+   - `theme_playlist_preview`：显式要求生成主题歌单
+     意图分类器优先使用 LLM 分类（DeepSeek V4 Flash），LLM 不可用时回退到规则型关键词匹配。另设 `mapToValidIntent()` 方法将 LLM 可能产出的非标准意图名称（如 `play_music`）映射到以上 5 个标准枚举值，防止因 LLM 输出格式偏差导致所有请求落入 `conversation` 兜底。
+6. 匿名用户也可获得 LLM 流式回复：`replyStreamMode()` 将 stream plan（intent、contentIds、trackDescriptions 等）缓存到 in-memory `StreamPayload`，`executeStreamReply()` 在 `buildStreamContext()` 返回 `null`（匿名用户无 DB 记录）时从缓存重建 `ReplyContext`，继续调用 LLM 流式生成。
+7. 当前支持动作（仅 `queue_append` / `queue_replace` / `theme_playlist_preview` 意图触发）：
    - `queue_replace`
    - `queue_append`
-7. 当 `intent=theme_playlist_preview` 且用户已登录时，前端可调用 `POST /dj/playlists` 把本轮主题预览保存为 `ai_generated` 歌单。
+8. 当 `intent=theme_playlist_preview` 且用户已登录时，前端可调用 `POST /dj/playlists` 把本轮主题预览保存为 `ai_generated` 歌单。
 
 请求 DTO：
 

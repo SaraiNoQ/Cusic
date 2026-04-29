@@ -1,8 +1,8 @@
 # Cusic 开发路线图
 
-- 文档版本：v0.3
+- 文档版本：v0.4
 - 文档状态：持续更新
-- 更新时间：2026-04-28
+- 更新时间：2026-04-29
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`
 
 ## 1. 目标与当前状态
@@ -27,10 +27,12 @@
 
 当前推进中：
 
-1. `Phase 4` 首轮 AI DJ 闭环已完成，DeepSeek V4 Pro 已接入（LLM Provider 抽象 + 熔断/重试/回退）。
-2. `Phase 5` imports 已接入首个真实 provider（Jamendo），画像与推荐已集成 LLM 解释生成。
+1. `Phase 4` 首轮 AI DJ 闭环已完成，DeepSeek V4 Flash 已接入（LLM Provider 抽象 + 熔断/重试/回退）。意图分类器已加固：LLM 优先分类 + 规则回退 + `mapToValidIntent()` 非标准意图映射，匿名用户已可用 LLM 流式回复。
+2. `Phase 5` imports 已接入首个真实 provider（Jamendo），画像与推荐已集成 LLM 解释生成。Taste Profile 页面已上线（`apps/web/src/features/profile`）。
 3. 前端 UX 已继续收敛：首页字号已上调，顶部 header/hero 纵向占比已压缩，AI DJ 首页空态改为单入口按钮，音量滑杆视觉进度与拖点位置已重新对齐。
-4. 服务器已迁移至 `10.132.166.83`，Docker registry mirror 已配置。
+4. 浅色/深色主题系统已上线：通过 CSS 自定义属性 + `data-theme` 属性切换，`DeviceHeader` 中提供 DARK/LIGHT 按钮。
+5. 前端 API 代理已切换为 Next.js rewrites 方案，浏览器端使用同源 `/api/v1/*` 路径，不再直接向 API 域发请求。
+6. 服务器已迁移至 `10.132.166.83`，Docker registry mirror 已配置。
 
 ## 2. 阶段规划总览
 

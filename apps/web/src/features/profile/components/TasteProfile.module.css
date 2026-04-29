@@ -1,0 +1,429 @@
+.screen {
+  min-height: 100dvh;
+  background: var(--bg-screen);
+  color: var(--text-primary-solid);
+  overflow-x: hidden;
+}
+
+.container {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 48px 24px 64px;
+}
+
+/* ── Loading ── */
+
+.loadingWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60dvh;
+  gap: 18px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--border-warm-alt);
+  border-top-color: var(--accent-orange);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.loadingWrap span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Error ── */
+
+.errorWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60dvh;
+  gap: 14px;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.errorIcon {
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--border-warm-strong);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--accent-orange-light);
+  font-size: 22px;
+}
+
+.errorWrap strong {
+  color: var(--accent-orange-light);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.errorWrap p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── Login prompt ── */
+
+.loginPrompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60dvh;
+  gap: 16px;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.loginPrompt p {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.loginPrompt button {
+  display: inline-flex;
+  min-width: 140px;
+  height: 46px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 22px;
+  border: 1px solid rgba(246, 158, 63, 0.72);
+  border-radius: 999px;
+  background: rgba(255, 146, 47, 0.14);
+  color: var(--accent-orange-lighter);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.loginPrompt button:hover {
+  border-color: rgba(255, 174, 94, 0.9);
+  box-shadow: 0 0 18px rgba(255, 147, 45, 0.18);
+}
+
+/* ── Title ── */
+
+.title {
+  margin: 0 0 32px 0;
+  text-align: center;
+}
+
+.titleEyebrow {
+  display: block;
+  color: var(--accent-teal);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.title h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+}
+
+/* ── Summary card ── */
+
+.summaryCard {
+  padding: 22px 24px;
+  border: 1px solid var(--border-warm);
+  border-radius: 18px;
+  background:
+    radial-gradient(
+      circle at 82% 18%,
+      rgba(255, 156, 70, 0.08),
+      transparent 28%
+    ),
+    linear-gradient(180deg, rgba(8, 16, 24, 0.87), rgba(4, 10, 16, 0.94));
+  margin-bottom: 28px;
+}
+
+.summaryCard p {
+  margin: 0;
+  color: var(--text-chat);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+/* ── Level badges ── */
+
+.levelRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 34px;
+}
+
+.levelBadge {
+  padding: 18px 20px;
+  border: 1px solid var(--border-standard);
+  border-radius: 16px;
+  background: var(--bg-input);
+}
+
+.levelLabel {
+  display: block;
+  color: var(--accent-teal);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.levelValue {
+  color: var(--accent-orange);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 18px;
+  letter-spacing: 0.06em;
+}
+
+.levelBar {
+  height: 4px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: rgba(125, 145, 154, 0.14);
+  overflow: hidden;
+}
+
+.levelBarFill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 500ms ease;
+}
+
+.levelBarFillLow {
+  width: 26%;
+  background: linear-gradient(
+    90deg,
+    var(--accent-teal),
+    var(--accent-teal-alt)
+  );
+}
+
+.levelBarFillMedium {
+  width: 56%;
+  background: linear-gradient(
+    90deg,
+    var(--accent-gold),
+    var(--accent-gold-light-alt)
+  );
+}
+
+.levelBarFillHigh {
+  width: 90%;
+  background: linear-gradient(
+    90deg,
+    var(--accent-orange-bright),
+    var(--gradient-progress-end)
+  );
+}
+
+/* ── Tag cloud ── */
+
+.tagSection {
+  margin-bottom: 30px;
+}
+
+.tagSectionHeading {
+  display: block;
+  color: var(--accent-gold);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-warm-alt);
+}
+
+.tagCloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tagChip {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 80px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-control);
+  border-radius: 14px;
+  background: linear-gradient(
+    180deg,
+    var(--gradient-button-start),
+    var(--gradient-button-end)
+  );
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background 150ms ease,
+    transform 120ms ease;
+  user-select: none;
+}
+
+.tagChip:hover {
+  border-color: rgba(255, 153, 44, 0.62);
+  box-shadow: 0 0 14px rgba(255, 147, 45, 0.12);
+}
+
+.tagChip:active {
+  transform: scale(0.97);
+}
+
+/* ── Chip action feedback ── */
+
+.tagChipIncrease {
+  border-color: rgba(255, 168, 69, 0.82);
+  background: linear-gradient(
+    180deg,
+    rgba(40, 25, 14, 0.9),
+    rgba(18, 12, 6, 0.96)
+  );
+  box-shadow: 0 0 18px rgba(255, 147, 45, 0.14);
+}
+
+.tagChipDecrease {
+  border-color: rgba(129, 168, 182, 0.62);
+  background: linear-gradient(
+    180deg,
+    rgba(14, 22, 30, 0.92),
+    rgba(6, 13, 19, 0.96)
+  );
+  box-shadow: 0 0 14px rgba(88, 174, 187, 0.12);
+}
+
+.tagChipRemove {
+  border-color: rgba(180, 120, 100, 0.5);
+  background: linear-gradient(
+    180deg,
+    rgba(28, 18, 16, 0.9),
+    rgba(14, 9, 8, 0.96)
+  );
+  opacity: 0.72;
+}
+
+/* ── Chip content ── */
+
+.tagValue {
+  color: var(--text-primary);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.tagChipNegative .tagValue {
+  color: var(--text-label-dim);
+}
+
+.tagWeightBar {
+  height: 3px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: rgba(125, 145, 154, 0.14);
+  overflow: hidden;
+}
+
+.tagWeightFill {
+  height: 100%;
+  border-radius: inherit;
+  transition:
+    width 400ms ease,
+    background 400ms ease;
+}
+
+.tagWeightFillPositive {
+  background: linear-gradient(
+    90deg,
+    var(--accent-gold),
+    var(--accent-gold-light-alt)
+  );
+}
+
+.tagWeightFillNegative {
+  background: linear-gradient(
+    90deg,
+    var(--accent-grade-negative-start),
+    var(--accent-grade-negative-end)
+  );
+}
+
+/* ── Action indicator ── */
+
+.tagAction {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tagActionIncrease {
+  color: var(--accent-orange-light);
+}
+
+.tagActionDecrease {
+  color: var(--accent-teal-alt);
+}
+
+.tagActionRemove {
+  color: #b08070;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 560px) {
+  .container {
+    padding: 32px 16px 48px;
+  }
+
+  .levelRow {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .title h1 {
+    font-size: 26px;
+  }
+
+  .summaryCard {
+    padding: 16px 18px;
+  }
+
+  .summaryCard p {
+    font-size: 15px;
+  }
+
+  .tagChip {
+    min-width: 64px;
+    padding: 8px 12px;
+  }
+}

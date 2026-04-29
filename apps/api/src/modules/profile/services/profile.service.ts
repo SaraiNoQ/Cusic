@@ -256,6 +256,13 @@ export class ProfileService {
         0.65,
       );
       this.bumpTag(positive, 'album', favorite.contentItem.albumName, 0.35);
+
+      const fGenres = this.extractMetadataArray(favorite.contentItem, 'genres');
+      const fMoods = this.extractMetadataArray(favorite.contentItem, 'moods');
+      const fEra = this.computeEra(favorite.contentItem.releaseDate);
+      this.bumpTag(positive, 'genre', fGenres, 0.7);
+      this.bumpTag(positive, 'mood', fMoods, 0.5);
+      if (fEra) this.bumpTag(positive, 'era', fEra, 0.4);
     }
 
     for (const item of playlistItems) {
@@ -272,6 +279,13 @@ export class ProfileService {
         this.fromContentType(item.contentItem.contentType),
         0.2,
       );
+
+      const pGenres = this.extractMetadataArray(item.contentItem, 'genres');
+      const pMoods = this.extractMetadataArray(item.contentItem, 'moods');
+      const pEra = this.computeEra(item.contentItem.releaseDate);
+      this.bumpTag(positive, 'genre', pGenres, 0.23);
+      this.bumpTag(positive, 'mood', pMoods, 0.16);
+      if (pEra) this.bumpTag(positive, 'era', pEra, 0.13);
     }
 
     for (const event of playbackEvents) {
@@ -306,6 +320,13 @@ export class ProfileService {
         this.fromContentType(event.contentItem.contentType),
         multiplier * 0.55,
       );
+
+      const evtGenres = this.extractMetadataArray(event.contentItem, 'genres');
+      const evtMoods = this.extractMetadataArray(event.contentItem, 'moods');
+      const evtEra = this.computeEra(event.contentItem.releaseDate);
+      this.bumpTag(target, 'genre', evtGenres, multiplier);
+      this.bumpTag(target, 'mood', evtMoods, multiplier * 0.7);
+      if (evtEra) this.bumpTag(target, 'era', evtEra, multiplier * 0.55);
     }
 
     const tags = [
@@ -398,6 +419,8 @@ export class ProfileService {
 
     const systemPrompt = `You are a music taste profiler for Cusic. Given a user's profile tags, generate a natural 1-2 sentence summary of their listening personality.
 
+Tag types may include: artist, language, type, album, genre, mood, era. Weave genre, mood, and era signals naturally into the listener's personality when present.
+
 Positive preferences: ${positive || 'no strong signals yet'}
 ${negative ? `Aversions: ${negative}` : ''}
 
@@ -406,7 +429,11 @@ Use warm, personal language. Mention top preferences first, then any notable ave
     return this.llmService.chat(
       [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: 'Summarize this listener taste profile in 1-2 natural sentences.' },
+        {
+          role: 'user',
+          content:
+            'Summarize this listener taste profile in 1-2 natural sentences.',
+        },
       ],
       {
         temperature: 0.6,
@@ -518,6 +545,34 @@ Use warm, personal language. Mention top preferences first, then any notable ave
     source.set(key, current);
   }
 
+  private extractMetadataArray(
+    contentItem: { metadataJson: Prisma.JsonValue | null } | null,
+    key: string,
+  ): string[] {
+    const meta = contentItem?.metadataJson;
+    if (meta && typeof meta === 'object' && !Array.isArray(meta)) {
+      const arr = (meta as Record<string, unknown>)[key];
+      return Array.isArray(arr)
+        ? (arr as unknown[]).filter((v): v is string => typeof v === 'string')
+        : [];
+    }
+    return [];
+  }
+
+  private computeEra(
+    releaseDate: Date | string | null | undefined,
+  ): string | null {
+    if (!releaseDate) return null;
+    const d =
+      typeof releaseDate === 'string' ? new Date(releaseDate) : releaseDate;
+    if (isNaN(d.getTime())) return null;
+    const year = d.getFullYear();
+    if (year < 2000) return 'classic';
+    if (year < 2010) return '2000s';
+    if (year < 2020) return '2010s';
+    return 'recent';
+  }
+
   private describeTag(type: string, value: string) {
     switch (type) {
       case 'artist':
@@ -528,6 +583,12 @@ Use warm, personal language. Mention top preferences first, then any notable ave
         return `${value}-leaning sessions`;
       case 'album':
         return `records around ${value}`;
+      case 'genre':
+        return `${value} music`;
+      case 'mood':
+        return `${value} vibes`;
+      case 'era':
+        return `${value} sounds`;
       default:
         return value;
     }

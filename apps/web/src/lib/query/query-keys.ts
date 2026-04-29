@@ -14,4 +14,5 @@ export const queryKeys = {
     ['dailyPlaylist', userId ?? 'anonymous'] as const,
   importJobs: (userId?: string | null) =>
     ['importJobs', userId ?? 'anonymous'] as const,
+  tasteReport: () => ['tasteReport'] as const,
 };

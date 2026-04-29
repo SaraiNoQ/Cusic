@@ -8,6 +8,7 @@ export function RecommendationPanel({
   onPlay,
   onQueue,
   onLoadDaily,
+  onSaveDaily,
   onFeedback,
 }: Readonly<{
   nowRecommendation: NowRecommendationDto | null;
@@ -17,10 +18,8 @@ export function RecommendationPanel({
     contentId: NowRecommendationDto['items'][number]['content'],
   ) => void;
   onLoadDaily: () => void;
-  onFeedback?: (
-    contentId: string,
-    feedbackType: 'like' | 'dislike',
-  ) => void;
+  onSaveDaily?: () => void;
+  onFeedback?: (contentId: string, feedbackType: 'like' | 'dislike') => void;
 }>) {
   const items = nowRecommendation?.items ?? [];
   const [feedbackState, setFeedbackState] = useState<
@@ -72,9 +71,7 @@ export function RecommendationPanel({
                       onClick={() => handleFeedback(item.contentId, 'like')}
                       title="Like this recommendation"
                     >
-                      {feedbackState[item.contentId] === 'liked'
-                        ? '★'
-                        : '☆'}
+                      {feedbackState[item.contentId] === 'liked' ? '★' : '☆'}
                     </button>
                     <button
                       type="button"
@@ -83,14 +80,10 @@ export function RecommendationPanel({
                           ? styles.feedbackButtonActive
                           : undefined
                       }
-                      onClick={() =>
-                        handleFeedback(item.contentId, 'dislike')
-                      }
+                      onClick={() => handleFeedback(item.contentId, 'dislike')}
                       title="Not interested"
                     >
-                      {feedbackState[item.contentId] === 'disliked'
-                        ? '✕'
-                        : '×'}
+                      {feedbackState[item.contentId] === 'disliked' ? '✕' : '×'}
                     </button>
                   </>
                 ) : null}
@@ -113,9 +106,21 @@ export function RecommendationPanel({
             <strong>{dailyPlaylist?.title ?? 'Today in Cusic'}</strong>
             <span>{dailyPlaylist?.itemCount ?? 0} ITEMS</span>
           </div>
-          <button type="button" onClick={onLoadDaily}>
-            LOAD
-          </button>
+          <div className={styles.dailyActions}>
+            <button type="button" onClick={onLoadDaily}>
+              LOAD
+            </button>
+            {onSaveDaily ? (
+              <button
+                type="button"
+                className={styles.dailySaveButton}
+                onClick={onSaveDaily}
+                title="Save to library"
+              >
+                SAVE
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className={styles.dailyPreview}>

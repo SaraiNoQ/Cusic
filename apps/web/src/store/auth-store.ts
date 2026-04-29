@@ -26,6 +26,29 @@ type AuthStore = {
   logout: () => Promise<void>;
 };
 
+let cooldownIntervalId: ReturnType<typeof setInterval> | null = null;
+
+function startCooldown(set: (partial: Partial<AuthStore>) => void) {
+  stopCooldown();
+  cooldownIntervalId = setInterval(() => {
+    // Use getState() inside the callback so we always read the latest value
+    const current = useAuthStore.getState().cooldownSeconds;
+    if (current <= 1) {
+      stopCooldown();
+      set({ cooldownSeconds: 0 });
+      return;
+    }
+    set({ cooldownSeconds: current - 1 });
+  }, 1000);
+}
+
+function stopCooldown() {
+  if (cooldownIntervalId !== null) {
+    clearInterval(cooldownIntervalId);
+    cooldownIntervalId = null;
+  }
+}
+
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   isAuthOpen: false,
@@ -54,7 +77,10 @@ export const useAuthStore = create<AuthStore>((set) => ({
     }
   },
   openAuth: () => set({ isAuthOpen: true, error: null }),
-  closeAuth: () => set({ isAuthOpen: false, error: null }),
+  closeAuth: () => {
+    stopCooldown();
+    set({ isAuthOpen: false, error: null, cooldownSeconds: 0 });
+  },
   requestCode: async (email) => {
     set({ isPending: true, error: null });
     try {
@@ -62,8 +88,13 @@ export const useAuthStore = create<AuthStore>((set) => ({
       set({
         cooldownSeconds: response.cooldownSeconds,
       });
-    } catch {
-      set({ error: 'Unable to send the verification code.' });
+      startCooldown(set);
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Unable to send the verification code.';
+      set({ error: message });
     } finally {
       set({ isPending: false });
     }
@@ -73,13 +104,18 @@ export const useAuthStore = create<AuthStore>((set) => ({
     try {
       const tokens = await loginWithEmailCode(email, code);
       writeAuthSession(tokens);
+      stopCooldown();
       set({
         user: tokens.user ?? null,
         isAuthOpen: false,
         cooldownSeconds: 0,
       });
-    } catch {
-      set({ error: 'The verification code is invalid or expired.' });
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'The verification code is invalid or expired.';
+      set({ error: message });
     } finally {
       set({ isPending: false });
     }
@@ -92,6 +128,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
         await logoutWithRefreshToken(session.refreshToken);
       }
     } finally {
+      stopCooldown();
       clearAuthSession();
       set({
         user: null,

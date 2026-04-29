@@ -1,3 +1,4 @@
+import { useUiStore } from '../../../store/ui-store';
 import styles from '../PlayerScreen.module.css';
 
 export function DeviceHeader({
@@ -13,6 +14,9 @@ export function DeviceHeader({
   isPlaying: boolean;
   statusText: string;
 }>) {
+  const theme = useUiStore((state) => state.theme);
+  const setTheme = useUiStore((state) => state.setTheme);
+
   return (
     <header className={styles.deviceHeader}>
       <button
@@ -47,10 +51,20 @@ export function DeviceHeader({
         </button>
 
         <div className={styles.headerSegmented} aria-label="Display mode">
-          <button type="button" className={styles.headerSegmentActive}>
+          <button
+            type="button"
+            className={theme === 'dark' ? styles.headerSegmentActive : ''}
+            onClick={() => setTheme('dark')}
+          >
             DARK
           </button>
-          <button type="button">LIGHT</button>
+          <button
+            type="button"
+            className={theme === 'light' ? styles.headerSegmentActive : ''}
+            onClick={() => setTheme('light')}
+          >
+            LIGHT
+          </button>
         </div>
       </div>
     </header>

@@ -1,8 +1,8 @@
 # 代码组织规范
 
-- 文档版本：v0.1
+- 文档版本：v0.2
 - 文档状态：生效
-- 更新时间：2026-04-23
+- 更新时间：2026-04-29
 - 关联文档：`docs/specs/engineering-playbook.md`、`docs/specs/api-design.md`
 
 ## 1. 目标
@@ -23,9 +23,9 @@
 推荐结构：
 
 1. `apps/web/src/app`
-   只放 Next.js 路由、布局和 providers。
+   只放 Next.js 路由、布局和 providers。`theme-sync.tsx` 为客户端组件负责将 `uiStore.theme` 同步到 `document.documentElement.dataset.theme`。
 2. `apps/web/src/features`
-   按业务能力拆分，如 `player`、`chat`、`search`、`atmosphere`。
+   按业务能力拆分，如 `player`、`chat`、`search`、`profile`、`atmosphere`。
 3. `apps/web/src/lib/api`
    API client、请求封装、模块级 API 方法。
 4. `apps/web/src/lib/query`

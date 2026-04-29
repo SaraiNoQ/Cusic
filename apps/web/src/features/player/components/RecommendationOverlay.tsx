@@ -10,6 +10,7 @@ export function RecommendationOverlay({
   onPlay,
   onQueue,
   onLoadDaily,
+  onSaveDaily,
   onFeedback,
 }: Readonly<{
   isOpen: boolean;
@@ -19,10 +20,8 @@ export function RecommendationOverlay({
   onPlay: (content: NowRecommendationDto['items'][number]['content']) => void;
   onQueue: (content: NowRecommendationDto['items'][number]['content']) => void;
   onLoadDaily: () => void;
-  onFeedback?: (
-    contentId: string,
-    feedbackType: 'like' | 'dislike',
-  ) => void;
+  onSaveDaily?: () => void;
+  onFeedback?: (contentId: string, feedbackType: 'like' | 'dislike') => void;
 }>) {
   if (!isOpen) {
     return null;
@@ -53,6 +52,7 @@ export function RecommendationOverlay({
             onPlay={onPlay}
             onQueue={onQueue}
             onLoadDaily={onLoadDaily}
+            onSaveDaily={onSaveDaily}
             onFeedback={onFeedback}
           />
         </div>
