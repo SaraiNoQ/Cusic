@@ -61,7 +61,7 @@ export function PlayerScreen() {
   const requestAuthCode = useAuthStore((state) => state.requestCode);
   const login = useAuthStore((state) => state.login);
   const logout = useAuthStore((state) => state.logout);
-  const shellRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     void hydrateAuth();
@@ -95,31 +95,44 @@ export function PlayerScreen() {
   ]);
 
   useEffect(() => {
-    const shell = shellRef.current;
-    if (!shell) {
+    const hero = heroRef.current;
+    if (
+      !hero ||
+      !window.matchMedia('(hover: hover) and (pointer: fine)').matches
+    ) {
       return;
     }
 
-    const handleMove = (event: MouseEvent) => {
-      const rect = shell.getBoundingClientRect();
+    const updateHeroGlow = (event: PointerEvent) => {
+      const rect = hero.getBoundingClientRect();
       const px = (event.clientX - rect.left) / rect.width;
       const py = (event.clientY - rect.top) / rect.height;
 
-      shell.style.setProperty('--mouse-x', `${px * 100}%`);
-      shell.style.setProperty('--mouse-y', `${py * 100}%`);
+      hero.style.setProperty('--hero-glow-x', `${px * 100}%`);
+      hero.style.setProperty('--hero-glow-y', `${py * 100}%`);
+      hero.style.setProperty('--hero-glow-opacity', '1');
+    };
+
+    const handleEnter = (event: PointerEvent) => {
+      updateHeroGlow(event);
+    };
+
+    const handleMove = (event: PointerEvent) => {
+      updateHeroGlow(event);
     };
 
     const handleLeave = () => {
-      shell.style.setProperty('--mouse-x', '50%');
-      shell.style.setProperty('--mouse-y', '36%');
+      hero.style.setProperty('--hero-glow-opacity', '0');
     };
 
-    window.addEventListener('mousemove', handleMove);
-    shell.addEventListener('mouseleave', handleLeave);
+    hero.addEventListener('pointerenter', handleEnter);
+    hero.addEventListener('pointermove', handleMove);
+    hero.addEventListener('pointerleave', handleLeave);
 
     return () => {
-      window.removeEventListener('mousemove', handleMove);
-      shell.removeEventListener('mouseleave', handleLeave);
+      hero.removeEventListener('pointerenter', handleEnter);
+      hero.removeEventListener('pointermove', handleMove);
+      hero.removeEventListener('pointerleave', handleLeave);
     };
   }, []);
 
@@ -219,7 +232,6 @@ export function PlayerScreen() {
       <div className={styles.viewport}>
         <div className={styles.deviceFrame}>
           <div
-            ref={shellRef}
             className={`${styles.deviceShell} ${player.isPlaying ? styles.deviceShellLive : ''}`}
           >
             <DeviceHeader
@@ -231,7 +243,7 @@ export function PlayerScreen() {
               statusText={player.statusText}
             />
 
-            <section className={styles.heroPanel}>
+            <section ref={heroRef} className={styles.heroPanel}>
               <div className={styles.heroGlow} />
               <div className={styles.heroSun} />
               <div className={styles.heroEarth}>

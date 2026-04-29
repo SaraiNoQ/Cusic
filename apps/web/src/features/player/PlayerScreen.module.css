@@ -126,8 +126,6 @@
 }
 
 .deviceShell {
-  --mouse-x: 50%;
-  --mouse-y: 36%;
   position: relative;
   display: flex;
   width: min(
@@ -176,19 +174,13 @@
   position: absolute;
   inset: 0;
   z-index: 0;
-  background:
-    radial-gradient(
-      circle at var(--mouse-x) var(--mouse-y),
-      var(--device-mouse-light),
-      transparent 20%
-    ),
-    linear-gradient(
-      120deg,
-      var(--device-shine-start),
-      transparent 16%,
-      transparent 78%,
-      var(--device-shine-end)
-    );
+  background: linear-gradient(
+    120deg,
+    var(--device-shine-start),
+    transparent 16%,
+    transparent 78%,
+    var(--device-shine-end)
+  );
   mix-blend-mode: screen;
   pointer-events: none;
 }
@@ -448,6 +440,9 @@
 }
 
 .heroPanel {
+  --hero-glow-x: 50%;
+  --hero-glow-y: 42%;
+  --hero-glow-opacity: 0;
   isolation: isolate;
   flex: 0 0 29%;
   min-height: 272px;
@@ -459,11 +454,6 @@
       var(--accent-orange-glow),
       transparent 22%
     ),
-    radial-gradient(
-      circle at 63% 42%,
-      var(--accent-teal-muted),
-      transparent 34%
-    ),
     linear-gradient(180deg, var(--bg-hero-start), var(--bg-hero-end));
 }
 
@@ -471,7 +461,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  z-index: -2;
+  z-index: -3;
   background-image:
     radial-gradient(
       circle at 7% 12%,
@@ -551,11 +541,28 @@
   opacity: 0.64;
 }
 
+.heroPanel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: var(--hero-glow-opacity);
+  background: radial-gradient(
+    circle at var(--hero-glow-x) var(--hero-glow-y),
+    var(--hero-spotlight-teal),
+    transparent 20%
+  );
+  filter: blur(4px);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
 .heroGlow {
   position: absolute;
   inset: auto -6% -18% -6%;
   height: 43%;
-  z-index: -1;
+  z-index: -2;
   background: linear-gradient(180deg, transparent, var(--bg-hero-glow));
 }
 
@@ -3254,6 +3261,12 @@
 
 :global([data-theme='light']) .heroGlow {
   opacity: 0.3;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .heroPanel::after {
+    opacity: 0;
+  }
 }
 
 :global([data-theme='light']) .djHelmet {

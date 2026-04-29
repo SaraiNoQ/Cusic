@@ -40,6 +40,7 @@
   --bg-hero-start: rgba(2, 7, 13, 0.18);
   --bg-hero-end: rgba(3, 8, 12, 0.42);
   --bg-hero-glow: rgba(12, 22, 30, 0.64);
+  --hero-spotlight-teal: rgba(126, 221, 233, 0.34);
   --bg-queue-channel-start: rgba(8, 18, 27, 0.86);
   --bg-queue-channel-end: rgba(4, 11, 17, 0.94);
   --bg-search-badge-start: rgba(20, 38, 48, 0.95);
@@ -233,6 +234,7 @@
   --bg-hero-start: rgba(240, 232, 218, 0.15);
   --bg-hero-end: rgba(235, 228, 214, 0.3);
   --bg-hero-glow: rgba(235, 228, 214, 0.4);
+  --hero-spotlight-teal: rgba(116, 176, 190, 0.16);
   --bg-queue-channel-start: rgba(248, 242, 232, 0.85);
   --bg-queue-channel-end: rgba(240, 234, 222, 0.92);
   --bg-search-badge-start: rgba(240, 235, 225, 0.95);
