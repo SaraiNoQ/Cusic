@@ -1,5 +1,6 @@
-import { useRef, type KeyboardEvent } from 'react';
+import { useCallback, useRef, type KeyboardEvent } from 'react';
 import styles from '../../player/PlayerScreen.module.css';
+import { VoiceRecordButton } from './VoiceRecordButton';
 
 export function ChatComposer({
   value,
@@ -27,6 +28,16 @@ export function ChatComposer({
     }
   };
 
+  const handleVoiceTranscription = useCallback(
+    (text: string) => {
+      onChange(text);
+    },
+    [onChange],
+  );
+
+  const supportsVoice =
+    typeof window !== 'undefined' && typeof MediaRecorder !== 'undefined';
+
   return (
     <form
       className={styles.composer}
@@ -45,13 +56,17 @@ export function ChatComposer({
         onKeyDown={handleKeyDown}
         placeholder="Say something to the DJ..."
       />
-      <button
-        type="button"
-        className={styles.micButton}
-        aria-label="Voice input"
-      >
-        <span />
-      </button>
+      {supportsVoice ? (
+        <VoiceRecordButton onTranscription={handleVoiceTranscription} />
+      ) : (
+        <button
+          type="button"
+          className={styles.micButton}
+          aria-label="Voice input"
+        >
+          <span />
+        </button>
+      )}
       <button
         type="submit"
         className={styles.sendButton}

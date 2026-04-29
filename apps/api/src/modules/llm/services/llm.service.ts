@@ -23,6 +23,23 @@ export class LlmService {
     private readonly provider: LLMProvider,
   ) {}
 
+  async embed(texts: string[]): Promise<number[][]> {
+    if (!(await this.isAvailable())) {
+      throw new LlmUnavailableError('LLM provider is not available');
+    }
+    try {
+      const result = await this.provider.embed(texts);
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      if (error instanceof LlmUnavailableError) {
+        throw error;
+      }
+      this.onFailure(error);
+      throw error;
+    }
+  }
+
   async isAvailable(): Promise<boolean> {
     if (this.circuitOpenUntil > Date.now()) {
       return false;

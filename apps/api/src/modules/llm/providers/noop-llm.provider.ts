@@ -8,7 +8,9 @@ export class NoOpLlmProvider implements LLMProvider {
   readonly name = 'noop';
   readonly model = 'none';
 
-  async complete(_request: LlmCompletionRequest): Promise<LlmCompletionResponse> {
+  async complete(
+    _request: LlmCompletionRequest,
+  ): Promise<LlmCompletionResponse> {
     return { content: '' };
   }
 
@@ -18,6 +20,10 @@ export class NoOpLlmProvider implements LLMProvider {
     _signal?: AbortSignal,
   ): Promise<void> {
     onEvent({ type: 'done' });
+  }
+
+  async embed(texts: string[]): Promise<number[][]> {
+    return texts.map(() => new Array(1536).fill(0));
   }
 
   async isAvailable(): Promise<boolean> {

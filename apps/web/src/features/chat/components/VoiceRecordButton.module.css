@@ -1,0 +1,65 @@
+.voiceButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 66px;
+  border: 1px solid var(--border-control);
+  border-radius: 50%;
+  background: linear-gradient(
+    180deg,
+    var(--gradient-button-start),
+    var(--gradient-button-end)
+  );
+  color: var(--text-button-solid);
+  font-size: 22px;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.voiceButton:hover {
+  border-color: var(--border-accent);
+  color: var(--accent-orange-light);
+  box-shadow:
+    0 0 18px rgba(255, 147, 45, 0.16),
+    0 -2px 8px rgba(255, 147, 45, 0.08);
+}
+
+.voiceButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.recording {
+  border-color: var(--border-accent) !important;
+  color: var(--accent-orange-bright) !important;
+  box-shadow:
+    0 0 20px rgba(255, 147, 45, 0.32),
+    0 0 40px rgba(255, 147, 45, 0.16);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.recordingIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 20px rgba(255, 147, 45, 0.32),
+      0 0 40px rgba(255, 147, 45, 0.16);
+  }
+  50% {
+    box-shadow:
+      0 0 28px rgba(255, 147, 45, 0.48),
+      0 0 56px rgba(255, 147, 45, 0.24);
+  }
+}

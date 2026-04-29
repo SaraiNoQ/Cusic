@@ -1,5 +1,7 @@
+import Link from 'next/link';
 import { useUiStore } from '../../../store/ui-store';
 import styles from '../PlayerScreen.module.css';
+import { CusicLogo } from './CusicLogo';
 
 export function DeviceHeader({
   onOpenSearch,
@@ -25,11 +27,20 @@ export function DeviceHeader({
         onClick={onOpenSearch}
         aria-label="Open library search"
       >
-        <span className={styles.brandCrescent}>C</span>
-        <span className={styles.brandWordmark}>USIC</span>
+        <span className={styles.brandLogo}>
+          <CusicLogo className={styles.brandLogoSvg} />
+        </span>
       </button>
 
       <div className={styles.headerActions}>
+        <Link
+          href="/settings"
+          className={styles.settingsGear}
+          aria-label="Settings"
+        >
+          <span aria-hidden="true">{'\u2699'}</span>
+        </Link>
+
         <button
           type="button"
           className={styles.loginButton}

@@ -28,6 +28,7 @@ import {
 import { Observable } from 'rxjs';
 import type { AuthenticatedUser } from '../../auth/services/auth.service';
 import { ContentService } from '../../content/services/content.service';
+import { KnowledgeService } from '../../knowledge/knowledge.service';
 import { LibraryService } from '../../library/services/library.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RecommendationService } from '../../recommendation/services/recommendation.service';
@@ -94,6 +95,7 @@ export class AiDjService {
     private readonly intentClassifier: IntentClassifierService,
     private readonly contentSelector: ContentSelectorService,
     private readonly replyGenerator: ReplyGeneratorService,
+    private readonly knowledgeService: KnowledgeService,
   ) {}
 
   async reply(input: ReplyInput): Promise<ChatTurnResponseDto> {
@@ -179,16 +181,24 @@ export class AiDjService {
       input.timezoneHeader,
     );
 
-    const fallbackText = this.replyGenerator.fallbackGenerate({
-      message,
-      intent: plan.intent,
-      contentIds: plan.contentIds,
-      trackDescriptions: plan.trackDescriptions,
-      tasteProfileSummary: plan.tasteSummary,
-      timeOfDay: plan.timeOfDay,
-      currentTrackTitle: plan.currentTrackTitle,
-      currentTrackLanguage: plan.currentTrackLanguage,
-    });
+    const knowledgeReplyText: string | undefined =
+      plan.intent === 'knowledge_query' &&
+      typeof plan.trace.knowledgeReplyText === 'string'
+        ? plan.trace.knowledgeReplyText
+        : undefined;
+
+    const fallbackText =
+      knowledgeReplyText ??
+      this.replyGenerator.fallbackGenerate({
+        message,
+        intent: plan.intent,
+        contentIds: plan.contentIds,
+        trackDescriptions: plan.trackDescriptions,
+        tasteProfileSummary: plan.tasteSummary,
+        timeOfDay: plan.timeOfDay,
+        currentTrackTitle: plan.currentTrackTitle,
+        currentTrackLanguage: plan.currentTrackLanguage,
+      });
 
     if (!input.user?.id) {
       const response = {
@@ -466,37 +476,15 @@ export class AiDjService {
         : null;
 
     if (replyContext) {
-      this.logger.log(
-        `Streaming LLM reply for message ${messageId} (${streamContext ? 'db' : 'cached'} context)`,
-      );
+      // For knowledge_query with pre-generated reply, stream the cached text
+      const isKnowledgeWithCache =
+        replyContext.intent === 'knowledge_query' &&
+        streamContext?.knowledgeReplyText;
 
       let fullText = '';
 
-      try {
-        fullText = await this.replyGenerator.generateStreamReply(
-          replyContext,
-          (delta) => {
-            subscriber.next({
-              type: 'chunk',
-              data: {
-                sessionId,
-                messageId,
-                delta,
-              },
-            });
-          },
-          signal,
-        );
-      } catch (error) {
-        this.logger.warn(
-          `LLM streaming failed, using fallback: ${String(error)}`,
-        );
-
-        if (signal.aborted) {
-          return;
-        }
-
-        fullText = this.replyGenerator.fallbackGenerate(replyContext);
+      if (isKnowledgeWithCache) {
+        fullText = streamContext.knowledgeReplyText!;
         const chars = this.chunkReplyText(fullText);
         for (const char of chars) {
           if (signal.aborted) {
@@ -510,6 +498,54 @@ export class AiDjService {
               delta: char,
             },
           });
+        }
+        this.logger.log(
+          `Streamed pre-generated knowledge reply for message ${messageId}`,
+        );
+      } else {
+        this.logger.log(
+          `Streaming LLM reply for message ${messageId} (${streamContext ? 'db' : 'cached'} context)`,
+        );
+
+        try {
+          fullText = await this.replyGenerator.generateStreamReply(
+            replyContext,
+            (delta) => {
+              subscriber.next({
+                type: 'chunk',
+                data: {
+                  sessionId,
+                  messageId,
+                  delta,
+                },
+              });
+            },
+            signal,
+          );
+        } catch (error) {
+          this.logger.warn(
+            `LLM streaming failed, using fallback: ${String(error)}`,
+          );
+
+          if (signal.aborted) {
+            return;
+          }
+
+          fullText = this.replyGenerator.fallbackGenerate(replyContext);
+          const chars = this.chunkReplyText(fullText);
+          for (const char of chars) {
+            if (signal.aborted) {
+              return;
+            }
+            subscriber.next({
+              type: 'chunk',
+              data: {
+                sessionId,
+                messageId,
+                delta: char,
+              },
+            });
+          }
         }
       }
 
@@ -632,6 +668,7 @@ export class AiDjService {
     timeOfDay?: string;
     currentTrackTitle?: string;
     currentTrackLanguage?: string;
+    knowledgeReplyText?: string;
   } | null> {
     if (!userId) {
       return null;
@@ -681,6 +718,10 @@ export class AiDjService {
       typeof trace.currentTrackLanguage === 'string'
         ? trace.currentTrackLanguage
         : undefined;
+    const knowledgeReplyText =
+      typeof trace.knowledgeReplyText === 'string'
+        ? trace.knowledgeReplyText
+        : undefined;
 
     if (!intent || !userMessage) {
       return null;
@@ -695,6 +736,7 @@ export class AiDjService {
       timeOfDay,
       currentTrackTitle,
       currentTrackLanguage,
+      knowledgeReplyText,
     };
   }
 
@@ -721,6 +763,47 @@ export class AiDjService {
     timezoneHeader?: string,
   ): Promise<ReplyPlan> {
     const intent = await this.intentClassifier.classify(message);
+
+    if (intent === 'knowledge_query') {
+      if (userId) {
+        try {
+          const result = await this.knowledgeService.query(
+            userId,
+            null,
+            message,
+          );
+          return {
+            intent,
+            replyText: result.summaryText,
+            actions: [],
+            trace: {
+              intent,
+              knowledgeTraceId: result.traceId,
+              relatedContentIds: result.relatedContent.map((c) => c.contentId),
+              mode: 'knowledge_query_v1',
+            },
+          };
+        } catch (error) {
+          this.logger.warn(
+            `Knowledge query failed, using conversational fallback: ${String(error)}`,
+          );
+        }
+      }
+
+      // Fallback to conversation-style reply
+      const fallbackText = await this.replyGenerator.generateReply({
+        message,
+        intent,
+        contentIds: [],
+        trackDescriptions: '',
+      });
+      return {
+        intent,
+        replyText: fallbackText,
+        actions: [],
+        trace: { intent, fallback: true, mode: 'knowledge_query_fallback_v1' },
+      };
+    }
 
     const isConversation = intent === 'conversation';
     const queueIds = surfaceContext?.queueContentIds ?? [];
@@ -842,6 +925,48 @@ export class AiDjService {
     timezoneHeader?: string,
   ): Promise<StreamPlan> {
     const intent = await this.intentClassifier.classify(message);
+
+    if (intent === 'knowledge_query') {
+      if (userId) {
+        try {
+          const result = await this.knowledgeService.query(
+            userId,
+            null,
+            message,
+          );
+          return {
+            intent,
+            actions: [],
+            contentIds: result.relatedContent.map((c) => c.contentId),
+            trackDescriptions: '',
+            trace: {
+              intent,
+              knowledgeTraceId: result.traceId,
+              knowledgeReplyText: result.summaryText,
+              relatedContentIds: result.relatedContent.map((c) => c.contentId),
+              mode: 'knowledge_query_stream_v1',
+            },
+          };
+        } catch (error) {
+          this.logger.warn(
+            `Knowledge query (stream) failed, using conversational fallback: ${String(error)}`,
+          );
+        }
+      }
+
+      // Fallback to conversation-style stream
+      return {
+        intent,
+        actions: [],
+        contentIds: [],
+        trackDescriptions: '',
+        trace: {
+          intent,
+          fallback: true,
+          mode: 'knowledge_query_stream_fallback_v1',
+        },
+      };
+    }
 
     const isConversation = intent === 'conversation';
     const queueIds = surfaceContext?.queueContentIds ?? [];
@@ -1083,7 +1208,8 @@ export class AiDjService {
       value === 'queue_replace' ||
       value === 'queue_append' ||
       value === 'recommend_explain' ||
-      value === 'theme_playlist_preview'
+      value === 'theme_playlist_preview' ||
+      value === 'knowledge_query'
     ) {
       return value;
     }

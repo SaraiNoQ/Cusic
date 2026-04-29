@@ -10,6 +10,8 @@ COPY apps/web/package.json ./apps/web/package.json
 RUN pnpm install --frozen-lockfile=false
 
 FROM deps AS build
+ARG API_INTERNAL_URL=http://api:3001
+ENV API_INTERNAL_URL=${API_INTERNAL_URL}
 COPY apps/web ./apps/web
 RUN pnpm --filter @music-ai/web build
 

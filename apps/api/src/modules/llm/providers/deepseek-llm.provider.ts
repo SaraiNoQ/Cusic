@@ -38,7 +38,9 @@ export class DeepseekLlmProvider implements LLMProvider {
     });
   }
 
-  async complete(request: LlmCompletionRequest): Promise<LlmCompletionResponse> {
+  async complete(
+    request: LlmCompletionRequest,
+  ): Promise<LlmCompletionResponse> {
     const response = await this.client.chat.completions.create({
       model: request.model ?? this.model,
       messages: request.messages.map((m) => ({
@@ -112,6 +114,14 @@ export class DeepseekLlmProvider implements LLMProvider {
     }
 
     onEvent({ type: 'done' });
+  }
+
+  async embed(texts: string[]): Promise<number[][]> {
+    const response = await this.client.embeddings.create({
+      model: 'text-embedding-3-small',
+      input: texts,
+    });
+    return response.data.map((d: { embedding: number[] }) => d.embedding);
   }
 
   async isAvailable(): Promise<boolean> {

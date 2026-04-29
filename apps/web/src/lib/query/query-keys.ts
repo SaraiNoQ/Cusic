@@ -16,3 +16,14 @@ export const queryKeys = {
     ['importJobs', userId ?? 'anonymous'] as const,
   tasteReport: () => ['tasteReport'] as const,
 };
+
+export const knowledgeKeys = {
+  all: ['knowledge'] as const,
+  traces: () => [...knowledgeKeys.all, 'traces'] as const,
+  trace: (id: string) => [...knowledgeKeys.all, 'trace', id] as const,
+} as const;
+
+export const voiceKeys = {
+  all: ['voice'] as const,
+  tts: (text: string) => [...voiceKeys.all, 'tts', text] as const,
+} as const;

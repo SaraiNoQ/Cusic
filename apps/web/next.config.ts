@@ -4,7 +4,6 @@ const apiInternalUrl = process.env.API_INTERNAL_URL ?? 'http://localhost:3001';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  output: 'standalone',
   async rewrites() {
     return [
       {

@@ -23,8 +23,11 @@ import {
   SourceType,
 } from '@prisma/client';
 import { ContentService } from '../../content/services/content.service';
+import { EmbeddingService } from '../../content/services/embedding.service';
+import { ContextService } from '../../context/context.service';
 import { LlmService } from '../../llm/services/llm.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { VectorSearchService } from '../../prisma/vector-search.service';
 import { ProfileService } from '../../profile/services/profile.service';
 
 type ZonedStamp = {
@@ -63,6 +66,9 @@ export class RecommendationService {
     private readonly contentService: ContentService,
     private readonly profileService: ProfileService,
     private readonly llmService: LlmService,
+    private readonly contextService: ContextService,
+    private readonly vectorSearchService: VectorSearchService,
+    private readonly embeddingService: EmbeddingService,
   ) {}
 
   async getNowRecommendation(
@@ -76,22 +82,43 @@ export class RecommendationService {
     }
 
     const profile = await this.profileService.getOrCreateProfileState(userId);
-    const ranked = await this.rankCandidates(userId, profile.tags, stamp.hour);
-    const top = ranked.slice(0, 3);
-    const explanation = await this.buildRecommendationExplanation(
+
+    const contextSnapshot = await this.contextService.createSnapshot(userId, {
+      timezone: stamp.timezone,
+    });
+
+    const { ranked, vectorCandidateCount } = await this.rankCandidates(
+      userId,
       profile.tags,
       stamp.hour,
+      contextSnapshot.moodLabel,
     );
+    const top = ranked.slice(0, 3);
+
+    // Build explanation and LLM per-item reasons in parallel
+    const [explanation, reasonMap] = await Promise.all([
+      this.buildRecommendationExplanation(profile.tags, stamp.hour),
+      this.generatePerItemReasons(top, profile.tags, {
+        moodLabel: contextSnapshot.moodLabel,
+        hour: stamp.hour,
+      }).catch((error) => {
+        this.logger.warn(`LLM per-item reasons failed: ${String(error)}`);
+        return new Map<string, string>();
+      }),
+    ]);
+
+    let llmReasonsUsed = false;
+    if (reasonMap.size > 0) {
+      for (const item of top) {
+        const reason = reasonMap.get(item.content.id);
+        if (reason) {
+          item.reasons = [reason];
+        }
+      }
+      llmReasonsUsed = true;
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const contextSnapshot = await tx.contextSnapshot.create({
-        data: {
-          userId,
-          timezone: stamp.timezone,
-          localTime: stamp.localTime,
-        },
-      });
-
       const recommendation = await tx.recommendationResult.create({
         data: {
           userId,
@@ -100,10 +127,13 @@ export class RecommendationService {
           tasteProfileId: profile.id,
           explanationText: explanation,
           traceJson: {
-            mode: 'rule_v1',
+            mode: 'vector_v1',
             candidateCount: ranked.length,
+            vectorCandidatesCount: vectorCandidateCount,
+            llmReasonsUsed,
             timezone: stamp.timezone,
             hour: stamp.hour,
+            moodLabel: contextSnapshot.moodLabel,
           },
         },
       });
@@ -164,19 +194,45 @@ export class RecommendationService {
     }
 
     const profile = await this.profileService.getOrCreateProfileState(userId);
-    const ranked = await this.rankCandidates(userId, profile.tags, stamp.hour);
+
+    const contextSnapshot = await this.contextService.createSnapshot(userId, {
+      timezone: stamp.timezone,
+    });
+
+    const { ranked, vectorCandidateCount } = await this.rankCandidates(
+      userId,
+      profile.tags,
+      stamp.hour,
+      contextSnapshot.moodLabel,
+    );
     const picks = ranked.slice(0, 5);
-    const explanation = await this.buildDailyExplanation(profile.tags, stamp.hour);
+
+    // Build explanation and LLM per-item reasons in parallel
+    const [explanation, reasonMap] = await Promise.all([
+      this.buildDailyExplanation(profile.tags, stamp.hour),
+      this.generatePerItemReasons(picks, profile.tags, {
+        moodLabel: contextSnapshot.moodLabel,
+        hour: stamp.hour,
+      }).catch((error) => {
+        this.logger.warn(
+          `LLM per-item reasons (daily) failed: ${String(error)}`,
+        );
+        return new Map<string, string>();
+      }),
+    ]);
+
+    let llmReasonsUsed = false;
+    if (reasonMap.size > 0) {
+      for (const item of picks) {
+        const reason = reasonMap.get(item.content.id);
+        if (reason) {
+          item.reasons = [reason];
+        }
+      }
+      llmReasonsUsed = true;
+    }
 
     const playlist = await this.prisma.$transaction(async (tx) => {
-      const contextSnapshot = await tx.contextSnapshot.create({
-        data: {
-          userId,
-          timezone: stamp.timezone,
-          localTime: stamp.localTime,
-        },
-      });
-
       const recommendation = await tx.recommendationResult.create({
         data: {
           userId,
@@ -185,10 +241,13 @@ export class RecommendationService {
           tasteProfileId: profile.id,
           explanationText: explanation,
           traceJson: {
-            mode: 'daily_rule_v1',
+            mode: 'vector_v1',
             candidateCount: ranked.length,
+            vectorCandidatesCount: vectorCandidateCount,
+            llmReasonsUsed,
             timezone: stamp.timezone,
             dateKey: stamp.dateKey,
+            moodLabel: contextSnapshot.moodLabel,
           },
         },
       });
@@ -302,21 +361,104 @@ export class RecommendationService {
       }
     }
 
+    const feedbackType = this.toFeedbackType(body.feedbackType);
     const feedback = await this.prisma.preferenceFeedback.create({
       data: {
         userId,
         targetType: body.targetType.trim().toLowerCase(),
         targetId: body.targetId.trim(),
-        feedbackType: this.toFeedbackType(body.feedbackType),
+        feedbackType,
         recommendationResultId: body.recommendationResultId ?? null,
         reasonText: body.reasonText?.trim() || null,
       },
     });
 
+    // Feedback-to-embedding loop: nudge taste profile toward/away from content
+    if (
+      feedbackType === FeedbackType.MORE_LIKE_THIS ||
+      feedbackType === FeedbackType.LESS_LIKE_THIS
+    ) {
+      try {
+        await this.nudgeProfileFromFeedback(
+          userId,
+          body.targetId.trim(),
+          feedbackType,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Feedback-to-embedding nudge failed: ${String(error)}`,
+        );
+      }
+    }
+
     return {
       feedbackId: feedback.id,
       recorded: true,
     };
+  }
+
+  /**
+   * Nudge the user's taste profile embedding toward or away from a content item.
+   */
+  private async nudgeProfileFromFeedback(
+    userId: string,
+    contentItemId: string,
+    feedbackType: FeedbackType,
+  ): Promise<void> {
+    // Fetch content item embedding
+    const contentRows = await this.prisma.$queryRaw<
+      Array<{ embedding: string }>
+    >`
+      SELECT embedding::text FROM content_items
+      WHERE id = ${contentItemId} AND embedding IS NOT NULL
+    `;
+    if (contentRows.length === 0 || !contentRows[0].embedding) {
+      return;
+    }
+    const contentEmb = this.parseVectorString(contentRows[0].embedding);
+
+    // Fetch user taste profile embedding
+    const profileRows = await this.prisma.$queryRaw<
+      Array<{ embedding: string }>
+    >`
+      SELECT embedding::text FROM taste_profiles
+      WHERE user_id = ${userId} AND embedding IS NOT NULL
+    `;
+
+    let profileEmb: number[];
+    if (profileRows.length > 0 && profileRows[0].embedding) {
+      profileEmb = this.parseVectorString(profileRows[0].embedding);
+    } else {
+      // No profile embedding yet — seed from the content embedding with half weight
+      profileEmb = contentEmb.map((v) => v * 0.5);
+    }
+
+    // Nudge
+    const direction =
+      feedbackType === FeedbackType.MORE_LIKE_THIS ? 'toward' : 'away';
+    const adjusted = await this.embeddingService.nudgeProfileEmbedding(
+      profileEmb,
+      contentEmb,
+      direction,
+      0.05,
+    );
+
+    // Update DB
+    const vectorStr = `[${adjusted.join(',')}]`;
+    await this.prisma.$executeRaw`
+      UPDATE taste_profiles SET embedding = ${vectorStr}::vector WHERE user_id = ${userId}
+    `;
+  }
+
+  /**
+   * Parse a pgvector text representation like [0.1,0.2,0.3] into a number array.
+   */
+  private parseVectorString(str: string): number[] {
+    return str
+      .replace(/^[[(]\s*/, '')
+      .replace(/\s*[\])]$/, '')
+      .split(',')
+      .map(Number);
   }
 
   private async getDemoNowRecommendation(
@@ -369,14 +511,40 @@ export class RecommendationService {
       isNegative: boolean;
     }>,
     hour: number,
-  ) {
+    moodLabel?: string,
+  ): Promise<{ ranked: RankedCandidate[]; vectorCandidateCount: number }> {
     await this.contentService.ensureDemoCatalogSynced();
 
-    const [candidates, favorites, events] = await Promise.all([
-      this.prisma.contentItem.findMany({
+    // Phase 1: Vector-based candidate recall
+    let candidates: Prisma.ContentItemGetPayload<Record<string, never>>[];
+    let vectorCandidateCount = 0;
+
+    try {
+      const vectorCandidates = await this.recallCandidates(userId);
+      if (vectorCandidates && vectorCandidates.length >= 3) {
+        candidates = vectorCandidates;
+        vectorCandidateCount = vectorCandidates.length;
+        this.logger.log(`Vector recall: ${vectorCandidateCount} candidates`);
+      } else {
+        candidates = await this.prisma.contentItem.findMany({
+          where: { playable: true },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        });
+        this.logger.log(
+          'Vector recall returned too few candidates, using full catalog',
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Vector recall failed, falling back to full catalog: ${String(error)}`,
+      );
+      candidates = await this.prisma.contentItem.findMany({
         where: { playable: true },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      }),
+      });
+    }
+
+    const [favorites, events] = await Promise.all([
       this.prisma.favorite.findMany({
         where: { userId, deletedAt: null },
         include: { contentItem: true },
@@ -413,7 +581,7 @@ export class RecommendationService {
         .map((event) => event.contentItemId),
     );
 
-    return candidates
+    const ranked = candidates
       .map((content): RankedCandidate => {
         let score = 0.12;
         const reasons: string[] = [];
@@ -510,6 +678,28 @@ export class RecommendationService {
           }
         }
 
+        if (moodLabel === 'focused') {
+          if (content.language?.toLowerCase() === 'instrumental') {
+            score += 0.25;
+          }
+          if (
+            content.canonicalTitle.toLowerCase().includes('ambient') ||
+            content.canonicalTitle.toLowerCase().includes('classical')
+          ) {
+            score += 0.2;
+            reasons.push('This fits a focused listening session.');
+          }
+        } else if (moodLabel === 'energetic') {
+          if (content.contentType === ContentType.TRACK) {
+            score += 0.15;
+          }
+        } else if (moodLabel === 'restless') {
+          if (content.contentType === ContentType.TRACK) {
+            score += 0.1;
+            reasons.push('A quick track can suit a restless mood.');
+          }
+        }
+
         return {
           content,
           score,
@@ -524,6 +714,74 @@ export class RecommendationService {
           right.content.canonicalTitle,
         );
       });
+
+    return { ranked, vectorCandidateCount };
+  }
+
+  /**
+   * Vector-based candidate recall using user taste profile embedding.
+   * Falls back to returning an empty array on any error.
+   */
+  private async recallCandidates(
+    userId: string,
+  ): Promise<Prisma.ContentItemGetPayload<Record<string, never>>[]> {
+    try {
+      const profile = await this.prisma.tasteProfile.findUnique({
+        where: { userId },
+        include: { tags: true },
+      });
+
+      if (!profile || profile.tags.length === 0) {
+        return [];
+      }
+
+      // Build tag description from positive tags, weighted
+      const positiveTags = profile.tags
+        .filter((t) => !t.isNegative)
+        .sort((a, b) => b.weight - a.weight)
+        .slice(0, 12);
+
+      if (positiveTags.length === 0) {
+        return [];
+      }
+
+      const tagText = positiveTags
+        .map((t) => `${t.tagType}:${t.tagValue}`)
+        .join(', ');
+
+      // Embed the taste profile text
+      const embeddings = await this.llmService.embed([tagText]);
+      const tasteEmbedding = embeddings[0];
+
+      // Vector search for similar content
+      const results = await this.vectorSearchService.searchSimilarContent(
+        tasteEmbedding,
+        50,
+      );
+
+      if (results.length === 0) {
+        return [];
+      }
+
+      // Fetch full ContentItem objects in vector order
+      const ids = results.map((r) => r.id as string);
+      const contentItems = await this.prisma.contentItem.findMany({
+        where: { id: { in: ids }, playable: true },
+      });
+
+      const itemMap = new Map(contentItems.map((item) => [item.id, item]));
+      const ordered = ids
+        .map((id) => itemMap.get(id))
+        .filter(
+          (item): item is Prisma.ContentItemGetPayload<Record<string, never>> =>
+            !!item,
+        );
+
+      return ordered;
+    } catch (error) {
+      this.logger.warn(`recallCandidates failed: ${String(error)}`);
+      return [];
+    }
   }
 
   private toRecommendationCardDto(
@@ -582,6 +840,124 @@ export class RecommendationService {
     return unique.join(' ');
   }
 
+  /**
+   * Generate per-item recommendation reasons via LLM.
+   * Returns a Map of contentId → reason (Chinese, 10 chars max).
+   * Falls back to empty Map on any error, so callers use compactReason.
+   */
+  private async generatePerItemReasons(
+    items: RankedCandidate[],
+    userTags: Array<{
+      tagType: string;
+      tagValue: string;
+      weight: number;
+      isNegative: boolean;
+    }>,
+    context: { moodLabel?: string; hour: number },
+  ): Promise<Map<string, string>> {
+    if (items.length === 0) {
+      return new Map();
+    }
+
+    const llmAvailable = await this.llmService.isAvailable();
+    if (!llmAvailable) {
+      return new Map();
+    }
+
+    try {
+      const positive = userTags
+        .filter((t) => !t.isNegative)
+        .sort((a, b) => b.weight - a.weight)
+        .slice(0, 8);
+
+      const tagLines =
+        positive.length > 0
+          ? positive.map((t) => `- ${t.tagType}: ${t.tagValue}`).join('\n')
+          : '新用户，尚无明确偏好';
+
+      const segment = this.describeDaySegment(context.hour);
+      const moodText = context.moodLabel || '未知';
+
+      const itemLines = items
+        .map((item) => {
+          const content = item.content;
+          const tags = this.extractContentTags(content);
+          const tagStr = tags.length > 0 ? ` | 标签: ${tags.join(', ')}` : '';
+          return `${content.id} | ${content.canonicalTitle} | 艺术家: ${content.primaryArtistNames.join(', ')}${tagStr}`;
+        })
+        .join('\n');
+
+      const systemPrompt = `你是一个音乐推荐引擎。为以下每首推荐曲目写一句简短推荐理由（10个字以内），说明为什么适合用户在此刻收听。只返回合法JSON，不要其他文本。`;
+
+      const userPrompt = `用户偏好：
+${tagLines}
+
+当前情境：${segment}，心情${moodText}
+
+候选曲目：
+${itemLines}
+
+请为每首曲目生成简短推荐理由，返回JSON格式：{"contentId": "理由"}`;
+
+      const response = await this.llmService.chat(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        {
+          temperature: 0.5,
+          maxTokens: 512,
+          timeoutMs: 8_000,
+        },
+      );
+
+      // Parse JSON from response (handle markdown code fences)
+      const cleaned = response
+        .replace(/```json\s*/gi, '')
+        .replace(/```\s*/g, '')
+        .trim();
+      const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+
+      const map = new Map<string, string>();
+      for (const [key, value] of Object.entries(parsed)) {
+        if (typeof value === 'string' && value.length > 0) {
+          map.set(key, value);
+        }
+      }
+      return map;
+    } catch (error) {
+      this.logger.warn(
+        `LLM per-item reasons generation failed: ${String(error)}`,
+      );
+      return new Map();
+    }
+  }
+
+  /**
+   * Extract genre/style/mood tags from a content item's metadata.
+   */
+  private extractContentTags(
+    content: Prisma.ContentItemGetPayload<Record<string, never>>,
+  ): string[] {
+    const meta = content.metadataJson;
+    if (meta && typeof meta === 'object' && !Array.isArray(meta)) {
+      const tagFields = ['genres', 'styles', 'moods', 'tags'];
+      const tags: string[] = [];
+      for (const field of tagFields) {
+        const val = (meta as Record<string, unknown>)[field];
+        if (Array.isArray(val)) {
+          tags.push(
+            ...(val as unknown[]).filter(
+              (t): t is string => typeof t === 'string',
+            ),
+          );
+        }
+      }
+      return tags;
+    }
+    return [];
+  }
+
   private async buildRecommendationExplanation(
     tags: Array<{
       tagType: string;
@@ -597,7 +973,9 @@ export class RecommendationService {
       try {
         return await this.llmRecommendationExplanation(tags, hour);
       } catch (error) {
-        this.logger.warn(`LLM recommendation explanation failed: ${String(error)}`);
+        this.logger.warn(
+          `LLM recommendation explanation failed: ${String(error)}`,
+        );
       }
     }
 
@@ -620,7 +998,10 @@ export class RecommendationService {
       .slice(0, 3);
 
     const tagDescriptions = positive
-      .map((tag) => `${this.describeTag(tag.tagType, tag.tagValue)} (weight: ${tag.weight.toFixed(2)})`)
+      .map(
+        (tag) =>
+          `${this.describeTag(tag.tagType, tag.tagValue)} (weight: ${tag.weight.toFixed(2)})`,
+      )
       .join(', ');
 
     const systemPrompt = `You are Cusic's recommendation engine. Generate a natural 1-2 sentence explanation for why specific tracks were recommended.
@@ -634,7 +1015,10 @@ Write a concise, warm explanation that connects the user's taste profile with th
     return this.llmService.chat(
       [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: 'Generate a brief, warm recommendation explanation.' },
+        {
+          role: 'user',
+          content: 'Generate a brief, warm recommendation explanation.',
+        },
       ],
       {
         temperature: 0.7,
@@ -705,7 +1089,10 @@ Write a concise, warm explanation that connects the user's taste profile with th
       .slice(0, 3);
 
     const tagDescriptions = positive
-      .map((tag) => `${this.describeTag(tag.tagType, tag.tagValue)} (weight: ${tag.weight.toFixed(2)})`)
+      .map(
+        (tag) =>
+          `${this.describeTag(tag.tagType, tag.tagValue)} (weight: ${tag.weight.toFixed(2)})`,
+      )
       .join(', ');
 
     const systemPrompt = `You are Cusic's daily playlist curator. Generate a natural 1-2 sentence description for a daily playlist tailored to the user.
@@ -719,7 +1106,10 @@ Write a warm, inviting description that captures the mood and the listening arc.
     return this.llmService.chat(
       [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: 'Describe this daily playlist in 1-2 natural sentences.' },
+        {
+          role: 'user',
+          content: 'Describe this daily playlist in 1-2 natural sentences.',
+        },
       ],
       {
         temperature: 0.7,

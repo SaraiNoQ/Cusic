@@ -9,11 +9,15 @@ import {
   Query,
   Req,
   Sse,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiConsumes,
   ApiOperation,
   ApiQuery,
   ApiResponse,
@@ -26,12 +30,16 @@ import { OptionalJwtAuthGuard } from '../../auth/guards/optional-jwt-auth.guard'
 import { ChatTurnDto } from '../dto/chat-turn.dto';
 import { SaveAiPlaylistDto } from '../dto/save-ai-playlist.dto';
 import { AiDjService } from '../services/ai-dj.service';
+import { VoiceService } from '../../voice/voice.service';
 
 @ApiTags('ai-dj')
 @ApiBearerAuth()
 @Controller('dj')
 export class AiDjController {
-  constructor(private readonly aiDjService: AiDjService) {}
+  constructor(
+    private readonly aiDjService: AiDjService,
+    private readonly voiceService: VoiceService,
+  ) {}
 
   @Post('chat')
   @UseGuards(OptionalJwtAuthGuard)
@@ -88,6 +96,98 @@ export class AiDjController {
         messageId: body.messageId,
         title: body.title,
       }),
+      meta: {},
+    };
+  }
+
+  @Post('voice/chat')
+  @UseGuards(OptionalJwtAuthGuard)
+  @UseInterceptors(FileInterceptor('audio'))
+  @ApiOperation({
+    summary: 'Voice AI DJ turn — audio in, text + optional TTS out',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        audio: {
+          type: 'string',
+          format: 'binary',
+          description: 'Audio file with voice message',
+        },
+        sessionId: {
+          type: 'string',
+          description: 'Optional session ID',
+          nullable: true,
+        },
+        responseMode: {
+          type: 'string',
+          enum: ['sync', 'stream'],
+          description: 'Response mode',
+          nullable: true,
+        },
+        voice: {
+          type: 'string',
+          description: 'TTS voice (qianxue, aizhen, aishuo)',
+          nullable: true,
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Voice AI DJ response' })
+  async voiceChat(
+    @UploadedFile()
+    file?: {
+      buffer: Buffer;
+      mimetype: string;
+      originalname: string;
+      size: number;
+    },
+    @Body('sessionId') sessionId?: string,
+    @Body('responseMode') responseMode?: string,
+    @Body('voice') voice?: string,
+    @Req() request?: RequestWithUser,
+    @Headers('x-cusic-timezone') timezoneHeader?: string,
+  ) {
+    // Step 1: ASR — transcribe audio to text
+    const format =
+      file?.mimetype === 'audio/wav'
+        ? 'wav'
+        : file?.mimetype === 'audio/mpeg'
+          ? 'mp3'
+          : 'pcm';
+    const transcription = file
+      ? await this.voiceService.transcribe(file.buffer, format)
+      : { text: '', confidence: 0 };
+
+    // Step 2: Process through AI DJ
+    const reply = await this.aiDjService.reply({
+      sessionId,
+      message: transcription.text,
+      responseMode:
+        responseMode === 'stream' ? 'stream' : ('sync' as 'sync' | 'stream'),
+      user: request?.user,
+      timezoneHeader,
+    });
+
+    // Step 3: Optional TTS for the reply text
+    let audioUrl: string | undefined;
+    if (reply.replyText) {
+      const synthesis = await this.voiceService.synthesize(
+        reply.replyText,
+        voice ?? 'qianxue',
+      );
+      audioUrl = synthesis.audioUrl || undefined;
+    }
+
+    return {
+      success: true,
+      data: {
+        reply,
+        transcription: transcription.text,
+        audioUrl,
+      },
       meta: {},
     };
   }

@@ -217,107 +217,108 @@
 }
 
 .brandMark {
+  --brand-logo-width: 244px;
   position: relative;
   display: inline-flex;
+  flex: 0 0 auto;
   isolation: isolate;
   min-width: 0;
   align-items: center;
-  color: var(--accent-brand);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
   text-align: left;
-  text-shadow:
-    0 1px 0 rgba(255, 236, 201, 0.24),
-    0 -1px 0 rgba(68, 39, 22, 0.9),
-    0 0 16px rgba(255, 179, 96, 0.22),
-    0 0 32px rgba(255, 156, 70, 0.1);
+  transition:
+    transform 180ms ease,
+    filter 180ms ease;
+}
+
+.brandMark::before {
+  content: '';
+  position: absolute;
+  left: 18px;
+  top: 6px;
+  z-index: 1;
+  width: 2.5px;
+  height: 2.5px;
+  border-radius: 50%;
+  background: rgba(255, 232, 198, 0.95);
+  box-shadow:
+    0 0 8px rgba(255, 220, 166, 0.75),
+    16px 1px 0 -1px rgba(255, 220, 166, 0.4),
+    72px 6px 0 -1px rgba(255, 220, 166, 0.32),
+    138px -2px 0 -1px rgba(255, 220, 166, 0.26);
 }
 
 .brandMark::after {
   content: '';
   position: absolute;
-  left: 21px;
-  top: 3px;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: #ffd99a;
-  box-shadow:
-    0 0 6px rgba(255, 216, 151, 0.75),
-    14px 2px 0 -2px rgba(255, 216, 151, 0.5),
-    70px 8px 0 -2px rgba(255, 216, 151, 0.42),
-    132px -1px 0 -2px rgba(255, 216, 151, 0.38);
-}
-
-.brandCrescent,
-.brandWordmark {
-  display: inline-block;
-  font-family: 'Palatino Linotype', Palatino, 'Times New Roman', Georgia, serif;
-  font-weight: 400;
-  line-height: 1;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-}
-
-.brandCrescent {
-  position: relative;
-  width: 72px;
-  font-size: 64px;
-  font-variant: small-caps;
-}
-
-.brandCrescent::before {
-  content: '';
-  position: absolute;
-  inset: -5px 6px -1px -5px;
-  border: 1.5px solid rgba(245, 192, 129, 0.92);
-  border-right-color: transparent;
-  border-radius: 999px;
-  filter: drop-shadow(0 0 7px rgba(255, 190, 122, 0.28))
-    drop-shadow(0 0 18px rgba(255, 152, 70, 0.1));
-}
-
-.brandCrescent::after {
-  content: '';
-  position: absolute;
-  left: 54px;
-  top: 8px;
-  width: 5px;
-  height: 5px;
-  background: radial-gradient(
-    circle,
-    #fff0c9 0 24%,
-    #ffd08b 30% 42%,
-    transparent 52%
-  );
-  filter: drop-shadow(0 0 6px rgba(255, 199, 126, 0.75));
-}
-
-.brandWordmark {
-  position: relative;
-  font-size: clamp(36px, 4.4vw, 48px);
-}
-
-.brandWordmark::before {
-  content: '';
-  position: absolute;
-  inset: -12% -4% -14%;
-  z-index: -1;
+  inset: -18% -7% -26%;
+  z-index: -2;
   background:
     radial-gradient(
-      circle at 12% 16%,
-      rgba(255, 226, 176, 0.2) 0 0.7px,
-      transparent 1.4px
+      ellipse at 22% 52%,
+      rgba(255, 194, 120, 0.16),
+      transparent 60%
     ),
     radial-gradient(
-      circle at 78% 24%,
-      rgba(255, 226, 176, 0.18) 0 0.6px,
-      transparent 1.3px
-    ),
-    radial-gradient(
-      ellipse at 42% 78%,
-      rgba(255, 155, 76, 0.1),
-      transparent 50%
+      ellipse at 50% 48%,
+      rgba(255, 245, 223, 0.08),
+      transparent 54%
     );
-  filter: blur(0.3px);
+  filter: blur(18px);
+  opacity: 0.88;
+}
+
+.brandMark:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.brandMark:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 8px;
+  border-radius: 999px;
+}
+
+.brandLogo {
+  position: relative;
+  display: block;
+  width: min(var(--brand-logo-width), 42vw);
+}
+
+.brandLogo::after {
+  content: '';
+  position: absolute;
+  inset: 14% 10% 16%;
+  z-index: -1;
+  background:
+    linear-gradient(
+      110deg,
+      rgba(255, 248, 230, 0.18),
+      transparent 32%,
+      rgba(255, 198, 118, 0.12) 56%,
+      transparent 78%
+    ),
+    radial-gradient(
+      ellipse at 48% 62%,
+      rgba(255, 192, 108, 0.2),
+      transparent 62%
+    );
+  filter: blur(14px);
+  opacity: 0.66;
+}
+
+.brandLogoSvg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 1px 0 rgba(255, 243, 218, 0.24))
+    drop-shadow(0 0 12px rgba(255, 183, 94, 0.14))
+    drop-shadow(0 12px 26px rgba(0, 0, 0, 0.34));
 }
 
 .headerActions {
@@ -327,6 +328,30 @@
   align-items: center;
   justify-content: flex-end;
   gap: 14px;
+}
+
+.settingsGear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 43px;
+  height: 43px;
+  border: 1px solid var(--border-subtle-faint);
+  border-radius: 50%;
+  color: var(--text-muted);
+  font-size: 20px;
+  text-decoration: none;
+  opacity: 0.55;
+  transition:
+    opacity 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.settingsGear:hover {
+  opacity: 0.85;
+  border-color: var(--border-accent);
+  color: var(--accent-orange-light);
 }
 
 .loginButton,
@@ -2579,23 +2604,13 @@
     padding: 24px 30px 18px 38px;
   }
 
-  .brandCrescent {
-    width: 66px;
-    font-size: 58px;
+  .brandMark {
+    --brand-logo-width: 220px;
   }
 
-  .brandWordmark {
-    font-size: 43px;
-  }
-
-  .brandCrescent::after {
-    left: 48px;
-    top: 7px;
-  }
-
-  .brandMark::after {
-    left: 18px;
-    top: 3px;
+  .brandMark::before {
+    left: 16px;
+    top: 5px;
   }
 
   .controlPanel {
@@ -2638,23 +2653,13 @@
     padding: 18px 26px 14px 34px;
   }
 
-  .brandCrescent {
-    width: 58px;
-    font-size: 48px;
+  .brandMark {
+    --brand-logo-width: 182px;
   }
 
-  .brandWordmark {
-    font-size: 34px;
-  }
-
-  .brandCrescent::after {
-    left: 39px;
-    top: 6px;
-  }
-
-  .brandMark::after {
-    left: 16px;
-    top: 3px;
+  .brandMark::before {
+    left: 12px;
+    top: 4px;
   }
 
   .headerActions {
@@ -2726,30 +2731,15 @@
     padding: 12px 18px 10px 24px;
   }
 
-  .brandCrescent {
-    width: 45px;
-    font-size: 38px;
+  .brandMark {
+    --brand-logo-width: 148px;
   }
 
-  .brandCrescent::before {
-    inset: -3px 4px 0 -4px;
-  }
-
-  .brandWordmark {
-    font-size: 27px;
-    letter-spacing: 0.13em;
-  }
-
-  .brandCrescent::after {
-    left: 33px;
-    top: 5px;
-  }
-
-  .brandMark::after {
-    left: 13px;
-    top: 2px;
-    width: 3px;
-    height: 3px;
+  .brandMark::before {
+    left: 11px;
+    top: 3px;
+    width: 2px;
+    height: 2px;
   }
 
   .headerActions {

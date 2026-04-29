@@ -241,7 +241,8 @@ export type AiDjIntent =
   | 'queue_replace'
   | 'queue_append'
   | 'recommend_explain'
-  | 'theme_playlist_preview';
+  | 'theme_playlist_preview'
+  | 'knowledge_query';
 
 export interface AiDjQueueReplaceActionDto {
   type: 'queue_replace';
@@ -411,4 +412,67 @@ export interface ProviderConnectionStatusDto {
   provider: string;
   connected: boolean;
   message: string;
+}
+
+export interface TranscriptionRequestDto {
+  audioFormat?: string;
+}
+
+export interface TranscriptionResponseDto {
+  text: string;
+  confidence: number;
+}
+
+export interface TtsRequestDto {
+  text: string;
+  voice?: string;
+}
+
+export interface TtsResponseDto {
+  audioUrl: string;
+  durationMs: number;
+}
+
+export interface VoiceChatRequestDto {
+  voice?: string;
+}
+
+export interface VoiceChatResponseDto {
+  reply: any; // ChatTurnResponseDto
+  transcription: string;
+  audioUrl?: string;
+}
+
+export interface KnowledgeQueryRequestDto {
+  question: string;
+  chatSessionId?: string;
+}
+
+export interface KnowledgeQueryResponseDto {
+  traceId: string;
+  summaryText: string;
+  sources: KnowledgeSourceDto[];
+  relatedContent: RelatedContentDto[];
+}
+
+export interface KnowledgeSourceDto {
+  sourceId: string;
+  title: string;
+  snippet: string;
+  url?: string;
+}
+
+export interface RelatedContentDto {
+  contentId: string;
+  title: string;
+  artist: string;
+  type: string;
+}
+
+export interface KnowledgeTraceDto {
+  id: string;
+  question: string;
+  summaryText: string;
+  sourceCount: number;
+  createdAt: string;
 }

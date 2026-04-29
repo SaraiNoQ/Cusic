@@ -28,7 +28,7 @@ export class IntentClassifierService {
     message: string,
     contextHint?: string,
   ): Promise<AiDjIntent> {
-    const systemPrompt = `You are an intent classifier for Cusic, a music AI DJ app. Classify the user message into EXACTLY ONE of these five valid intents. Do NOT invent new intent names.
+    const systemPrompt = `You are an intent classifier for Cusic, a music AI DJ app. Classify the user message into EXACTLY ONE of these six valid intents. Do NOT invent new intent names.
 
 VALID INTENTS (use only these exact strings):
 1. "queue_replace" — User wants to CHANGE/SWITCH what's playing now. Chinese cues: 来一首、来几首、来首、放一首、放几首、播一首、播几首、换一首、换几首、切歌、换歌、放点、来点、来点别的、换一种、放个. English cues: "play", "put on", "switch to", "change the music", "I want to hear", "give me [a/some] song".
@@ -39,10 +39,12 @@ VALID INTENTS (use only these exact strings):
 
 4. "recommend_explain" — User asks WHY something was recommended or seeks explanation. Chinese cues: 为什么推、为什么推荐、解释、背后逻辑. English cues: "why", "explain", "reason".
 
-5. "conversation" — Everything else: casual chat, music questions, knowledge questions, asking for suggestions/recommendations WITHOUT explicitly asking to play/queue music. If the user asks "推荐" or "recommend" or "有什么好听的" but does NOT say "来/放/播/play", use "conversation".
+5. "knowledge_query" — User asks about music knowledge, artist backgrounds, genre history, song stories, music theory. Chinese cues: 介绍、背景、历史、故事、流派、风格、知识、什么是、谁写的、什么时候出的. English cues: "tell me about", "who is", "history of", "what genre", "background", "story behind", "music knowledge".
+
+6. "conversation" — Everything else: casual chat, general questions, asking for suggestions/recommendations WITHOUT explicitly asking to play/queue music. If the user asks "推荐" or "recommend" or "有什么好听的" but does NOT say "来/放/播/play", use "conversation".
 
 Output ONLY a single line of JSON, no markdown, no code fences, no extra commentary:
-{"intent":"<one of the five valid intent strings>","confidence":<0.0-1.0>}`;
+{"intent":"<one of the six valid intent strings>","confidence":<0.0-1.0>}`;
 
     const userMessage = contextHint
       ? `Context hint: ${contextHint}\n\nUser message: ${message}`
@@ -127,6 +129,7 @@ Output ONLY a single line of JSON, no markdown, no code fences, no extra comment
       /推荐.*歌单|歌单|playlist|curate|build/i,
       /加|补|append|add|再来|多来/i,
       /为什么|解释|explain|reason|背后/i,
+      /介绍|背景|历史|故事|流派|知识|什么是|谁写的|genre|history|background|story/i,
       /推荐|recommend|suggest|有什么|what.*(song|music|track|listen)/i,
     ];
 
@@ -134,7 +137,8 @@ Output ONLY a single line of JSON, no markdown, no code fences, no extra comment
     if (replacePatterns[1].test(normalized)) return 'theme_playlist_preview';
     if (replacePatterns[2].test(normalized)) return 'queue_append';
     if (replacePatterns[3].test(normalized)) return 'recommend_explain';
-    if (replacePatterns[4].test(normalized)) return 'conversation';
+    if (replacePatterns[4].test(normalized)) return 'knowledge_query';
+    if (replacePatterns[5].test(normalized)) return 'conversation';
 
     return null;
   }
@@ -145,7 +149,8 @@ Output ONLY a single line of JSON, no markdown, no code fences, no extra comment
       value === 'queue_replace' ||
       value === 'queue_append' ||
       value === 'recommend_explain' ||
-      value === 'theme_playlist_preview'
+      value === 'theme_playlist_preview' ||
+      value === 'knowledge_query'
     );
   }
 
@@ -208,6 +213,25 @@ Output ONLY a single line of JSON, no markdown, no code fences, no extra comment
       normalizedMessage.includes('放个')
     ) {
       return 'queue_replace';
+    }
+
+    if (
+      normalizedMessage.includes('介绍') ||
+      normalizedMessage.includes('背景') ||
+      normalizedMessage.includes('历史') ||
+      normalizedMessage.includes('故事') ||
+      normalizedMessage.includes('流派') ||
+      normalizedMessage.includes('风格') ||
+      normalizedMessage.includes('知识') ||
+      normalizedMessage.includes('什么是') ||
+      normalizedMessage.includes('谁写的') ||
+      normalizedMessage.includes('什么时候出') ||
+      normalizedMessage.includes('genre') ||
+      normalizedMessage.includes('history') ||
+      normalizedMessage.includes('background') ||
+      normalizedMessage.includes('story')
+    ) {
+      return 'knowledge_query';
     }
 
     return 'conversation';

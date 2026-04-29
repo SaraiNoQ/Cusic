@@ -35,5 +35,6 @@ export interface LLMProvider {
     onEvent: (event: LlmStreamEvent) => void,
     signal?: AbortSignal,
   ): Promise<void>;
+  embed(texts: string[]): Promise<number[][]>;
   isAvailable(): Promise<boolean>;
 }

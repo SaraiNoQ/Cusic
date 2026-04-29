@@ -1,0 +1,80 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: min(100%, 620px);
+  padding: 20px 22px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  background: var(--bg-card-dark);
+  align-self: flex-start;
+}
+
+.title {
+  font-family: 'Palatino Linotype', Palatino, 'Times New Roman', Georgia, serif;
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--accent-teal);
+  text-transform: uppercase;
+}
+
+.summary {
+  color: var(--text-chat);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.sectionRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sectionLabel {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--text-chat-bubble-index);
+  text-transform: uppercase;
+}
+
+.sourcesList,
+.relatedList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+}
+
+.sourceItem,
+.relatedItem {
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.sourceLink {
+  color: var(--accent-teal-pale);
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+
+.sourceLink:hover {
+  color: var(--accent-orange-hover);
+  text-decoration: underline;
+}
+
+.sourceTitle {
+  color: var(--text-secondary);
+}
+
+.relatedLink {
+  color: var(--accent-teal-pale);
+  text-decoration: none;
+  font-size: 15px;
+  transition: color 150ms ease;
+}
+
+.relatedLink:hover {
+  color: var(--accent-orange-hover);
+  text-decoration: underline;
+}

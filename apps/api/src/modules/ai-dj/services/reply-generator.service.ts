@@ -117,6 +117,8 @@ export class ReplyGeneratorService {
         'The user wants to understand why something was recommended. Explain the musical reasoning.',
       theme_playlist_preview:
         'The user wants a themed playlist. Paint a vivid picture of the mood and explain why these tracks fit together.',
+      knowledge_query:
+        "The user is asking about music knowledge — artist backgrounds, genre history, song stories, or music theory. Provide an informative, well-structured answer. Reference the tracks in the user's music library if relevant. Be conversational but factual.",
     };
 
     const systemPrompt = `You are Cusic's AI DJ, a warm, knowledgeable music companion. Your tone is conversational like a real radio DJ — friendly, insightful, and never robotic.
@@ -197,6 +199,9 @@ Guidelines:
         return contentIds.length > 0
           ? '我先把这个主题压成一组可直接上机的预览队列，你先听走向，再决定要不要继续扩写。'
           : '这轮主题还不够清晰，我先保留当前频道。你可以补一句语种、场景或时间段。';
+
+      case 'knowledge_query':
+        return '关于这个问题我需要一点时间整理答案。你可以先用「来一首」或「换歌」试试队列操作，或者稍等片刻再问我。';
 
       case 'queue_replace':
       default:

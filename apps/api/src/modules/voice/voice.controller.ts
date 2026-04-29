@@ -1,4 +1,13 @@
-import { Body, Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -7,24 +16,46 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
+import { VoiceService } from './voice.service';
 
 class TtsDto {
   @IsString()
   text!: string;
 
+  @IsOptional()
   @IsString()
-  voice!: string;
+  voice?: string;
 }
 
 @ApiTags('voice')
 @ApiBearerAuth()
-@Controller('dj/voice')
+@Controller('voice')
 export class VoiceController {
+  constructor(private readonly voiceService: VoiceService) {}
+
+  @Get('voices')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'List available TTS voices' })
+  @ApiResponse({ status: 200, description: 'List of available voices' })
+  async getVoices() {
+    const voices = this.voiceService.getAvailableVoices();
+    return {
+      success: true,
+      data: {
+        provider: this.voiceService.getProviderType(),
+        voices,
+      },
+      meta: {},
+    };
+  }
+
   @Post('asr')
+  @UseGuards(OptionalJwtAuthGuard)
   @UseInterceptors(FileInterceptor('audio'))
-  @ApiOperation({ summary: 'Speech-to-text for AI DJ voice input' })
+  @ApiOperation({ summary: 'Speech-to-text transcription' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -33,31 +64,69 @@ export class VoiceController {
         audio: {
           type: 'string',
           format: 'binary',
+          description: 'Audio file to transcribe',
         },
       },
     },
   })
-  @ApiResponse({ status: 200, description: 'ASR result' })
-  asr(@UploadedFile() file?: unknown) {
+  @ApiResponse({ status: 200, description: 'ASR transcription result' })
+  async asr(
+    @UploadedFile()
+    file?: {
+      buffer: Buffer;
+      mimetype: string;
+      originalname: string;
+      size: number;
+    },
+  ) {
+    if (!file) {
+      return {
+        success: true,
+        data: {
+          text: '',
+          confidence: 0,
+        },
+        meta: {},
+      };
+    }
+
+    const format = file.mimetype === 'audio/wav' ? 'wav' : 'pcm';
+    const result = await this.voiceService.transcribe(file.buffer, format);
+
     return {
       success: true,
-      data: {
-        text: file ? 'stub transcription from uploaded audio' : 'no audio uploaded',
-      },
+      data: result,
       meta: {},
     };
   }
 
   @Post('tts')
-  @ApiOperation({ summary: 'Text-to-speech for AI DJ output' })
-  @ApiResponse({ status: 200, description: 'TTS result' })
-  tts(@Body() body: TtsDto) {
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Text-to-speech synthesis' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Text to synthesize' },
+        voice: {
+          type: 'string',
+          description: 'Voice to use (qianxue, aizhen, aishuo)',
+          nullable: true,
+        },
+      },
+      required: ['text'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'TTS synthesis result' })
+  async tts(@Body() body: TtsDto) {
+    const result = await this.voiceService.synthesize(
+      body.text,
+      body.voice ?? 'qianxue',
+    );
+
     return {
       success: true,
-      data: {
-        audioUrl: `https://example.com/tts/${encodeURIComponent(body.voice)}.mp3`,
-        text: body.text,
-      },
+      data: result,
       meta: {},
     };
   }
