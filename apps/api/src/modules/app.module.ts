@@ -30,10 +30,7 @@ import { VoiceModule } from './voice/voice.module';
             ? { target: 'pino-pretty', options: { singleLine: true } }
             : undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        genReqId: (req: any) => {
-          const id = req.requestId as string | undefined;
-          return id || undefined;
-        },
+        genReqId: (req: any) => req.requestId ?? '',
         autoLogging: {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ignore: (req: any) => (req.url as string)?.includes('/system/health'),
