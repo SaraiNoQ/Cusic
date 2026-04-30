@@ -12,7 +12,7 @@
     ]
   },
   "moduleNameMapper": {
-    "^@music-ai/shared$": "<rootDir>/../../packages/shared/src",
+    "^@music-ai/shared$": "<rootDir>/../../../packages/shared/src",
     "^@prisma/client$": "<rootDir>/__mocks__/prisma-client.ts",
     "^ioredis$": "<rootDir>/__mocks__/ioredis.ts",
     "^openai$": "<rootDir>/__mocks__/empty.ts",

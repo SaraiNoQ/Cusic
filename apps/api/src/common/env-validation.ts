@@ -17,11 +17,14 @@ export function validateEnv(): void {
     process.env.JWT_ACCESS_SECRET === 'replace-me-access' ||
     process.env.JWT_REFRESH_SECRET === 'replace-me-refresh'
   ) {
-    console.error(
-      'FATAL: JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must not use the default placeholder values. ' +
-        'Set strong, unique secrets before running in production.',
-    );
-    process.exit(1);
+    const msg =
+      'JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must not use the default placeholder values. ' +
+      'Set strong, unique secrets before running in production.';
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`FATAL: ${msg}`);
+      process.exit(1);
+    }
+    console.warn(`WARNING: ${msg}`);
   }
 
   if (missing.length > 0) {
