@@ -1,6 +1,6 @@
 {
   "testEnvironment": "jsdom",
-  "setupFilesAfterFramework": ["@testing-library/jest-dom"],
+  "setupFilesAfterSetup": ["@testing-library/jest-dom"],
   "moduleNameMapper": {
     "^@music-ai/shared$": "<rootDir>/../../packages/shared/src",
     "^@music-ai/ui$": "<rootDir>/../../packages/ui/src",
