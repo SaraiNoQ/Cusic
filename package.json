@@ -10,8 +10,10 @@
     "typecheck": "turbo typecheck",
     "test": "turbo test",
     "prepare": "husky",
+    "postinstall": "prisma generate",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
+    "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate --schema prisma/schema.prisma"
   },
   "devDependencies": {
