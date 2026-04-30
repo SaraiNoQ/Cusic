@@ -1,6 +1,6 @@
 # Cusic 开发路线图
 
-- 文档版本：v0.5
+- 文档版本：v0.6
 - 文档状态：持续更新
 - 更新时间：2026-04-30
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`
@@ -21,6 +21,7 @@
 8. 语音与知识模块（VoiceModule: MiMo/阿里云 TTS/ASR, KnowledgeModule: LLM + 内容目录音乐知识问答, ContextModule: 播放事件情绪推导）。
 9. 向量搜索服务（pgvector cosine similarity 候选召回，Taste Profile embedding 生成）。
 10. 设置页面（settings page）、品牌 CusicLogo、语音选择器 UI（voice selector）、知识卡片组件（knowledge cards）。
+11. Phase 7 加固与上线准备：安全加固、结构化日志、性能优化、CI/CD、Docker HEALTHCHECK、备份恢复、发布流程、测试。
 
 当前未完成重点：
 
@@ -29,7 +30,7 @@
 
 当前推进中：
 
-1. `Phase 7` 加固与上线准备：性能优化、错误监控与日志完善、数据备份与恢复、发布与回滚流程。
+无（Phase 7 已于 2026-04-30 完成，当前各阶段均已结束）。
 
 ## 2. 阶段规划总览
 
@@ -202,7 +203,7 @@
 
 目标：从可用原型进入可稳定交付阶段。
 
-当前状态：当前阶段 —— 从可用原型进入可稳定交付阶段。
+状态：**Done**。
 
 核心工作：
 
@@ -210,6 +211,17 @@
 2. 错误监控与日志完善。
 3. 数据备份与恢复流程。
 4. 发布流程、验收清单与灰度策略。
+
+完成内容：
+
+1. **安全加固**：Helmet 安全头、@nestjs/throttler 全局限流（100req/min，auth 端点 5req/min）、CSP 头、启动环境变量校验。
+2. **结构化日志**：nestjs-pino JSON 日志、全局异常过滤器（GlobalExceptionFilter）、请求 ID 追踪（RequestIdInterceptor）。
+3. **性能优化**：gzip/brotli 压缩、Next.js 静态资源缓存、Redis 健康检查。
+4. **CI/CD**：GitHub Actions 工作流（lint / typecheck / test-api / build-api / build-web）。
+5. **Docker HEALTHCHECK**：全部 5 个服务健康检查，service_healthy 依赖条件。
+6. **备份恢复**：pg_dump 自动备份脚本（7 天轮转）、恢复脚本、Docker 卷备份、cron 自动安装。
+7. **发布流程**：CHANGELOG.md、deploy.sh / rollback.sh、IMAGE_TAG 版本化。
+8. **测试**：修复 imports.spec.ts、web smoke test。
 
 交付产物：
 

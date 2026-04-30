@@ -1,6 +1,6 @@
 # 音乐 AI App 架构设计文档
 
-- 文档版本：v0.2
+- 文档版本：v0.3
 - 文档状态：初版
 - 更新时间：2026-04-30
 - 对齐文档：`docs/RPD.md`
@@ -534,6 +534,12 @@ ContentProvider 对外统一返回如下最小字段：
 
 首版不默认采用 Kubernetes。待流量与团队规模上升后，再评估容器编排平台。
 
+此外，部署基础设施已包含以下运维能力：
+
+1. Docker HEALTHCHECK：全部 5 个服务（api、web、worker、db、redis）均配置健康检查，Compose 中通过 `service_healthy` 条件控制启动依赖顺序。
+2. GitHub Actions CI：自动执行 lint、typecheck、test-api、build-api、build-web，在合并前拦截常见问题。
+3. 备份脚本（`scripts/` 目录）：提供 pg_dump 自动备份（7 天轮转）、恢复脚本、Docker 卷备份及 cron 自动安装工具。
+
 ## 9. API 与接口形态
 
 首版接口风格采用 `REST + SSE/WebSocket`。
@@ -568,16 +574,22 @@ ContentProvider 对外统一返回如下最小字段：
 2. 用户可撤回日历、飞书、定位和麦克风权限。
 3. 会话令牌与第三方 access token 分离存储。
 4. 不把完整原始第三方响应长期暴露给前端。
+5. 全局 Helmet 安全头，防御常见 Web 漏洞（XSS、点击劫持、MIME 嗅探等）。
+6. @nestjs/throttler 全局限流（100 req/min），auth 端点 5 req/min。
+7. Content-Security-Policy（CSP）头，限制脚本、样式及媒体来源。
+8. 启动时环境变量校验，缺少必需变量时服务拒绝启动。
 
-### 10.2 监控
+### 10.2 可观测性
 
 首版至少具备：
 
-1. 结构化日志
-2. 请求链路 ID
-3. AI 调用耗时、失败率、重试统计
-4. 推荐点击率、完播率、跳过率
-5. Provider 健康检查
+1. nestjs-pino 结构化 JSON 日志，统一输出格式。
+2. 全局异常过滤器（GlobalExceptionFilter），捕获并标准化所有未处理异常。
+3. 请求 ID 追踪（RequestIdInterceptor），注入 `x-request-id` 贯穿全链路。
+4. AI 调用耗时、失败率、重试统计。
+5. 推荐点击率、完播率、跳过率。
+6. Provider 健康检查。
+7. Docker HEALTHCHECK 覆盖全部 5 个服务，Compose 使用 service_healthy 依赖条件确保启动顺序。
 
 ### 10.3 容错与降级
 
@@ -585,6 +597,14 @@ ContentProvider 对外统一返回如下最小字段：
 2. LLM 异常时，基础搜索与播放能力不能受影响。
 3. TTS 异常时，允许只返回文字回复。
 4. 天气、定位、日程缺失时，回退到长期画像推荐。
+
+### 10.4 部署与运维
+
+1. GitHub Actions CI 流水线：lint / typecheck / test-api / build-api / build-web。
+2. 备份脚本（`scripts/` 目录）：pg_dump 自动备份（7 天轮转）、恢复脚本、Docker 卷备份、cron 自动安装。
+3. 发布与回滚脚本：`deploy.sh` / `rollback.sh`。
+4. `IMAGE_TAG` 版本化部署，支持按标签回滚到任意历史版本。
+5. CHANGELOG.md 记录每次发布的变更摘要。
 
 ## 11. 首版边界与后续演进
 

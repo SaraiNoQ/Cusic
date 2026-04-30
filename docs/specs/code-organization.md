@@ -1,6 +1,6 @@
 # 代码组织规范
 
-- 文档版本：v0.4
+- 文档版本：v0.5
 - 文档状态：生效
 - 更新时间：2026-04-30
 - 关联文档：`docs/specs/engineering-playbook.md`、`docs/specs/api-design.md`
@@ -39,6 +39,8 @@
    Zustand store，仅放会话级和本地交互状态。
 6. `apps/web/src/hooks`
    只放跨 feature 复用的 hooks；feature 私有 hook 放在各自目录下。
+7. `apps/web/src/__tests__/`
+   前端烟雾测试目录，包含 `page.test.tsx` 用于验证首页渲染和关键交互路径是否正常。
 
 硬约束：
 
@@ -58,7 +60,7 @@
 
 ## 4. 后端目录规则
 
-入口文件 `apps/api/src/main.ts` 负责 NestJS 应用启动、CORS 配置（`app.enableCors` 含字符串/正则混合白名单）、全局路径前缀（`api/v1`）和 Swagger 挂载。
+入口文件 `apps/api/src/main.ts` 负责 NestJS 应用启动、Helmet 安全头、compression 响应压缩、Pino 结构化日志、CORS 配置（`app.enableCors` 含字符串/正则混合白名单）、全局路径前缀（`api/v1`）、GlobalExceptionFilter 统一错误处理、`validateEnv()` 启动环境变量校验和 Swagger 挂载。
 
 后端按领域模块组织，每个核心模块至少具备以下层次：
 
@@ -80,6 +82,14 @@
 - Content 模块：`services/embedding.service.ts`
 - Prisma 模块：`vector-search.service.ts`
 - Context 模块：`context.service.ts`
+
+#### 4.1 通用基础设施
+
+`apps/api/src/common/` 目录存放跨模块的通用基础设施文件：
+
+1. `env-validation.ts` — 启动环境变量校验，确保关键环境变量（数据库连接、密钥、服务端口等）在应用启动前均已正确配置，缺失时立即中止启动并输出明确错误信息。
+2. `global-exception.filter.ts` — 全局异常过滤器，统一捕获 NestJS 未处理异常，按异常类型返回标准化的 JSON 错误响应（包含 `statusCode`、`message`、`error`、`requestId` 等字段）。
+3. `request-id.ts` — 请求 ID 追踪，为每个 HTTP 请求生成或提取唯一 `X-Request-Id` 头，贯穿请求生命周期，并在错误响应与日志中携带，便于问题定位与链路追踪。
 
 硬约束：
 
@@ -116,7 +126,38 @@
 10. 向量搜索基础设施 ✓
 11. 设置页面 ✓
 
-## 7. 验收标准
+## 7. CI/CD 与运维脚本
+
+项目使用 GitHub Actions 作为 CI 流水线，并使用 Shell 脚本管理部署、回滚和备份运维任务。
+
+### 7.1 CI/CD 流水线
+
+`.github/workflows/ci.yml` — GitHub Actions pipeline，在每次 push 到任意分支时触发，依次执行以下 job：
+
+1. `lint` — ESLint 代码规范检查
+2. `typecheck` — TypeScript 类型检查
+3. `test-api` — API 后端单元测试与集成测试
+4. `build-api` — API 服务构建
+5. `build-web` — Web 前端构建
+
+所有 job 并行或按依赖顺序运行，任一步骤失败则会话标记为失败。
+
+### 7.2 部署与版本管理
+
+- `scripts/deploy.sh` — 部署脚本，负责拉取最新代码、构建 Docker 镜像、按 `IMAGE_TAG` 版本号标记镜像并启动/更新容器。
+- `scripts/rollback.sh` — 回滚脚本，支持通过指定 `IMAGE_TAG` 回退到先前版本的 Docker 镜像，快速恢复服务。
+- `IMAGE_TAG` 版本化：每次构建通过 `IMAGE_TAG` 环境变量或 CI 注入的 Git commit SHA 标识镜像版本，实现可追溯、可回滚的部署流程。
+
+### 7.3 数据备份与恢复
+
+- `scripts/backup-db.sh` — 数据库备份脚本，使用 `pg_dump` 导出 PostgreSQL 数据并通过 gzip 压缩，按 7 天轮转策略保留备份文件。
+- `scripts/restore-db.sh` — 数据库恢复脚本，交互式选择备份文件并恢复到 PostgreSQL 实例。
+- `scripts/backup-volumes.sh` — Docker 卷备份脚本，将 Docker 管理的命名卷打包为 tar.gz 归档文件。
+- `scripts/setup-backup-cron.sh` — 定时备份安装脚本，将上述备份任务注册为 cron 定时作业（默认每日凌晨 2:00 执行），实现自动化备份。
+
+所有备份文件统一存放在项目根目录的 `backups/` 目录下（`.gz` 和 `.tar.gz` 文件已通过 `.gitignore` 排除）。
+
+## 8. 验收标准
 
 1. 页面主入口不再是一个数百行控制器式组件。
 2. 后端 controller 文件显著变薄，只保留 HTTP 语义和 Swagger。

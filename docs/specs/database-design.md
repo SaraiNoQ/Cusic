@@ -1,6 +1,6 @@
 # 音乐 AI App 数据库设计文档
 
-- 文档版本：v0.3
+- 文档版本：v0.4
 - 文档状态：初版
 - 更新时间：2026-04-30
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`
@@ -783,6 +783,8 @@
 3. 限流状态
 4. 导入任务中间进度
 
+> Redis 健康状态现已纳入系统监控：`GET /api/v1/system/health` 端点会检测 Redis 连通性，Docker HEALTHCHECK 同样依赖该健康端点。当 Redis 不可达时，API 健康检查将报告 `redis: disconnected`，并触发容器自动重启。
+
 ### 5.2 BullMQ
 
 任务类型建议：
@@ -806,7 +808,50 @@
 4. 所有外键必须显式声明 relation name
 5. 所有软删除查询必须在仓储层默认过滤 `deleted_at is null`
 
-## 7. 首版不纳入数据库细化范围
+## 7. 备份与恢复
+
+项目提供完整的数据库和卷备份工具链，确保生产数据安全可恢复。
+
+### 7.1 数据库备份
+
+`scripts/backup-db.sh` — 基于 `pg_dump` 的 PostgreSQL 全量备份脚本：
+
+1. 使用 `pg_dump` 导出目标数据库的完整 DDL 和数据。
+2. 输出经 gzip 压缩为 `.gz` 文件，存入 `backups/` 目录。
+3. 默认采用 7 天轮转策略（7-day rotation），自动清理超过 7 天的旧备份文件，避免磁盘空间耗尽。
+4. 备份文件命名格式：`backup_YYYYMMDD_HHMMSS.sql.gz`。
+
+### 7.2 数据库恢复
+
+`scripts/restore-db.sh` — 交互式数据库恢复脚本：
+
+1. 列出 `backups/` 目录中所有可用的 `.gz` 备份文件。
+2. 操作者交互选择目标备份文件。
+3. 将选定的备份解压并通过 `psql` 恢复到目标 PostgreSQL 实例。
+4. 恢复前会提示确认，防止误操作覆盖当前数据。
+
+### 7.3 Docker 卷备份
+
+`scripts/backup-volumes.sh` — Docker 命名卷备份脚本：
+
+1. 将 PostgreSQL 数据卷和 Redis 数据卷打包为 `.tar.gz` 归档文件。
+2. 归档存储在 `backups/` 目录中，与数据库备份采用相同的 gitignore 策略。
+
+### 7.4 定时备份
+
+`scripts/setup-backup-cron.sh` — 一键安装定时备份任务：
+
+1. 将 `backup-db.sh` 和 `backup-volumes.sh` 注册到系统 crontab。
+2. 默认执行时间为每日凌晨 2:00（`0 2 * * *`）。
+3. 备份任务输出重定向到日志文件，便于事后排查。
+
+### 7.5 备份存储与安全
+
+- 所有备份文件统一存放在项目根目录的 `backups/` 目录下。
+- `.gz` 和 `.tar.gz` 后缀文件已通过 `.gitignore` 排除，防止误提交到 Git 仓库。
+- 生产环境建议将 `backups/` 目录挂载到宿主机持久化存储或云存储，避免容器销毁时丢失备份。
+
+## 8. 首版不纳入数据库细化范围
 
 1. 分库分表
 2. 完整审计日志仓库
@@ -814,7 +859,7 @@
 4. 后台运营配置表
 5. 实时消息总线持久化表
 
-## 8. 当前默认假设
+## 9. 当前默认假设
 
 1. 首版只支持邮箱身份，但身份表预留多种登录方式。
 2. `content_items` 采用统一主表，避免业务层绑定内容源差异。

@@ -1,6 +1,6 @@
 # 音乐 AI App API 设计文档
 
-- 文档版本：v0.5
+- 文档版本：v0.6
 - 文档状态：持续更新
 - 更新时间：2026-04-30
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`、`docs/specs/database-design.md`
@@ -49,6 +49,15 @@ Content-Type: application/json
 - 浏览器只与 Web 域通信，不再直接访问 API 域。这消除了对 CORS 配置的浏览器端依赖，也避免了将 API 内部地址暴露到前端 JS bundle 中。
 - API 端 CORS 作为兜底：当 Cloudflare Tunnel 直接将请求路由到 `api.sarainoq.cn`（如 Swagger UI 或调试工具）时，正则表达式匹配确保跨域请求仍然可用。
 
+### 2.1.2 安全头与中间件
+
+API 端统一启用以下安全与性能中间件：
+
+1. **Helmet**：通过 `helmet` 中间件为所有响应注入标准安全头（CSP、X-Frame-Options、X-Content-Type-Options 等），防止常见 Web 攻击。
+2. **速率限制**：通过 `@nestjs/throttler` 实施全局速率限制，默认 100 req/min；认证相关端点（`/auth/*`）额外限制为 5 req/min，防止暴力破解。
+3. **请求体大小限制**：请求体最大为 1MB，防止大体积请求耗尽服务资源。
+4. **压缩**：通过 `compression` 中间件启用 gzip/brotli 响应压缩，减少传输体积。
+
 ### 2.2 成功响应结构
 
 ```json
@@ -61,6 +70,8 @@ Content-Type: application/json
 
 ### 2.3 失败响应结构
 
+所有异常由 `GlobalExceptionFilter`（`apps/api/src/common/global-exception.filter.ts`）统一拦截，返回一致格式：
+
 ```json
 {
   "success": false,
@@ -68,9 +79,14 @@ Content-Type: application/json
     "code": "AUTH_INVALID_TOKEN",
     "message": "Access token is invalid or expired"
   },
-  "meta": {}
+  "meta": {
+    "requestId": "req_abc123",
+    "timestamp": "2026-04-30T12:00:00.000Z"
+  }
 }
 ```
+
+其中 `requestId` 由 `RequestIdInterceptor` 注入，贯穿请求全生命周期。异常同时以 JSON 结构化日志（`nestjs-pino`）输出，包含 `requestId`、错误码和堆栈信息，便于排障。
 
 ### 2.4 分页规范
 
@@ -1265,17 +1281,56 @@ Content-Type: application/json
 
 ### 9.4 `GET /system/health`
 
-用途：开发与运维必需的健康检查接口。
+用途：开发与运维必需的健康检查接口，Docker HEALTHCHECK 指令使用此端点判断容器健康状态。
 
-返回内容建议：
+返回内容：
 
 1. API 状态
 2. PostgreSQL 状态
-3. Redis 状态
+3. Redis 状态（含连通性检查字段 `redis`）
 4. Queue 状态
 5. Provider 简要状态
+6. 版本号（读取 `APP_VERSION` 环境变量）
 
-## 10. 通用错误码规范
+响应示例：
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "ok",
+    "version": "0.6.0",
+    "postgres": "ok",
+    "redis": "ok",
+    "queue": "ok"
+  }
+}
+```
+
+## 11. 运维与安全
+
+### 11.1 环境变量校验
+
+API 启动时通过 `validateEnv()`（`apps/api/src/common/env-validation.ts`）对关键环境变量做强制性校验：
+
+- `DATABASE_URL`、`REDIS_URL` — 必须存在且非占位值
+- JWT 密钥（`JWT_ACCESS_SECRET`、`JWT_REFRESH_SECRET`） — 不得使用默认值或 `CHANGE_ME`
+- 校验失败时进程拒绝启动，防止因配置缺失导致运行时错误
+
+### 11.2 Docker 健康检查
+
+所有 5 个容器（web、api、worker、postgres、redis）均配置 Docker HEALTHCHECK 指令，服务间依赖使用 `condition: service_healthy` 确保启动顺序正确。`/system/health` 端点为 api 容器的健康检查目标。
+
+### 11.3 备份脚本
+
+备份与恢复脚本位于仓库根目录 `scripts/` 下：
+
+- `scripts/backup-db.sh` — PostgreSQL 数据库导出备份
+- `scripts/restore-db.sh` — 数据库备份恢复
+- `scripts/backup-volumes.sh` — Docker 卷备份
+- `scripts/setup-backup-cron.sh` — 配置定时备份任务
+
+## 12. 通用错误码规范
 
 错误码按模块分组，例如：
 
