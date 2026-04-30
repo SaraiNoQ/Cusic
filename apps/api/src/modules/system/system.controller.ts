@@ -91,7 +91,7 @@ export class SystemController {
           } catch {
             return 'unavailable';
           } finally {
-            redis?.disconnect().catch(() => {});
+            redis?.disconnect();
           }
         },
         3000,
