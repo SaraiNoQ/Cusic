@@ -1,6 +1,6 @@
 # 音乐 AI App API 设计文档
 
-- 文档版本：v0.4
+- 文档版本：v0.5
 - 文档状态：持续更新
 - 更新时间：2026-04-30
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`、`docs/specs/database-design.md`
@@ -36,17 +36,18 @@ Content-Type: application/json
 公网部署要求：
 
 1. Web 域名为 `https://web.sarainoq.cn`。
-2. API 域名为 `https://api.sarainoq.cn/api/v1`。
-3. API CORS 通过 `API_CORS_ORIGINS` 配置，生产默认包含 `https://web.sarainoq.cn`。
+2. API 域名为 `https://api.sarainoq.cn/api/v1`（仅用于直连调试，正常 Web 流量不经过此域名）。
+3. API CORS 通过 `API_CORS_ORIGINS` 配置，生产默认包含 `https://web.sarainoq.cn`、`https://api.sarainoq.cn` 以及 `*.sarainoq.cn` 的正则匹配。当环境变量未配置时，`main.ts` 中的 `getAllowedCorsOrigins()` 使用内置默认值（含正则表达式 `^https://.*\.sarainoq\.cn$` 以匹配任意子域）。
 4. 浏览器端不得通过 `web.sarainoq.cn:3001` 访问 API。
 
 ### 2.1.1 前端 API 代理策略
 
 为消除跨域问题，前端采用了 Next.js rewrites 将同源 `/api/v1/*` 请求代理到 API 后端：
 
-- `NEXT_PUBLIC_API_BASE_URL=/api/v1`：浏览器端 JS 使用相对路径发起请求，请求到达同源的 Next.js 服务器。
-- `API_INTERNAL_URL`：Next.js 服务端将 `/api/v1/*` 代理转发的目标地址。Docker Compose 部署时设为 `http://api:3001`（Docker 网络内部地址），本地开发时默认 `http://localhost:3001`。
+- `NEXT_PUBLIC_API_BASE_URL=/api/v1`：浏览器端 JS 使用相对路径发起请求，请求到达同源的 Next.js 服务器。`getApiBaseUrl()` 在非本地环境下直接返回 `/api/v1`，不再动态构造 `api.*` 子域名绝对 URL。
+- `API_INTERNAL_URL`：Next.js 服务端将 `/api/v1/*` 代理转发的目标地址。Docker Compose 部署时通过 build args 显式传入 `http://api:3001`，本地开发时默认 `http://localhost:3001`。`docker-compose.yml` 中为 web 服务显式声明了 `build.args.NEXT_PUBLIC_API_BASE_URL` 和 `build.args.API_INTERNAL_URL`，防止宿主机环境变量意外覆盖 Dockerfile 默认值。
 - 浏览器只与 Web 域通信，不再直接访问 API 域。这消除了对 CORS 配置的浏览器端依赖，也避免了将 API 内部地址暴露到前端 JS bundle 中。
+- API 端 CORS 作为兜底：当 Cloudflare Tunnel 直接将请求路由到 `api.sarainoq.cn`（如 Swagger UI 或调试工具）时，正则表达式匹配确保跨域请求仍然可用。
 
 ### 2.2 成功响应结构
 

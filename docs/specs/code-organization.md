@@ -1,6 +1,6 @@
 # 代码组织规范
 
-- 文档版本：v0.3
+- 文档版本：v0.4
 - 文档状态：生效
 - 更新时间：2026-04-30
 - 关联文档：`docs/specs/engineering-playbook.md`、`docs/specs/api-design.md`
@@ -32,7 +32,7 @@
    - `features/player`：包含 `CusicLogo.tsx`（SVG 金色金属质感 C + USIC 文字 logo）。
    - 各 feature 的 `*.module.css` 中如需针对浅色模式调整装饰层，使用 `:global([data-theme='light']) .className` 选择器穿透模块作用域。
 3. `apps/web/src/lib/api`
-   API client、请求封装、模块级 API 方法。
+   API client、请求封装、模块级 API 方法。`client.ts` 为中枢：`getApiBaseUrl()` 按环境解析 API 基地址（本地直连，生产走 `/api/v1` 相对路径以复用 Next.js rewrites），`apiFetch()` 统一注入认证头、时区头和 token 自动刷新。
 4. `apps/web/src/lib/query`
    TanStack Query 的 client、query key、query helper。
 5. `apps/web/src/store`
@@ -57,6 +57,8 @@
 6. 样式：优先 feature 级 `*.module.css`
 
 ## 4. 后端目录规则
+
+入口文件 `apps/api/src/main.ts` 负责 NestJS 应用启动、CORS 配置（`app.enableCors` 含字符串/正则混合白名单）、全局路径前缀（`api/v1`）和 Swagger 挂载。
 
 后端按领域模块组织，每个核心模块至少具备以下层次：
 
