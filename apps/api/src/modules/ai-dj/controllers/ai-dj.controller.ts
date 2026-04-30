@@ -151,12 +151,7 @@ export class AiDjController {
     @Headers('x-cusic-timezone') timezoneHeader?: string,
   ) {
     // Step 1: ASR — transcribe audio to text
-    const format =
-      file?.mimetype === 'audio/wav'
-        ? 'wav'
-        : file?.mimetype === 'audio/mpeg'
-          ? 'mp3'
-          : 'pcm';
+    const format = file?.mimetype || 'audio/webm';
     const transcription = file
       ? await this.voiceService.transcribe(file.buffer, format)
       : { text: '', confidence: 0 };

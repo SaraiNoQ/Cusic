@@ -669,6 +669,10 @@
 1. `index(user_id, created_at desc)`
 2. `index(chat_session_id)`
 
+实现记录：
+
+1. 已完全实现，`KnowledgeService.query()` 在每次知识查询时写入 trace 记录。
+
 #### 3.8.4 `knowledge_sources`
 
 用途：知识讲解使用的来源明细。
@@ -687,6 +691,10 @@
 
 1. `index(knowledge_trace_id)`
 2. `ivfflat/hnsw(embedding)`
+
+实现记录：
+
+1. 已完全实现，`KnowledgeService.query()` 在每次知识查询时将来源明细写入本表，与 `knowledge_traces` 同步创建。
 
 ### 3.9 任务域
 

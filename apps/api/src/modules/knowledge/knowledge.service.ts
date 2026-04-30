@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ContentType } from '@prisma/client';
 import type {
   KnowledgeQueryResponseDto,
@@ -8,6 +8,12 @@ import type {
 } from '@music-ai/shared';
 import { LlmService } from '../llm/services/llm.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  WEB_SEARCH_PROVIDER,
+  WebSearchProvider,
+  WebSearchResult,
+} from './providers/web-search.interface';
+import { getRequestId } from '../../common/request-id';
 
 @Injectable()
 export class KnowledgeService {
@@ -16,6 +22,8 @@ export class KnowledgeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly llmService: LlmService,
+    @Inject(WEB_SEARCH_PROVIDER)
+    private readonly webSearchProvider: WebSearchProvider,
   ) {}
 
   async query(
@@ -26,10 +34,32 @@ export class KnowledgeService {
     // 1. Search content catalog for relevant artists/topics
     const catalogMatches = await this.searchContentCatalog(question);
 
-    // 2. Build LLM prompt with catalog context
-    const prompt = this.buildKnowledgePrompt(question, catalogMatches);
+    // 2. If no catalog matches, fall back to web search
+    let webResults: WebSearchResult[] = [];
+    if (catalogMatches.length === 0) {
+      try {
+        webResults = await this.webSearchProvider.search(question);
+        if (webResults.length > 0) {
+          this.logger.log(
+            `[${getRequestId()}] Web search returned ${webResults.length} results for: "${question}"`,
+          );
+        }
+      } catch (error) {
+        this.logger.warn(
+          `[${getRequestId()}] Web search failed, continuing without web context: ${String(error)}`,
+        );
+        webResults = [];
+      }
+    }
 
-    // 3. Call LLM
+    // 3. Build LLM prompt with catalog and web context
+    const prompt = this.buildKnowledgePrompt(
+      question,
+      catalogMatches,
+      webResults,
+    );
+
+    // 4. Call LLM
     let reply: string;
     try {
       reply = await this.llmService.chat(
@@ -44,27 +74,35 @@ export class KnowledgeService {
       );
     } catch (error) {
       this.logger.warn(
-        `LLM knowledge query failed, using fallback: ${String(error)}`,
+        `[${getRequestId()}] LLM knowledge query failed, using fallback: ${String(error)}`,
       );
       reply = '抱歉，暂时无法回答音乐知识相关的问题，请稍后再试。';
     }
 
-    // 4. Persist KnowledgeTrace and KnowledgeSources
-    const sourceCount = Math.min(catalogMatches.length, 5);
+    // 5. Build source records for persistence
+    const catalogSources = catalogMatches.slice(0, 5).map((item) => ({
+      sourceUrl: `content://${item.id}`,
+      sourceTitle: item.canonicalTitle,
+      snippetText: `${(item.primaryArtistNames ?? []).join(', ') || 'Unknown'} — ${item.canonicalTitle}`,
+    }));
+
+    const webSources = webResults.slice(0, 5).map((r) => ({
+      sourceUrl: r.url,
+      sourceTitle: r.title,
+      snippetText: r.snippet,
+    }));
+
+    const allSources = [...catalogSources, ...webSources];
+
+    // 6. Persist KnowledgeTrace and KnowledgeSources
     const trace = await this.prisma.knowledgeTrace.create({
       data: {
         userId,
         chatSessionId,
         queryText: question,
         summaryText: reply,
-        sourceCount,
-        sources: {
-          create: catalogMatches.slice(0, 5).map((item) => ({
-            sourceUrl: `content://${item.id}`,
-            sourceTitle: item.canonicalTitle,
-            snippetText: `${(item.primaryArtistNames ?? []).join(', ') || 'Unknown'} — ${item.canonicalTitle}`,
-          })),
-        },
+        sourceCount: allSources.length,
+        sources: allSources.length > 0 ? { create: allSources } : undefined,
       },
       include: { sources: true },
     });
@@ -78,6 +116,7 @@ export class KnowledgeService {
           title: s.sourceTitle,
           snippet: s.snippetText ?? '',
           url: s.sourceUrl,
+          sourceType: this.deriveSourceType(s.sourceUrl),
         }),
       ),
       relatedContent: catalogMatches.slice(0, 5).map(
@@ -89,6 +128,10 @@ export class KnowledgeService {
         }),
       ),
     };
+  }
+
+  private deriveSourceType(sourceUrl: string): 'catalog' | 'web_search' {
+    return sourceUrl.startsWith('content://') ? 'catalog' : 'web_search';
   }
 
   private async searchContentCatalog(question: string) {
@@ -117,10 +160,12 @@ export class KnowledgeService {
       canonicalTitle: string;
       contentType: ContentType;
     }>,
+    webResults: WebSearchResult[],
   ): string {
     let contextBlock = '';
+
     if (catalogMatches.length > 0) {
-      contextBlock =
+      contextBlock +=
         '\n\n可参考的音乐库资料：\n' +
         catalogMatches
           .map(
@@ -129,6 +174,15 @@ export class KnowledgeService {
           )
           .join('\n');
     }
+
+    if (webResults.length > 0) {
+      contextBlock +=
+        '\n\n可参考的网络搜索结果：\n' +
+        webResults
+          .map((r) => `- ${r.title}: ${r.snippet} (来源: ${r.url})`)
+          .join('\n');
+    }
+
     return `你是一位音乐知识讲解专家。请用中文回答用户的问题。${contextBlock}\n\n用户问题：${question}`;
   }
 
@@ -169,6 +223,7 @@ export class KnowledgeService {
           title: s.sourceTitle,
           snippet: s.snippetText ?? '',
           url: s.sourceUrl,
+          sourceType: this.deriveSourceType(s.sourceUrl),
         }),
       ),
       relatedContent: [],

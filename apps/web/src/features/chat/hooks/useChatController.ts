@@ -92,6 +92,7 @@ export function useChatController(playerController: PlayerController) {
   const setMessages = useChatStore((state) => state.setMessages);
   const resetConversation = useChatStore((state) => state.resetConversation);
   const setHydratedSession = useChatStore((state) => state.setHydratedSession);
+  const setChatError = useChatStore((state) => state.setChatError);
   const setStatusText = usePlayerStore((state) => state.setStatusText);
 
   const chatMutation = useMutation({
@@ -307,6 +308,7 @@ export function useChatController(playerController: PlayerController) {
         role: 'assistant',
         text: '我暂时没有收到后端信号，但播放器本身还在线。你可以先继续搜索和播放。',
       });
+      setChatError('AI DJ 暂时无法连接，请检查网络后重试。');
       setStatusText('AI DJ lane lost signal, but the player is still online.');
     } finally {
       abortController.abort();
@@ -341,6 +343,7 @@ export function useChatController(playerController: PlayerController) {
           : `${result.playlist?.title ?? 'That AI DJ draft'} is already in your library.`,
       );
     } catch {
+      setChatError('保存歌单失败，请稍后重试。');
       setStatusText('AI DJ could not persist that draft into your library.');
     }
   };

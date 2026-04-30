@@ -23,6 +23,9 @@ export class KnowledgeSourceDto {
 
   @ApiPropertyOptional({ description: '来源链接' })
   url?: string;
+
+  @ApiProperty({ description: '来源类型：catalog=曲库, web_search=网络搜索' })
+  sourceType!: 'catalog' | 'web_search';
 }
 
 export class RelatedContentDto {

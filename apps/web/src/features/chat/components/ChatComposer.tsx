@@ -71,9 +71,9 @@ export function ChatComposer({
         type="submit"
         className={styles.sendButton}
         disabled={isPending}
-        aria-label="Send"
+        aria-label={isPending ? 'AI DJ is thinking...' : 'Send'}
       >
-        <span>{isPending ? '...' : '↑'}</span>
+        <span>{isPending ? <i className={styles.spinner} /> : '↑'}</span>
       </button>
     </form>
   );

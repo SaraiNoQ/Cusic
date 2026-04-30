@@ -7,6 +7,7 @@ import type {
   LlmStreamEvent,
 } from '../interfaces/llm-provider.interface';
 import { LLM_PROVIDER_TOKEN } from '../llm.constants';
+import { getRequestId } from '../../../common/request-id';
 
 const CIRCUIT_BREAKER_THRESHOLD = 5;
 const CIRCUIT_BREAKER_COOLDOWN_MS = 60_000;
@@ -43,6 +44,14 @@ export class LlmService {
   async isAvailable(): Promise<boolean> {
     if (this.circuitOpenUntil > Date.now()) {
       return false;
+    }
+
+    // Log circuit re-closure if it was previously open
+    if (this.circuitOpenUntil > 0 && this.circuitOpenUntil <= Date.now()) {
+      this.logger.log(
+        `[${getRequestId()}] Circuit breaker cooldown expired — circuit closed`,
+      );
+      this.circuitOpenUntil = 0;
     }
 
     try {
@@ -136,19 +145,24 @@ export class LlmService {
   }
 
   private onSuccess(): void {
+    if (this.consecutiveFailures > 0) {
+      this.logger.log(
+        `[${getRequestId()}] LLM call succeeded — resetting consecutive failures from ${this.consecutiveFailures} to 0`,
+      );
+    }
     this.consecutiveFailures = 0;
   }
 
   private onFailure(error: unknown): void {
     this.consecutiveFailures++;
     this.logger.warn(
-      `LLM call failed (${this.consecutiveFailures}/${CIRCUIT_BREAKER_THRESHOLD}): ${String(error)}`,
+      `[${getRequestId()}] LLM call failed (${this.consecutiveFailures}/${CIRCUIT_BREAKER_THRESHOLD}): ${String(error)}`,
     );
 
     if (this.consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
       this.circuitOpenUntil = Date.now() + CIRCUIT_BREAKER_COOLDOWN_MS;
       this.logger.error(
-        `Circuit breaker opened until ${new Date(this.circuitOpenUntil).toISOString()}`,
+        `[${getRequestId()}] Circuit breaker OPENED — next retry allowed after ${new Date(this.circuitOpenUntil).toISOString()} (cooldown ${CIRCUIT_BREAKER_COOLDOWN_MS}ms)`,
       );
     }
   }

@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
+import { getRequestId } from '../../../common/request-id';
 import type {
   AiDjActionDto,
   AiDjIntent,
@@ -524,7 +525,7 @@ export class AiDjService {
           );
         } catch (error) {
           this.logger.warn(
-            `LLM streaming failed, using fallback: ${String(error)}`,
+            `[${getRequestId()}] LLM streaming failed, using fallback: ${String(error)}`,
           );
 
           if (signal.aborted) {
@@ -751,7 +752,7 @@ export class AiDjService {
       });
     } catch (error) {
       this.logger.error(
-        `Failed to update persisted reply for ${messageId}: ${String(error)}`,
+        `[${getRequestId()}] Failed to update persisted reply for ${messageId}: ${String(error)}`,
       );
     }
   }
@@ -785,7 +786,7 @@ export class AiDjService {
           };
         } catch (error) {
           this.logger.warn(
-            `Knowledge query failed, using conversational fallback: ${String(error)}`,
+            `[${getRequestId()}] Knowledge query failed, using conversational fallback: ${String(error)}`,
           );
         }
       }
@@ -949,7 +950,7 @@ export class AiDjService {
           };
         } catch (error) {
           this.logger.warn(
-            `Knowledge query (stream) failed, using conversational fallback: ${String(error)}`,
+            `[${getRequestId()}] Knowledge query (stream) failed, using conversational fallback: ${String(error)}`,
           );
         }
       }

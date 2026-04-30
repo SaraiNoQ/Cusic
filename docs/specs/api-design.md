@@ -1,8 +1,8 @@
 # 音乐 AI App API 设计文档
 
-- 文档版本：v0.3
+- 文档版本：v0.4
 - 文档状态：持续更新
-- 更新时间：2026-04-29
+- 更新时间：2026-04-30
 - 关联文档：`docs/RPD.md`、`docs/arch.md`、`docs/specs/engineering-playbook.md`、`docs/specs/database-design.md`
 
 ## 1. 设计目标与约束
@@ -719,6 +719,18 @@ Content-Type: application/json
 }
 ```
 
+### 6.6 推荐实现备注
+
+推荐系统首版实现采用向量召回 + LLM 精排的混合架构：
+
+1. **向量召回**：基于 pgvector 余弦相似度进行第一阶段候选召回。用户画像向量（来自 `taste_profiles` 或实时行为嵌入）与内容向量（来自 `content_item_embeddings`）计算相似度，返回 Top-K 候选集。
+2. **LLM 生成推荐理由**：对每个推荐结果，LLM 生成个性化推荐理由（per-item reason），融合用户画像、当前上下文与内容特征。
+3. **反馈闭环**：用户反馈（`preference_feedback`）通过反馈嵌入（feedback-to-embedding）更新用户画像向量，形成持续优化的推荐闭环。
+4. **traceJson 字段**：每条推荐结果（`recommendation_results`）的 `trace_json` 中包含：
+   - `mode: 'vector_v1'`
+   - `vectorCandidatesCount`：向量召回阶段的候选数量
+   - `llmReasonsUsed`：是否使用了 LLM 生成的推荐理由
+
 ## 7. AI DJ 与语音接口
 
 ### 7.1 `POST /dj/chat`
@@ -737,7 +749,8 @@ Content-Type: application/json
    - `queue_append`：显式要求向当前队列追加曲目
    - `queue_replace`：显式要求替换整个播放队列
    - `theme_playlist_preview`：显式要求生成主题歌单
-     意图分类器优先使用 LLM 分类（DeepSeek V4 Flash），LLM 不可用时回退到规则型关键词匹配。另设 `mapToValidIntent()` 方法将 LLM 可能产出的非标准意图名称（如 `play_music`）映射到以上 5 个标准枚举值，防止因 LLM 输出格式偏差导致所有请求落入 `conversation` 兜底。
+   - `knowledge_query`：用户询问音乐知识、艺人背景、流派历史、歌曲故事等
+     意图分类器优先使用 LLM 分类（DeepSeek V4 Flash），LLM 不可用时回退到规则型关键词匹配。另设 `mapToValidIntent()` 方法将 LLM 可能产出的非标准意图名称（如 `play_music`）映射到以上 6 个标准枚举值，防止因 LLM 输出格式偏差导致所有请求落入 `conversation` 兜底。
 6. 匿名用户也可获得 LLM 流式回复：`replyStreamMode()` 将 stream plan（intent、contentIds、trackDescriptions 等）缓存到 in-memory `StreamPayload`，`executeStreamReply()` 在 `buildStreamContext()` 返回 `null`（匿名用户无 DB 记录）时从缓存重建 `ReplyContext`，继续调用 LLM 流式生成。
 7. 当前支持动作（仅 `queue_append` / `queue_replace` / `theme_playlist_preview` 意图触发）：
    - `queue_replace`
@@ -862,7 +875,7 @@ Content-Type: application/json
 }
 ```
 
-### 7.4 `GET /dj/chat/stream`
+### 7.8 `GET /dj/chat/stream`
 
 用途：以 SSE 接收 AI DJ 流式回复。
 
@@ -928,14 +941,15 @@ Content-Type: application/json
 }
 ```
 
-### 7.4 `POST /dj/voice/asr`
+### 7.4 `GET /voice/voices`
 
-用途：语音转文本。
+用途：列出可用的 TTS 语音列表。
 
-请求：
+首版实现约束：
 
-1. `multipart/form-data`
-2. 文件字段：`audio`
+1. 鉴权：`OptionalJwtAuthGuard`（允许匿名访问）。
+2. 返回当前 TTS provider 支持的全部语音，包含 id、name、language、gender 字段。
+3. 若未配置任何 TTS provider，返回空列表。
 
 响应 DTO：
 
@@ -943,21 +957,65 @@ Content-Type: application/json
 {
   "success": true,
   "data": {
-    "text": "我想听披头士"
+    "provider": "mimo",
+    "voices": [
+      {
+        "id": "bingtang",
+        "name": "冰糖",
+        "language": "zh",
+        "gender": "female"
+      }
+    ]
   }
 }
 ```
 
-### 7.5 `POST /dj/voice/tts`
+### 7.5 `POST /voice/asr`
 
-用途：文本转语音。
+用途：语音转文本（ASR）。
+
+首版实现约束：
+
+1. 鉴权：`OptionalJwtAuthGuard`（允许匿名访问）。
+2. 请求格式：`multipart/form-data`，文件字段为 `audio`。
+3. 支持音频格式：WAV、MP3、PCM。
+4. 返回转录文本与置信度。
+
+响应 DTO：
+
+```json
+{
+  "success": true,
+  "data": {
+    "text": "我想听披头士",
+    "confidence": 0.95
+  }
+}
+```
+
+错误码：
+
+1. `VOICE_ASR_FAILED`
+2. `VOICE_UNSUPPORTED_FORMAT`
+
+### 7.6 `POST /voice/tts`
+
+用途：文本转语音（TTS）。
+
+首版实现约束：
+
+1. 鉴权：`JwtAuthGuard`（需登录）。
+2. 请求格式：JSON，包含 `text`（必填）和可选 `voice` 参数。
+3. MiMo TTS 为优先 provider，可选音色：`bingtang`、`molly`、`soda`、`baihua`、`mia`、`chloe`、`milo`、`dean`。
+4. 阿里云 TTS 为备选 provider，可选音色：`qianxue`、`aizhen`、`aishuo`。
+5. 两者均未配置时回退到 stub，返回模拟音频地址。
 
 请求 DTO：
 
 ```json
 {
   "text": "下面给你讲讲披头士。",
-  "voice": "cn_female_editorial"
+  "voice": "bingtang"
 }
 ```
 
@@ -967,14 +1025,123 @@ Content-Type: application/json
 {
   "success": true,
   "data": {
+    "audioUrl": "https://...",
+    "durationMs": 4200
+  }
+}
+```
+
+错误码：
+
+1. `VOICE_TTS_FAILED`
+2. `VOICE_INVALID_VOICE`
+
+### 7.7 `POST /dj/voice/chat`
+
+用途：语音 AI DJ 对话——上传音频后依次完成 ASR 转录、AI DJ 处理与 TTS 合成，返回完整语音对话结果。
+
+首版实现约束：
+
+1. 鉴权：`OptionalJwtAuthGuard`（允许匿名访问）。
+2. 请求格式：`multipart/form-data`，文件字段为 `audio`。
+3. 流程：音频上传 → ASR 转录（`/voice/asr`） → AI DJ 对话处理（`/dj/chat`） → TTS 合成（`/voice/tts`） → 返回语音结果。
+4. 若 TTS provider 未配置或合成失败，`audioUrl` 返回 `null`，但 `reply` 与 `transcription` 仍然正常返回。
+
+响应 DTO：
+
+```json
+{
+  "success": true,
+  "data": {
+    "reply": "披头士是来自英国利物浦的传奇摇滚乐队……",
+    "transcription": "给我讲讲披头士",
     "audioUrl": "https://..."
   }
 }
 ```
 
-## 8. 导入、任务与系统接口
+错误码：
 
-### 8.1 `GET /imports`
+1. `VOICE_CHAT_ASR_FAILED`
+2. `VOICE_CHAT_TTS_FAILED`
+
+实现备注：MiMo TTS 为首选 provider，阿里云 TTS 为备选 fallback。当两者均未配置时，TTS 合成返回 stub 模拟结果。
+
+## 8. 知识问答接口
+
+### 8.1 `POST /knowledge/query`
+
+用途：提交知识问答请求，基于内容目录进行回答。
+
+首版实现约束：
+
+1. 鉴权：`JwtAuthGuard`（需登录）。
+2. 请求参数：
+   - `question`（必填）：用户知识问答问题。
+   - `chatSessionId`（可选）：关联的 AI DJ 会话 ID。
+3. 服务端使用 LLM 结合内容目录上下文（content catalog context）生成回答，从内容库检索相关来源与关联内容。
+4. 每次查询持久化一条 trace 记录（`knowledge_traces`）及其引用来源（`knowledge_sources`）。
+
+请求 DTO：
+
+```json
+{
+  "question": "披头士乐队有哪些经典专辑？",
+  "chatSessionId": "chat_01"
+}
+```
+
+响应 DTO：
+
+```json
+{
+  "success": true,
+  "data": {
+    "traceId": "kt_01",
+    "summaryText": "披头士（The Beatles）是来自英国利物浦的传奇摇滚乐队……",
+    "sources": [
+      {
+        "contentId": "cnt_beatles_01",
+        "title": "Abbey Road",
+        "relevance": 0.95
+      }
+    ],
+    "relatedContent": [
+      {
+        "contentId": "cnt_beatles_02",
+        "title": "Let It Be",
+        "type": "track"
+      }
+    ]
+  }
+}
+```
+
+### 8.2 `GET /knowledge/traces`
+
+用途：列出当前用户的知识问答历史记录。
+
+首版实现约束：
+
+1. 鉴权：`JwtAuthGuard`（需登录）。
+2. 按时间倒序返回知识查询记录。
+3. 支持分页参数 `page`、`pageSize`。
+
+### 8.3 `GET /knowledge/traces/:traceId`
+
+用途：获取指定知识问答 trace 的完整详情，包含来源引用。
+
+首版实现约束：
+
+1. 鉴权：`JwtAuthGuard`（需登录）。
+2. 只允许读取当前用户自己的 trace 记录。
+3. 返回完整 `summaryText`、`sources[]` 与 `relatedContent[]`。
+
+实现备注：知识问答使用 LLM 结合内容目录上下文生成回答，持久化 trace 与 source 记录用于历史回溯与来源溯源。
+
+## 9. 导入、任务与系统接口
+
+### 9.1 `GET /imports`
 
 用途：列出当前登录用户最近的导入任务。
 
@@ -985,7 +1152,7 @@ Content-Type: application/json
 3. 当前只返回任务摘要列表，不做分页参数开放。
 4. `resultSummary` 会返回 worker 执行阶段的结构化摘要，便于前端列表和详情展示。
 
-### 8.2 `POST /imports/playlists`
+### 9.2 `POST /imports/playlists`
 
 用途：提交歌单或历史导入任务。
 
@@ -1084,7 +1251,7 @@ Content-Type: application/json
 }
 ```
 
-### 8.3 `GET /imports/:jobId`
+### 9.3 `GET /imports/:jobId`
 
 用途：查询导入任务状态。
 
@@ -1095,7 +1262,7 @@ Content-Type: application/json
 3. 若任务不存在，返回 `IMPORT_JOB_NOT_FOUND` 对应的 404。
 4. worker 执行时，状态按 `queued -> running -> succeeded/failed` 流转；前端应轮询该接口直到任务进入终态。
 
-### 8.3 `GET /system/health`
+### 9.4 `GET /system/health`
 
 用途：开发与运维必需的健康检查接口。
 
@@ -1107,7 +1274,7 @@ Content-Type: application/json
 4. Queue 状态
 5. Provider 简要状态
 
-## 9. 通用错误码规范
+## 10. 通用错误码规范
 
 错误码按模块分组，例如：
 
@@ -1134,7 +1301,7 @@ Content-Type: application/json
 8. `IMPORT_JOB_NOT_FOUND`
 9. `SYSTEM_DEPENDENCY_UNHEALTHY`
 
-## 10. DTO 与共享类型约束
+## 11. DTO 与共享类型约束
 
 建议进入 `packages/shared` 的公共类型包括：
 
@@ -1154,14 +1321,14 @@ Content-Type: application/json
 2. 不把数据库表结构直接暴露为 API DTO
 3. Provider 原始字段不得直接透传给前端
 
-## 11. 首版不纳入 API 细化范围
+## 12. 首版不纳入 API 细化范围
 
 1. 后台管理接口
 2. A/B 实验接口
 3. 灰度发布接口
 4. 公网开放平台接口
 
-## 12. 当前默认假设
+## 13. 当前默认假设
 
 1. JWT 主要用于 Web 首发的前后端联调，不在首版同时支持 cookie session。
 2. SSE 仅用于 AI DJ 流式文本回复，其他接口仍走普通 HTTP。

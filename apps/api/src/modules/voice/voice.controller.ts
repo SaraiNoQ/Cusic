@@ -90,7 +90,8 @@ export class VoiceController {
       };
     }
 
-    const format = file.mimetype === 'audio/wav' ? 'wav' : 'pcm';
+    // Derive format from the file's declared MIME type
+    const format = file.mimetype || 'audio/webm';
     const result = await this.voiceService.transcribe(file.buffer, format);
 
     return {

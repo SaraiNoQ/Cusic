@@ -8,6 +8,8 @@ import type {
 export interface MiMoVoiceConfig {
   apiKey: string;
   baseUrl: string;
+  /** Optional fallback ASR provider (e.g. Aliyun) since MiMo has no hosted ASR */
+  asrFallback?: VoiceProvider;
 }
 
 const BUILT_IN_VOICES: Record<
@@ -26,19 +28,39 @@ const BUILT_IN_VOICES: Record<
 
 export const MIMO_BUILT_IN_VOICES = BUILT_IN_VOICES;
 
+/**
+ * MiMo平台ASR说明：
+ * MiMo-V2.5-ASR 模型已开源（GitHub/HuggingFace），但平台不提供托管的 ASR API。
+ * 平台仅提供 TTS 系列模型的API服务（mimo-v2.5-tts等）。
+ * 如需语音识别，请自行部署开源模型，或使用 fallback provider（如阿里云NLS）。
+ */
 export class MiMoVoiceProvider implements VoiceProvider {
   private readonly logger = new Logger(MiMoVoiceProvider.name);
   private readonly apiKey: string;
   private readonly baseUrl: string;
+  private readonly asrFallback?: VoiceProvider;
 
   constructor(config: MiMoVoiceConfig) {
     this.apiKey = config.apiKey;
     this.baseUrl = config.baseUrl || 'https://api.xiaomimimo.com/v1';
+    this.asrFallback = config.asrFallback;
   }
 
-  async asr(_audio: Buffer, _format: string): Promise<TranscriptionResult> {
-    this.logger.warn('MiMo ASR not available — returning stub');
-    return { text: '[MiMo ASR not available]', confidence: 0 };
+  async asr(audio: Buffer, format: string): Promise<TranscriptionResult> {
+    // MiMo平台不提供托管ASR API，尝试使用fallback provider
+    if (this.asrFallback) {
+      this.logger.log('MiMo: delegating ASR to fallback provider');
+      return this.asrFallback.asr(audio, format);
+    }
+
+    this.logger.warn(
+      'MiMo ASR 不可用 — MiMo平台仅提供TTS API，无托管ASR服务。' +
+        '请配置 ASR_FALLBACK_PROVIDER=aliyun 或自行部署 MiMo-V2.5-ASR 开源模型。',
+    );
+    return {
+      text: '',
+      confidence: 0,
+    };
   }
 
   async tts(text: string, voiceKey: string): Promise<SynthesisResult> {

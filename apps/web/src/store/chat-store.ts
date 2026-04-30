@@ -16,6 +16,7 @@ type ChatStore = {
   streamingMessageId: string | null;
   messages: ChatMessageVm[];
   hasHydratedSession: boolean;
+  chatError: string | null;
   setSessionId: (sessionId?: string) => void;
   setInput: (input: string) => void;
   setPending: (isPending: boolean) => void;
@@ -26,6 +27,8 @@ type ChatStore = {
   setMessages: (messages: ChatMessageVm[]) => void;
   resetConversation: () => void;
   setHydratedSession: (value: boolean) => void;
+  setChatError: (error: string | null) => void;
+  clearChatError: () => void;
 };
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -35,6 +38,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   streamingMessageId: null,
   messages: initialChatMessages,
   hasHydratedSession: false,
+  chatError: null,
   setSessionId: (sessionId) => set({ sessionId }),
   setInput: (input) => set({ input }),
   setPending: (isPending) => set({ isPending }),
@@ -67,6 +71,9 @@ export const useChatStore = create<ChatStore>((set) => ({
       streamingMessageId: null,
       messages: initialChatMessages,
       hasHydratedSession: false,
+      chatError: null,
     }),
   setHydratedSession: (hasHydratedSession) => set({ hasHydratedSession }),
+  setChatError: (chatError) => set({ chatError }),
+  clearChatError: () => set({ chatError: null }),
 }));

@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { RequestIdInterceptor } from '../common/request-id';
 import { AiDjModule } from './ai-dj/ai-dj.module';
 import { AuthModule } from './auth/auth.module';
 import { ContentModule } from './content/content.module';
@@ -32,6 +34,12 @@ import { VoiceModule } from './voice/voice.module';
     VoiceModule,
     EventsModule,
     ImportsModule,
+  ],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestIdInterceptor,
+    },
   ],
 })
 export class AppModule {}

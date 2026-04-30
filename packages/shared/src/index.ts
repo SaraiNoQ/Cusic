@@ -455,11 +455,14 @@ export interface KnowledgeQueryResponseDto {
   relatedContent: RelatedContentDto[];
 }
 
+export type KnowledgeSourceType = 'catalog' | 'web_search';
+
 export interface KnowledgeSourceDto {
   sourceId: string;
   title: string;
   snippet: string;
   url?: string;
+  sourceType: KnowledgeSourceType;
 }
 
 export interface RelatedContentDto {

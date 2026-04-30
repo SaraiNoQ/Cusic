@@ -1,3 +1,11 @@
+.voiceButtonWrapper {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
 .voiceButton {
   display: inline-flex;
   align-items: center;
@@ -21,7 +29,7 @@
     transform 150ms ease;
 }
 
-.voiceButton:hover {
+.voiceButton:hover:not(:disabled) {
   border-color: var(--border-accent);
   color: var(--accent-orange-light);
   box-shadow:
@@ -32,6 +40,11 @@
 .voiceButton:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+}
+
+.voiceButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.85;
 }
 
 .recording {
@@ -50,6 +63,50 @@
   line-height: 1;
 }
 
+.processing {
+  cursor: not-allowed;
+  opacity: 0.85;
+  border-color: var(--accent-teal-pale) !important;
+  box-shadow:
+    0 0 18px rgba(62, 208, 165, 0.18),
+    0 0 36px rgba(62, 208, 165, 0.08);
+}
+
+.statusText {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--accent-teal-light);
+  white-space: nowrap;
+  animation: statusPulse 1.2s ease-in-out infinite;
+}
+
+/* Recording duration above the button */
+.durationLabel {
+  font-size: 12px;
+  color: var(--accent-orange-light);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  animation: statusPulse 1.2s ease-in-out infinite;
+}
+
+/* Transcribing label below the button */
+.transcribingLabel {
+  font-size: 11px;
+  color: var(--accent-teal-light);
+  white-space: nowrap;
+  animation: statusPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 @keyframes pulse {
   0%,
   100% {
@@ -61,5 +118,25 @@
     box-shadow:
       0 0 28px rgba(255, 147, 45, 0.48),
       0 0 56px rgba(255, 147, 45, 0.24);
+  }
+}
+
+@media (max-width: 560px) {
+  .voiceButton {
+    width: 52px;
+    height: 54px;
+    font-size: 18px;
+  }
+
+  .statusText {
+    font-size: 9px;
+  }
+
+  .durationLabel {
+    font-size: 11px;
+  }
+
+  .transcribingLabel {
+    font-size: 10px;
   }
 }

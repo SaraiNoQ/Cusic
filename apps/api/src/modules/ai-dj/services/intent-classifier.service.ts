@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { AiDjIntent } from '@music-ai/shared';
 import { LlmService } from '../../llm/services/llm.service';
+import { getRequestId } from '../../../common/request-id';
 
 @Injectable()
 export class IntentClassifierService {
@@ -16,7 +17,7 @@ export class IntentClassifierService {
         return await this.llmClassify(message, contextHint);
       } catch (error) {
         this.logger.warn(
-          `LLM intent classification failed, using fallback: ${String(error)}`,
+          `[${getRequestId()}] LLM intent classification failed, using fallback: ${String(error)}`,
         );
       }
     }
@@ -96,7 +97,7 @@ Output ONLY a single line of JSON, no markdown, no code fences, no extra comment
       }
       if (parsed.intent) {
         this.logger.warn(
-          `LLM returned non-standard intent: "${parsed.intent}", attempting mapping`,
+          `[${getRequestId()}] LLM returned non-standard intent: "${parsed.intent}", attempting mapping`,
         );
       }
     } catch {

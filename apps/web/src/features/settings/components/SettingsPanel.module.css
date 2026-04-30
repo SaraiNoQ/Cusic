@@ -301,6 +301,10 @@
     padding: 20px 24px;
   }
 
+  .header h1 {
+    font-size: 22px;
+  }
+
   .content {
     padding: 32px 16px;
     gap: 24px;
@@ -310,7 +314,76 @@
     padding: 24px 20px;
   }
 
+  .sectionLabel {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
   .themeToggle {
     width: 140px;
+  }
+
+  .voiceSelect {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .userInfo {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 420px) {
+  .header {
+    padding: 16px 16px;
+  }
+
+  .header h1 {
+    font-size: 18px;
+  }
+
+  .headerLeft {
+    gap: 10px;
+  }
+
+  .backLink {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .content {
+    padding: 24px 12px;
+    gap: 20px;
+  }
+
+  .section {
+    padding: 20px 16px;
+    gap: 14px;
+  }
+
+  .sectionHeading {
+    font-size: 15px;
+  }
+
+  .sectionLabelText {
+    font-size: 14px;
+  }
+
+  .themeToggle {
+    width: 130px;
+  }
+
+  .themeToggle button {
+    height: 32px;
+    font-size: 12px;
+  }
+
+  .userName {
+    font-size: 14px;
+  }
+
+  .userEmail {
+    font-size: 12px;
   }
 }

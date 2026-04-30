@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { LlmService } from '../../llm/services/llm.service';
+import { getRequestId } from '../../../common/request-id';
 
 interface EmbeddingInput {
   canonicalTitle: string;
@@ -33,8 +34,17 @@ export class EmbeddingService {
     }
     const text = parts.join('; ');
 
-    const results = await this.llmService.embed([text]);
-    return results[0];
+    try {
+      const results = await this.llmService.embed([text]);
+      return results[0];
+    } catch (error) {
+      this.logger.error(
+        `[${getRequestId()}] Failed to generate embedding for "${item.canonicalTitle}": ${String(error)}`,
+      );
+      throw new Error(
+        `Embedding generation failed for "${item.canonicalTitle}"`,
+      );
+    }
   }
 
   /**
@@ -58,9 +68,13 @@ export class EmbeddingService {
       return;
     }
 
-    this.logger.log(`Generating embeddings for ${rows.length} content items`);
+    this.logger.log(
+      `[${getRequestId()}] Generating embeddings for ${rows.length} content items`,
+    );
 
     const batchSize = 20;
+    let failedCount = 0;
+
     for (let i = 0; i < rows.length; i += batchSize) {
       const batch = rows.slice(i, i + batchSize);
 
@@ -94,21 +108,34 @@ export class EmbeddingService {
         return parts.join('; ');
       });
 
-      const embeddings = await this.llmService.embed(texts);
+      try {
+        const embeddings = await this.llmService.embed(texts);
 
-      for (let j = 0; j < batch.length; j++) {
-        const vectorStr = `[${embeddings[j].join(',')}]`;
-        await this.prisma.$executeRaw`
-          UPDATE content_items SET embedding = ${vectorStr}::vector WHERE id = ${batch[j].id}
-        `;
+        for (let j = 0; j < batch.length; j++) {
+          const vectorStr = `[${embeddings[j].join(',')}]`;
+          await this.prisma.$executeRaw`
+            UPDATE content_items SET embedding = ${vectorStr}::vector WHERE id = ${batch[j].id}
+          `;
+        }
+
+        this.logger.log(
+          `Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(rows.length / batchSize)} complete`,
+        );
+      } catch (error) {
+        failedCount += batch.length;
+        this.logger.warn(
+          `[${getRequestId()}] Embedding batch ${Math.floor(i / batchSize) + 1} failed: ${String(error)}`,
+        );
       }
-
-      this.logger.log(
-        `Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(rows.length / batchSize)} complete`,
-      );
     }
 
-    this.logger.log('All content embeddings generated');
+    if (failedCount > 0) {
+      this.logger.warn(
+        `[${getRequestId()}] Embedding generation complete with ${failedCount}/${rows.length} items failed`,
+      );
+    } else {
+      this.logger.log('All content embeddings generated');
+    }
   }
 
   /**

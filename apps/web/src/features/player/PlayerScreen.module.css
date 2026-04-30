@@ -1859,6 +1859,28 @@
   font-size: 36px;
 }
 
+.sendButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid transparent;
+  border-top-color: var(--accent-gold-cta);
+  border-right-color: var(--accent-gold-cta);
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .deviceFooter {
   display: grid;
   flex: 0 0 54px;

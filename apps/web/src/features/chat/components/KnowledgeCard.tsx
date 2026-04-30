@@ -4,6 +4,7 @@ import styles from './KnowledgeCard.module.css';
 interface KnowledgeSource {
   title: string;
   url?: string;
+  sourceType?: 'catalog' | 'web_search';
 }
 
 interface RelatedContent {
@@ -16,14 +17,32 @@ export interface KnowledgeCardProps {
   summaryText: string;
   sources?: KnowledgeSource[];
   relatedContent?: RelatedContent[];
+  isLoading?: boolean;
 }
+
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  catalog: '来自曲库',
+  web_search: '来自网络',
+};
 
 export function KnowledgeCard({
   title,
   summaryText,
   sources,
   relatedContent,
+  isLoading = false,
 }: Readonly<KnowledgeCardProps>) {
+  if (isLoading) {
+    return (
+      <article className={`${styles.card} ${styles.shimmer}`} aria-busy="true">
+        {title ? <h3 className={styles.title}>{title}</h3> : null}
+        <div className={styles.shimmerLine} />
+        <div className={styles.shimmerLine} />
+        <div className={styles.shimmerLine} />
+      </article>
+    );
+  }
+
   return (
     <article className={styles.card}>
       {title ? <h3 className={styles.title}>{title}</h3> : null}
@@ -31,10 +50,19 @@ export function KnowledgeCard({
 
       {sources && sources.length > 0 ? (
         <div className={styles.sectionRow}>
-          <span className={styles.sectionLabel}>Sources</span>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionLabel}>Sources</span>
+            <span className={styles.sourceCountBadge}>{sources.length}</span>
+          </div>
           <ul className={styles.sourcesList}>
             {sources.map((source, index) => (
               <li key={index} className={styles.sourceItem}>
+                <span className={styles.sourceTypeLabel}>
+                  {source.sourceType
+                    ? (SOURCE_TYPE_LABELS[source.sourceType] ??
+                      source.sourceType)
+                    : ''}
+                </span>
                 {source.url ? (
                   <a
                     href={source.url}

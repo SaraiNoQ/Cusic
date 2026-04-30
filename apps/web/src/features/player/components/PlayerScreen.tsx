@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { AtmosphereCanvas } from '../../atmosphere/components/AtmosphereCanvas';
 import { AuthPanel } from '../../auth/components/AuthPanel';
 import { ChatOverlay } from '../../chat/components/ChatOverlay';
 import { ChatPanel } from '../../chat/components/ChatPanel';
+import { ErrorToast } from '../../chat/components/ErrorToast';
 import { useChatController } from '../../chat/hooks/useChatController';
 import { ImportOverlay } from '../../imports/components/ImportOverlay';
 import { useImportsController } from '../../imports/hooks/useImportsController';
@@ -17,6 +18,7 @@ import {
   submitFeedback,
 } from '../../../lib/api/recommendation-api';
 import styles from '../PlayerScreen.module.css';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { usePlayerController } from '../hooks/usePlayerController';
 import { ControlStrip } from './ControlStrip';
 import { DeviceHeader } from './DeviceHeader';
@@ -206,6 +208,27 @@ export function PlayerScreen() {
   const closeImports = () => {
     setImportsOpen(false);
   };
+
+  const closeAllOverlays = useCallback(() => {
+    search.closeSearch();
+    setRecommendationOpen(false);
+    setChatOverlayOpen(false);
+    setImportsOpen(false);
+    setQueueOpen(false);
+    closeAuth();
+  }, [
+    search,
+    setRecommendationOpen,
+    setChatOverlayOpen,
+    setImportsOpen,
+    setQueueOpen,
+    closeAuth,
+  ]);
+
+  useKeyboardShortcuts({
+    onTogglePlayPause: () => void player.togglePlayPause(),
+    onCloseOverlays: closeAllOverlays,
+  });
 
   return (
     <main className={styles.screen}>
@@ -434,6 +457,8 @@ export function PlayerScreen() {
         onRequestCode={requestAuthCode}
         onLogin={login}
       />
+
+      <ErrorToast />
     </main>
   );
 }

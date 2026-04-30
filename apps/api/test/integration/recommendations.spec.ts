@@ -1,0 +1,150 @@
+import { RecommendationController } from '../../src/modules/recommendation/controllers/recommendation.controller';
+import type { RecommendationService } from '../../src/modules/recommendation/services/recommendation.service';
+import type {
+  NowRecommendationDto,
+  RecommendationCardDto,
+  ContentItemDto,
+} from '@music-ai/shared';
+import type { RequestWithUser } from '../../src/modules/auth/guards/jwt-auth.guard';
+
+function mockContentItem(
+  overrides: Partial<ContentItemDto> = {},
+): ContentItemDto {
+  return {
+    id: 'cnt_test_1',
+    type: 'track',
+    title: 'Test Track',
+    artists: ['Test Artist'],
+    album: null,
+    durationMs: 200000,
+    language: 'en',
+    coverUrl: null,
+    audioUrl: null,
+    playable: true,
+    ...overrides,
+  };
+}
+
+function mockNowRecommendation(
+  overrides: Partial<NowRecommendationDto> = {},
+): NowRecommendationDto {
+  return {
+    recommendationId: 'rec_test_1',
+    explanation: 'A balanced lane for your current session.',
+    items: [
+      {
+        contentId: 'cnt_1',
+        title: 'Track One',
+        reason: 'Fits your current mood.',
+        content: mockContentItem({ id: 'cnt_1', title: 'Track One' }),
+      },
+      {
+        contentId: 'cnt_2',
+        title: 'Track Two',
+        reason: 'Matches recent listening.',
+        content: mockContentItem({ id: 'cnt_2', title: 'Track Two' }),
+      },
+    ],
+    ...overrides,
+  };
+}
+
+describe('RecommendationController (integration)', () => {
+  let controller: RecommendationController;
+  let mockService: Record<string, jest.Mock>;
+
+  const anonymousRequest: RequestWithUser = {
+    headers: {},
+    user: undefined,
+  };
+
+  beforeEach(() => {
+    mockService = {
+      getNowRecommendation: jest.fn(),
+      getDailyPlaylist: jest.fn(),
+      submitFeedback: jest.fn(),
+    };
+    controller = new RecommendationController(
+      mockService as unknown as RecommendationService,
+    );
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // ── GET /recommend/now ────────────────────────────────────────────
+  describe('getNowRecommendation()', () => {
+    it('returns recommendation cards with content items', async () => {
+      mockService.getNowRecommendation!.mockResolvedValue(
+        mockNowRecommendation(),
+      );
+
+      const result = await controller.getNowRecommendation(anonymousRequest);
+
+      expect(result.success).toBe(true);
+      expect(result.data).toHaveProperty('recommendationId');
+      expect(result.data).toHaveProperty('explanation');
+      expect(result.data).toHaveProperty('items');
+      expect(result.data.items).toHaveLength(2);
+      expect(result.data.items[0]).toHaveProperty('contentId');
+      expect(result.data.items[0]).toHaveProperty('title');
+      expect(result.data.items[0]).toHaveProperty('reason');
+      expect(result.data.items[0]).toHaveProperty('content');
+    });
+
+    it('passes userId to service when authenticated', async () => {
+      const authRequest: RequestWithUser = {
+        headers: { authorization: 'Bearer test-token' },
+        user: { id: 'user_1', email: 'a@b.com', sessionId: 'ses_1' },
+      };
+      mockService.getNowRecommendation!.mockResolvedValue(
+        mockNowRecommendation(),
+      );
+
+      await controller.getNowRecommendation(authRequest);
+
+      expect(mockService.getNowRecommendation).toHaveBeenCalledWith(
+        'user_1',
+        undefined,
+      );
+    });
+
+    it('passes timezone header to service', async () => {
+      mockService.getNowRecommendation!.mockResolvedValue(
+        mockNowRecommendation(),
+      );
+
+      await controller.getNowRecommendation(
+        anonymousRequest,
+        'America/New_York',
+      );
+
+      expect(mockService.getNowRecommendation).toHaveBeenCalledWith(
+        undefined,
+        'America/New_York',
+      );
+    });
+
+    it('works for anonymous users with demo recommendations', async () => {
+      mockService.getNowRecommendation!.mockResolvedValue(
+        mockNowRecommendation({
+          recommendationId: 'rec_demo_now',
+          explanation: 'A quieter lane for a late-hour session.',
+        }),
+      );
+
+      const result = await controller.getNowRecommendation(
+        anonymousRequest,
+        'UTC',
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data.recommendationId).toBe('rec_demo_now');
+      expect(mockService.getNowRecommendation).toHaveBeenCalledWith(
+        undefined,
+        'UTC',
+      );
+    });
+  });
+});

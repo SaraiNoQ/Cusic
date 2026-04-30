@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { getRequestId } from '../../../common/request-id';
 import type {
   ContentItemDto,
   DailyPlaylistDto,
@@ -102,7 +103,9 @@ export class RecommendationService {
         moodLabel: contextSnapshot.moodLabel,
         hour: stamp.hour,
       }).catch((error) => {
-        this.logger.warn(`LLM per-item reasons failed: ${String(error)}`);
+        this.logger.warn(
+          `[${getRequestId()}] LLM per-item reasons failed: ${String(error)}`,
+        );
         return new Map<string, string>();
       }),
     ]);
@@ -215,7 +218,7 @@ export class RecommendationService {
         hour: stamp.hour,
       }).catch((error) => {
         this.logger.warn(
-          `LLM per-item reasons (daily) failed: ${String(error)}`,
+          `[${getRequestId()}] LLM per-item reasons (daily) failed: ${String(error)}`,
         );
         return new Map<string, string>();
       }),
@@ -386,7 +389,7 @@ export class RecommendationService {
         );
       } catch (error) {
         this.logger.warn(
-          `Feedback-to-embedding nudge failed: ${String(error)}`,
+          `[${getRequestId()}] Feedback-to-embedding nudge failed: ${String(error)}`,
         );
       }
     }
@@ -536,7 +539,7 @@ export class RecommendationService {
       }
     } catch (error) {
       this.logger.warn(
-        `Vector recall failed, falling back to full catalog: ${String(error)}`,
+        `[${getRequestId()}] Vector recall failed, falling back to full catalog: ${String(error)}`,
       );
       candidates = await this.prisma.contentItem.findMany({
         where: { playable: true },
@@ -779,7 +782,9 @@ export class RecommendationService {
 
       return ordered;
     } catch (error) {
-      this.logger.warn(`recallCandidates failed: ${String(error)}`);
+      this.logger.warn(
+        `[${getRequestId()}] recallCandidates failed: ${String(error)}`,
+      );
       return [];
     }
   }
@@ -927,7 +932,7 @@ ${itemLines}
       return map;
     } catch (error) {
       this.logger.warn(
-        `LLM per-item reasons generation failed: ${String(error)}`,
+        `[${getRequestId()}] LLM per-item reasons generation failed: ${String(error)}`,
       );
       return new Map();
     }
@@ -974,7 +979,7 @@ ${itemLines}
         return await this.llmRecommendationExplanation(tags, hour);
       } catch (error) {
         this.logger.warn(
-          `LLM recommendation explanation failed: ${String(error)}`,
+          `[${getRequestId()}] LLM recommendation explanation failed: ${String(error)}`,
         );
       }
     }
@@ -1066,7 +1071,9 @@ Write a concise, warm explanation that connects the user's taste profile with th
       try {
         return await this.llmDailyExplanation(tags, hour);
       } catch (error) {
-        this.logger.warn(`LLM daily explanation failed: ${String(error)}`);
+        this.logger.warn(
+          `[${getRequestId()}] LLM daily explanation failed: ${String(error)}`,
+        );
       }
     }
 
