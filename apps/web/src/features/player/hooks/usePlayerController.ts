@@ -483,20 +483,51 @@ export function usePlayerController() {
       return;
     }
 
-    audio
-      .play()
-      .then(() => {
-        setIsPlaying(true);
-      })
-      .catch(() => {
-        setIsPlaying(false);
-      });
-  }, [currentTrack, setIsPlaying]);
+    let cancelled = false;
+
+    const onCanPlay = () => {
+      if (cancelled) return;
+      audio
+        .play()
+        .then(() => {
+          if (!cancelled) setIsPlaying(true);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setIsPlaying(false);
+            setStatusText('Playback blocked. Tap play to start.');
+          }
+        });
+    };
+
+    // If the audio is already ready (same track re-render), play immediately.
+    // Otherwise wait for the canplay event so the new source is loaded.
+    if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+      onCanPlay();
+    } else {
+      audio.addEventListener('canplay', onCanPlay, { once: true });
+    }
+
+    return () => {
+      cancelled = true;
+      audio.removeEventListener('canplay', onCanPlay);
+    };
+  }, [currentTrack, setIsPlaying, setStatusText]);
 
   const audioHandlers = useMemo(
     () => ({
       onLoadedMetadata: (event: SyntheticEvent<HTMLAudioElement>) => {
-        setDurationSeconds(event.currentTarget.duration || 0);
+        const audio = event.currentTarget;
+        setDurationSeconds(audio.duration || 0);
+        // Safety net: if the canplay listener hasn't fired yet, try playing now.
+        if (
+          audio.paused &&
+          audio.readyState >= HTMLMediaElement.HAVE_METADATA
+        ) {
+          audio.play().catch(() => {
+            /* canplay listener will retry */
+          });
+        }
       },
       onTimeUpdate: (event: SyntheticEvent<HTMLAudioElement>) => {
         const nextProgressSeconds = event.currentTarget.currentTime || 0;

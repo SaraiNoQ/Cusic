@@ -3292,3 +3292,95 @@
 :global([data-theme='light']) .djHelmet::after {
   border-color: rgba(180, 150, 110, 0.25);
 }
+
+/* Clock digits — darken active cells for contrast on light background */
+:global([data-theme='light']) .matrixCellActive {
+  background: #8a7a60;
+  box-shadow:
+    0 0 5px rgba(100, 80, 40, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+/* Colon dots — reduce glow in light mode */
+:global([data-theme='light']) .matrixColon span {
+  background: #c06810;
+  box-shadow: 0 0 8px rgba(180, 80, 20, 0.35);
+}
+
+/* Date/clock labels — boost contrast */
+:global([data-theme='light']) .clockDateStack strong {
+  color: #8a6018;
+  text-shadow: 0 0 10px rgba(160, 120, 40, 0.12);
+}
+
+:global([data-theme='light']) .clockDateStack span,
+:global([data-theme='light']) .clockDateStack p {
+  opacity: 0.88;
+}
+
+/* Hover states — use darker glow visible on light backgrounds */
+:global([data-theme='light']) .iconButton:hover,
+:global([data-theme='light']) .pillButton:hover,
+:global([data-theme='light']) .micButton:hover,
+:global([data-theme='light']) .sendButton:hover,
+:global([data-theme='light']) .iconButtonActive {
+  border-color: var(--border-accent);
+  color: var(--accent-orange-light);
+  box-shadow: 0 0 18px rgba(180, 80, 20, 0.22);
+}
+
+:global([data-theme='light']) .chatEntryButton:hover {
+  border-color: var(--border-accent);
+  color: var(--accent-orange-light);
+  box-shadow: 0 0 18px rgba(180, 80, 20, 0.18);
+}
+
+:global([data-theme='light']) .loginButton:hover,
+:global([data-theme='light']) .searchButton:hover {
+  border-color: var(--border-accent);
+  color: var(--accent-orange-hover);
+  box-shadow: 0 0 18px rgba(180, 80, 20, 0.15);
+}
+
+:global([data-theme='light']) .settingsGear:hover {
+  border-color: var(--border-accent);
+  color: var(--accent-orange-light);
+}
+
+:global([data-theme='light']) .queueUtilityButton:hover {
+  border-color: var(--border-accent);
+  color: var(--accent-orange-light);
+  box-shadow: 0 0 14px rgba(180, 80, 20, 0.18);
+}
+
+:global([data-theme='light']) .queueOverlayItem:hover {
+  border-color: var(--border-accent-hover);
+  background: linear-gradient(
+    180deg,
+    rgba(242, 234, 222, 0.95),
+    rgba(235, 226, 214, 0.98)
+  );
+}
+
+:global([data-theme='light']) .queueOverlayClose:hover {
+  border-color: var(--border-accent);
+  color: var(--accent-orange-light);
+  box-shadow: 0 0 14px rgba(180, 80, 20, 0.18);
+}
+
+/* Focus ring — boost visibility on light backgrounds */
+:global([data-theme='light']) .brandMark:focus-visible,
+:global([data-theme='light']) button:focus-visible {
+  outline-color: rgba(180, 100, 30, 0.6);
+}
+
+/* Progress bar — ensure visible on light bg */
+:global([data-theme='light']) .progressTrack {
+  background: rgba(180, 170, 155, 0.3);
+}
+
+/* Textarea focus — visible border on light bg */
+:global([data-theme='light']) textarea:focus {
+  border-color: rgba(200, 100, 20, 0.7);
+  box-shadow: 0 0 12px rgba(180, 80, 20, 0.2);
+}

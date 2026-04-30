@@ -32,17 +32,17 @@ export class IntentClassifierService {
     const systemPrompt = `You are an intent classifier for Cusic, a music AI DJ app. Classify the user message into EXACTLY ONE of these six valid intents. Do NOT invent new intent names.
 
 VALID INTENTS (use only these exact strings):
-1. "queue_replace" — User wants to CHANGE/SWITCH what's playing now. Chinese cues: 来一首、来几首、来首、放一首、放几首、播一首、播几首、换一首、换几首、切歌、换歌、放点、来点、来点别的、换一种、放个. English cues: "play", "put on", "switch to", "change the music", "I want to hear", "give me [a/some] song".
+1. "queue_replace" — User wants to CHANGE/SWITCH what's playing now. This includes: directly asking to play specific music ("play jazz", "放首中文歌", "来点摇滚"), requesting a different style/mood ("换种风格", "something different"), or any request that would change the current track. Chinese cues: 来一首、来几首、来首、放一首、放几首、播一首、播几首、换一首、换几首、切歌、换歌、放点、来点、来点别的、换一种、放个、我想听、给我放、帮我播. English cues: "play", "put on", "switch to", "change the music", "I want to hear", "give me [a/some] song", "can you play".
 
-2. "queue_append" — User wants to ADD more tracks to existing queue. Chinese cues: 加一首、加几首、再来一首、再来几首、补一首、补几首、多来点、追加. English cues: "add", "append", "more like this", "another one".
+2. "queue_append" — User wants to ADD more tracks WITHOUT replacing what's playing. Chinese cues: 加一首、加几首、再来一首、再来几首、补一首、补几首、多来点、追加. English cues: "add", "append", "more like this", "another one".
 
-3. "theme_playlist_preview" — User wants a CURATED PLAYLIST or collection built. Chinese cues: 歌单、做个歌单、做一份、做张、建一个、推荐一个歌单. English cues: "playlist", "build a list", "curate".
+3. "theme_playlist_preview" — User wants a CURATED PLAYLIST or collection built (multiple tracks around a theme). Chinese cues: 歌单、做个歌单、做一份、做张、建一个、推荐一个歌单、整理一个列表. English cues: "playlist", "build a list", "curate", "make me a mix".
 
-4. "recommend_explain" — User asks WHY something was recommended or seeks explanation. Chinese cues: 为什么推、为什么推荐、解释、背后逻辑. English cues: "why", "explain", "reason".
+4. "recommend_explain" — User asks WHY something was recommended or seeks explanation. Chinese cues: 为什么推、为什么推荐、解释、背后逻辑、什么原因. English cues: "why", "explain", "reason".
 
-5. "knowledge_query" — User asks about music knowledge, artist backgrounds, genre history, song stories, music theory. Chinese cues: 介绍、背景、历史、故事、流派、风格、知识、什么是、谁写的、什么时候出的. English cues: "tell me about", "who is", "history of", "what genre", "background", "story behind", "music knowledge".
+5. "knowledge_query" — User asks about music knowledge, artist backgrounds, genre history, song stories, music theory. Not about playing music. Chinese cues: 介绍、背景、历史、故事、流派、风格、知识、什么是、谁写的、什么时候出的. English cues: "tell me about", "who is", "history of", "what genre", "background", "story behind", "music knowledge".
 
-6. "conversation" — Everything else: casual chat, general questions, asking for suggestions/recommendations WITHOUT explicitly asking to play/queue music. If the user asks "推荐" or "recommend" or "有什么好听的" but does NOT say "来/放/播/play", use "conversation".
+6. "conversation" — Casual chat, greetings, general questions, asking for suggestions or recommendations WITHOUT explicitly asking to play/queue music. If the user says "推荐" or "有什么好听的" or "suggest something" but does NOT say "来/放/播/play", use "conversation".
 
 Output ONLY a single line of JSON, no markdown, no code fences, no extra commentary:
 {"intent":"<one of the six valid intent strings>","confidence":<0.0-1.0>}`;
@@ -156,81 +156,47 @@ Output ONLY a single line of JSON, no markdown, no code fences, no extra comment
   }
 
   fallbackClassify(normalizedMessage: string): AiDjIntent {
+    // Pattern-based classification using broader regex instead of exact
+    // substring matching. Each group is tested in priority order so that
+    // more-specific intents (explain, playlist, append) win over the
+    // broader queue_replace pattern.
+
     if (
-      normalizedMessage.includes('为什么') ||
-      normalizedMessage.includes('why') ||
-      normalizedMessage.includes('解释') ||
-      normalizedMessage.includes('背后')
+      /(?:为什么|为何|怎么会|啥原因|什么依据|why|explain|reason|背后|怎么.*推)/i.test(
+        normalizedMessage,
+      )
     ) {
       return 'recommend_explain';
     }
 
     if (
-      normalizedMessage.includes('加一首') ||
-      normalizedMessage.includes('加几首') ||
-      normalizedMessage.includes('再来一首') ||
-      normalizedMessage.includes('再来几首') ||
-      normalizedMessage.includes('补一首') ||
-      normalizedMessage.includes('补几首') ||
-      normalizedMessage.includes('append') ||
-      normalizedMessage.includes('多来点')
-    ) {
-      return 'queue_append';
-    }
-
-    if (
-      normalizedMessage.includes('歌单') ||
-      normalizedMessage.includes('playlist') ||
-      normalizedMessage.includes('做一份') ||
-      normalizedMessage.includes('做张') ||
-      normalizedMessage.includes('建一个')
+      /(?:歌单|playlist|做(?:一份?|张|个)|建(?:一个?|张)|整理.*(?:歌|曲|列表)|推荐.*(?:歌单|列表|合集)|curat|build.*list|create.*playlist)/i.test(
+        normalizedMessage,
+      )
     ) {
       return 'theme_playlist_preview';
     }
 
     if (
-      normalizedMessage.includes('换一首') ||
-      normalizedMessage.includes('换几首') ||
-      normalizedMessage.includes('切歌') ||
-      normalizedMessage.includes('换歌') ||
-      normalizedMessage.includes('replace') ||
-      normalizedMessage.includes('换点') ||
-      normalizedMessage.includes('放点') ||
-      normalizedMessage.includes('来点别的') ||
-      normalizedMessage.includes('换一种')
+      /(?:加|补|追加|再来|多来|再.*(?:来|放|播)|append|more.*like.*this|another.*(?:one|song|track))/i.test(
+        normalizedMessage,
+      )
+    ) {
+      return 'queue_append';
+    }
+
+    if (
+      /(?:[换切].*[首歌]|[换切].*曲|换一?点|放一?点|来一?点|来[首点个些]|放[首点个些]|播[首点个些]|换[首点个些]|切[首歌]|[给帮]我.*(?:放|播|来|换|切)|play|put on|switch|change.*(?:music|song|track)|我想听|听.*[首歌曲]|给我.*(?:歌|曲|音乐))/i.test(
+        normalizedMessage,
+      )
     ) {
       return 'queue_replace';
     }
 
     if (
-      normalizedMessage.includes('来一首') ||
-      normalizedMessage.includes('来几首') ||
-      normalizedMessage.includes('来首') ||
-      normalizedMessage.includes('放一首') ||
-      normalizedMessage.includes('放几首') ||
-      normalizedMessage.includes('播一首') ||
-      normalizedMessage.includes('播几首') ||
-      normalizedMessage.includes('来点') ||
-      normalizedMessage.includes('放个')
-    ) {
-      return 'queue_replace';
-    }
-
-    if (
-      normalizedMessage.includes('介绍') ||
-      normalizedMessage.includes('背景') ||
-      normalizedMessage.includes('历史') ||
-      normalizedMessage.includes('故事') ||
-      normalizedMessage.includes('流派') ||
-      normalizedMessage.includes('风格') ||
-      normalizedMessage.includes('知识') ||
-      normalizedMessage.includes('什么是') ||
-      normalizedMessage.includes('谁写的') ||
-      normalizedMessage.includes('什么时候出') ||
-      normalizedMessage.includes('genre') ||
-      normalizedMessage.includes('history') ||
-      normalizedMessage.includes('background') ||
-      normalizedMessage.includes('story')
+      /(?:介绍|背景|历史|故事|流派|风格|知识|什么是|谁写的|什么时候出|谁唱|怎么.*写|出自|来源|起源|genre|history|background|story|tell.*about|who.*(?:is|made|wrote|sang)|what.*genre|how.*made)/i.test(
+        normalizedMessage,
+      )
     ) {
       return 'knowledge_query';
     }

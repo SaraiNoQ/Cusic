@@ -157,40 +157,23 @@ Guidelines:
 
     switch (intent) {
       case 'conversation':
-        if (context.message) {
-          const isAskingForRec =
-            /推荐|recommend|建议|suggest|有什么|what.*(song|music|track|listen)/i;
-          const isAskingAboutGenre = /genre|风格|流派|type of music/i;
-          const isAskingAboutArtist = /artist|歌手|who.*sing|谁.*唱/i;
-
-          if (isAskingForRec.test(context.message)) {
-            return '我听到了你的请求。目前我的推荐引擎正在冷却中，请稍等片刻再试，或者直接用「来一首」「换歌」「做个歌单」这样的指令告诉我你想怎么调整队列。';
-          }
-          if (isAskingAboutGenre.test(context.message)) {
-            return '这个问题我需要一点时间整理答案。你可以先用「来一首」或「换歌」试试队列操作，或者稍等片刻再问我。';
-          }
-          if (isAskingAboutArtist.test(context.message)) {
-            return '关于这个艺人我需要更多时间检索信息。你可以试试用「放点」、「换歌」等指令调整当前播放，或者稍后再问我。';
-          }
-          return '我暂时没法深入回答这个问题，但你可以试试直接指令我：比如「来一首 + 风格」、「换歌」、「加歌」或者「做个歌单」。播放器本身还在正常运行。';
-        }
-        return '这个问题我暂时没办法给出很具体的答案，你可以试试问我推荐、点歌或者调整当前播放队列。';
+        return this.fallbackConversation(context);
 
       case 'queue_append':
         return contentIds.length > 0
           ? '我在当前队列后面补两段相近但不抢戏的内容，让这条听感线继续往前走。'
-          : '这轮我没有找到适合继续追加的内容，先保持当前队列不动。';
+          : '这轮我没有找到适合继续追加的内容，先保持当前队列不动。你可以再给我一点风格或语种的线索。';
 
       case 'recommend_explain': {
         if (context.currentTrackTitle) {
-          const languageCue =
+          const langCue =
             context.currentTrackLanguage === 'zh'
               ? '中文声线把夜色拉近'
               : context.currentTrackLanguage === 'instrumental'
                 ? '没有人声会让专注区更稳定'
                 : '英文词面留白更多，适合做背景而不抢注意力';
 
-          return `这首 ${context.currentTrackTitle} 现在成立，主要是因为它的速度和密度都比较克制，${languageCue}。如果你想，我下一轮可以按它继续往更冷、更亮或者更城市化的方向扩。`;
+          return `这首 ${context.currentTrackTitle} 现在成立，主要是因为它的速度和密度都比较克制，${langCue}。如果你想，我下一轮可以按它继续往更冷、更亮或者更城市化的方向扩。`;
         }
         return '这轮推荐的逻辑更偏向当前时间段和你最近的收听走向，所以我会优先给出稳定、可连续播放的内容，而不是一次性把探索幅度拉得太大。';
       }
@@ -198,17 +181,71 @@ Guidelines:
       case 'theme_playlist_preview':
         return contentIds.length > 0
           ? '我先把这个主题压成一组可直接上机的预览队列，你先听走向，再决定要不要继续扩写。'
-          : '这轮主题还不够清晰，我先保留当前频道。你可以补一句语种、场景或时间段。';
+          : '这轮主题还不够清晰，我先保留当前频道。你可以补一句语种、场景或时间段，我再帮你捏合。';
 
       case 'knowledge_query':
-        return '关于这个问题我需要一点时间整理答案。你可以先用「来一首」或「换歌」试试队列操作，或者稍等片刻再问我。';
+        return '这是一个有意思的问题。虽然我现在没法做完整的知识检索，但你可以试试用「放一首 + 风格」来调整播放，或者稍等片刻后重新问我。';
 
       case 'queue_replace':
       default:
         return contentIds.length > 0
           ? '收到。我把主频道切到更贴近你这句指令的航线，先用三段内容把新的听感重心立住。'
-          : '我还没锁定足够明确的方向，先不动当前队列。你可以再补一句语种、场景或风格。';
+          : '我还没锁定足够明确的方向，先不动当前队列。你可以再补一句语种、场景或风格，比如「来点粤语」「放首爵士」或者「换个安静的」。';
     }
+  }
+
+  private fallbackConversation(context: ReplyContext): string {
+    const msg = context.message ?? '';
+
+    // Detect what kind of conversation the user is trying to have
+    const isGreeting = /^(hi|hello|hey|你好|嗨|哈喽|早|晚上好|下午好)\b/i.test(
+      msg.trim(),
+    );
+    const isAskingAboutCapability =
+      /你能|你会|你可以|can you|what can you|你.*做什么|你.*功能/i.test(msg);
+    const isAskingForRec =
+      /推荐|recommend|建议|suggest|有什么|what.*(song|music|track|listen)|好听的/i.test(
+        msg,
+      );
+    const isAskingAboutMood = /心情|mood|氛围|vibe|适合|场景|scene|场合/i.test(
+      msg,
+    );
+    const isAskingAboutGenre =
+      /genre|风格|流派|类型|type of music|jazz|rock|classical|电子|民谣/i.test(
+        msg,
+      );
+    const isAskingAboutArtist = /artist|歌手|艺人|谁.*唱|who.*sing|乐队/i.test(
+      msg,
+    );
+
+    if (isGreeting) {
+      const timeGreeting = context.timeOfDay?.includes('morning')
+        ? '早上好'
+        : context.timeOfDay?.includes('night')
+          ? '晚上好'
+          : '你好';
+
+      return `${timeGreeting}！我是 Cusic，你的 AI DJ 伙伴。你可以直接跟我说「来一首」「换个风格」「做个歌单」，或者在当前播放时问我关于音乐的问题。想从哪里开始？`;
+    }
+
+    if (isAskingAboutCapability) {
+      return '你可以直接跟我说「来一首 + 风格」点歌、「换歌」切换播放、「做个歌单」整理合集，或者在播放时问我关于音乐背景的问题。我也支持语音输入，按住麦克风按钮就行。试试看？';
+    }
+
+    if (isAskingForRec) {
+      return '我完全理解你想要发掘新声音的心情。你可以用「来一首 + 风格/语种/场景」这样的指令直接点歌（比如「来首粤语」「放点爵士」），也可以说「做个歌单」让我帮你整理一个主题合集。你有偏好的方向吗？';
+    }
+
+    if (isAskingAboutMood || isAskingAboutGenre) {
+      return '好品味！不同的风格和氛围确实能让听感完全不同。你可以直接用「来一首 + 你想要的感觉」点歌，比如「来点放松的」「放首摇滚」或者「换个安静的」。想试试哪个方向？';
+    }
+
+    if (isAskingAboutArtist) {
+      return '关于艺人和乐队的详细信息，我建议你直接用「来一首 + 艺人/风格」点歌先听听感觉，或者用搜索功能查找。如果你想知道为什么推荐了某首歌，随时问我「为什么推荐这个」。';
+    }
+
+    // Default conversation fallback — warm, inviting, and nudges toward action
+    return '我听到了你的想法。作为你的 AI DJ，我可以帮你点歌、切歌、建歌单，或者解释为什么推荐了某首歌。你可以直接用指令试试看，比如「来一首爵士」「换个风格」或者「做个歌单」。有什么想听的吗？';
   }
 
   private chunkText(text: string): string[] {
