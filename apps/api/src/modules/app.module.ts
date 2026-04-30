@@ -29,17 +29,14 @@ import { VoiceModule } from './voice/voice.module';
           process.env.NODE_ENV !== 'production'
             ? { target: 'pino-pretty', options: { singleLine: true } }
             : undefined,
-        genReqId: (req: Record<string, unknown>) => {
-          const id = (req as Record<string, unknown>).requestId as
-            | string
-            | undefined;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        genReqId: (req: any) => {
+          const id = req.requestId as string | undefined;
           return id || undefined;
         },
         autoLogging: {
-          ignore: (req: Record<string, unknown>) =>
-            ((req as Record<string, unknown>).url as string)?.includes(
-              '/system/health',
-            ),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ignore: (req: any) => (req.url as string)?.includes('/system/health'),
         },
       },
     }),
