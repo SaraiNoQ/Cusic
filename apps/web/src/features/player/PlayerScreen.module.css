@@ -3369,8 +3369,11 @@
 }
 
 /* Focus ring — boost visibility on light backgrounds */
-:global([data-theme='light']) .brandMark:focus-visible,
-:global([data-theme='light']) button:focus-visible {
+:global([data-theme='light']) .brandMark:focus-visible {
+  outline-color: rgba(180, 100, 30, 0.6);
+}
+
+.screen :global([data-theme='light']) button:focus-visible {
   outline-color: rgba(180, 100, 30, 0.6);
 }
 
@@ -3380,7 +3383,7 @@
 }
 
 /* Textarea focus — visible border on light bg */
-:global([data-theme='light']) textarea:focus {
+.screen :global([data-theme='light']) textarea:focus {
   border-color: rgba(200, 100, 20, 0.7);
   box-shadow: 0 0 12px rgba(180, 80, 20, 0.2);
 }
