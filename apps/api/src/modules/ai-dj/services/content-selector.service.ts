@@ -130,7 +130,7 @@ Return ONLY a valid JSON object: {"contentIds": ["id1", "id2"], "reasoning": "Br
     if (keywords.length > 0) {
       // Search the library with extracted keywords
       const searchResult = await this.contentService.search({
-        query: keywords.join(' '),
+        q: keywords.join(' '),
         page: 1,
         pageSize: count,
       });
