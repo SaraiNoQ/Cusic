@@ -11,7 +11,9 @@ RUN pnpm install --frozen-lockfile=false
 
 FROM deps AS build
 ARG API_INTERNAL_URL=http://api:3001
+ARG NEXT_PUBLIC_API_BASE_URL=/api/v1
 ENV API_INTERNAL_URL=${API_INTERNAL_URL}
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 COPY apps/web ./apps/web
 RUN pnpm --filter @music-ai/web build
 

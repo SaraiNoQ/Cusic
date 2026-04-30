@@ -35,11 +35,9 @@ export function getApiBaseUrl() {
       return `${protocol}//${hostname}:3001/api/v1`;
     }
 
-    const apiHostname = hostname.startsWith('web.')
-      ? hostname.replace(/^web\./, 'api.')
-      : `api.${hostname}`;
-
-    return `${protocol}//${apiHostname}/api/v1`;
+    // Production: use relative path so Next.js rewrite proxy handles the
+    // request server-side, avoiding cross-origin CORS issues entirely.
+    return '/api/v1';
   }
 
   return 'http://localhost:3001/api/v1';

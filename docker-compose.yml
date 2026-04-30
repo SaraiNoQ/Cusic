@@ -39,6 +39,9 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: /api/v1
+        API_INTERNAL_URL: http://api:3001
     container_name: music-ai-web
     restart: unless-stopped
     env_file:

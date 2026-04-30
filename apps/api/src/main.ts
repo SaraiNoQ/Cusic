@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './modules/app.module';
 
-function getAllowedCorsOrigins() {
+function getAllowedCorsOrigins(): (string | RegExp)[] {
   const configuredOrigins = process.env.API_CORS_ORIGINS;
   if (configuredOrigins) {
     return configuredOrigins
@@ -12,15 +12,25 @@ function getAllowedCorsOrigins() {
       .filter(Boolean);
   }
 
-  return ['http://localhost:3000', 'https://web.sarainoq.cn'];
+  // Default: allow localhost dev and Cloudflare Tunnel production origins.
+  // Also allow any sarainoq.cn subdomain so direct API access works as a
+  // fallback even when the Next.js rewrite proxy is bypassed.
+  return [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'https://web.sarainoq.cn',
+    'https://api.sarainoq.cn',
+    /^https:\/\/.*\.sarainoq\.cn$/,
+  ];
 }
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  const allowedCorsOrigins = getAllowedCorsOrigins();
 
   app.enableCors({
-    origin: allowedCorsOrigins,
+    origin: getAllowedCorsOrigins(),
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Cusic-Timezone'],
     credentials: false,
   });
   app.setGlobalPrefix('api/v1');
