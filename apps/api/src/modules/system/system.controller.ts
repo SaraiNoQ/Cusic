@@ -1,5 +1,6 @@
 import { Controller, Get, Logger } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import Redis from 'ioredis';
 import { LlmService } from '../llm/services/llm.service';
 import { VoiceService } from '../voice/voice.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -27,7 +28,7 @@ export class SystemController {
       data: {
         status: 'ok',
         service: 'api',
-        version: '0.1.0',
+        version: process.env.APP_VERSION ?? '0.1.0',
         providers: providerStatus,
       },
       meta: {
@@ -40,6 +41,7 @@ export class SystemController {
     llm: 'ok' | 'degraded';
     voice: string;
     db: 'ok' | 'error';
+    redis: string;
   }> {
     // Check LLM
     let llmStatus: 'ok' | 'degraded' = 'degraded';
@@ -68,10 +70,28 @@ export class SystemController {
       dbStatus = 'error';
     }
 
+    // Check Redis
+    const redisStatus = await this.checkRedis();
+
     return {
       llm: llmStatus,
       voice: voiceStatus,
       db: dbStatus,
+      redis: redisStatus,
     };
+  }
+
+  private async checkRedis(): Promise<string> {
+    try {
+      const redis = new Redis(process.env.REDIS_URL ?? 'redis://redis:6379', {
+        connectTimeout: 3000,
+        maxRetriesPerRequest: 1,
+      });
+      const result = await redis.ping();
+      await redis.quit();
+      return result === 'PONG' ? 'ok' : 'degraded';
+    } catch {
+      return 'unavailable';
+    }
   }
 }

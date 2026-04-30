@@ -10,3 +10,5 @@ coverage
 .DS_Store
 .claude/
 *.tsbuildinfo
+backups/*.gz
+backups/*.tar.gz

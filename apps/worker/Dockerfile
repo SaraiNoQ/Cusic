@@ -1,6 +1,7 @@
 FROM node:22-alpine AS base
 WORKDIR /app
-RUN npm config set registry https://registry.npmmirror.com \
+RUN apk add --no-cache procps \
+  && npm config set registry https://registry.npmmirror.com \
   && npm install -g pnpm@9.15.0
 
 FROM base AS deps
@@ -23,4 +24,5 @@ COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=deps /app/.npmrc ./.npmrc
 COPY --from=deps /app/packages ./packages
 COPY --from=build /app/apps/worker ./apps/worker
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD pgrep -f "node apps/worker" || exit 1
 CMD ["node", "apps/worker/dist/index.js"]

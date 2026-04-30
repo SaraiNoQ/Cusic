@@ -11,6 +11,11 @@ services:
       - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -20,8 +25,14 @@ services:
       - '6379:6379'
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   api:
+    image: 'music-ai-api:${IMAGE_TAG:-latest}'
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -32,10 +43,13 @@ services:
     ports:
       - '3001:3001'
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   web:
+    image: 'music-ai-web:${IMAGE_TAG:-latest}'
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -49,11 +63,13 @@ services:
     ports:
       - '3000:3000'
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     extra_hosts:
       - 'api:host-gateway'
 
   worker:
+    image: 'music-ai-worker:${IMAGE_TAG:-latest}'
     build:
       context: .
       dockerfile: apps/worker/Dockerfile
@@ -62,8 +78,10 @@ services:
     env_file:
       - .env
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:

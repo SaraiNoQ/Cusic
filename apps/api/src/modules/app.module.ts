@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { LoggerModule } from 'nestjs-pino';
 import { RequestIdInterceptor } from '../common/request-id';
 import { AiDjModule } from './ai-dj/ai-dj.module';
 import { AuthModule } from './auth/auth.module';
@@ -20,6 +22,22 @@ import { VoiceModule } from './voice/voice.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        transport:
+          process.env.NODE_ENV !== 'production'
+            ? { target: 'pino-pretty', options: { singleLine: true } }
+            : undefined,
+        genReqId: (req) => {
+          const id = (req as any).requestId;
+          return id || undefined;
+        },
+        autoLogging: {
+          ignore: (req) => (req as any).url?.includes('/system/health'),
+        },
+      },
+    }),
     SystemModule,
     PrismaModule,
     LlmModule,
@@ -36,6 +54,10 @@ import { VoiceModule } from './voice/voice.module';
     ImportsModule,
   ],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: RequestIdInterceptor,

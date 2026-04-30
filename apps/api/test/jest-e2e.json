@@ -14,9 +14,9 @@
   "moduleNameMapper": {
     "^@music-ai/shared$": "<rootDir>/../../packages/shared/src",
     "^@prisma/client$": "<rootDir>/__mocks__/prisma-client.ts",
-    "^ioredis$": "<rootDir>/__mocks__/empty.ts",
+    "^ioredis$": "<rootDir>/__mocks__/ioredis.ts",
     "^openai$": "<rootDir>/__mocks__/empty.ts",
-    "^bullmq$": "<rootDir>/__mocks__/empty.ts",
+    "^bullmq$": "<rootDir>/__mocks__/bullmq.ts",
     "^nodemailer$": "<rootDir>/__mocks__/empty.ts"
   },
   "collectCoverageFrom": ["<rootDir>/../src/**/*.ts"],

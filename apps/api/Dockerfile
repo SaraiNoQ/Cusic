@@ -1,6 +1,7 @@
 FROM node:22-alpine AS base
 WORKDIR /app
-RUN npm config set registry https://registry.npmmirror.com \
+RUN apk add --no-cache wget \
+  && npm config set registry https://registry.npmmirror.com \
   && npm install -g pnpm@9.15.0
 
 FROM base AS deps
@@ -25,4 +26,5 @@ COPY --from=deps /app/packages ./packages
 COPY --from=build /app/apps/api ./apps/api
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 EXPOSE 3001
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/v1/system/health || exit 1
 CMD ["node", "apps/api/dist/apps/api/src/main.js"]
