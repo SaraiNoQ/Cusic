@@ -26,5 +26,5 @@ COPY --from=deps /app/packages ./packages
 COPY --from=build /app/apps/api ./apps/api
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 EXPOSE 3001
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/v1/system/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/v1/system/health || exit 1
 CMD ["node", "apps/api/dist/apps/api/src/main.js"]

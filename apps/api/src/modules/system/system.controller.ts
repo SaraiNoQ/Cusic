@@ -38,60 +38,69 @@ export class SystemController {
   }
 
   private async checkProviders(): Promise<{
-    llm: 'ok' | 'degraded';
+    llm: string;
     voice: string;
-    db: 'ok' | 'error';
+    db: string;
     redis: string;
   }> {
-    // Check LLM
-    let llmStatus: 'ok' | 'degraded' = 'degraded';
-    try {
-      const llmAvailable = await this.llmService.isAvailable();
-      llmStatus = llmAvailable ? 'ok' : 'degraded';
-    } catch (error) {
-      this.logger.warn(
-        `[${getRequestId()}] LLM health check failed: ${String(error)}`,
-      );
-      llmStatus = 'degraded';
-    }
+    // Run all checks in parallel so no single slow provider blocks the response.
+    // Each check gets its own timeout to guarantee the health endpoint returns
+    // within the Docker HEALTHCHECK window (< 5s).
+    const race = <T>(fn: () => Promise<T>, ms: number, fallback: T) =>
+      Promise.race([
+        fn(),
+        new Promise<T>((r) => setTimeout(() => r(fallback), ms)),
+      ]);
 
-    // Check voice provider type
-    const voiceStatus = this.voiceService.getProviderType();
+    const [llm, db, redis] = await Promise.all([
+      race(
+        async () => {
+          try {
+            return (await this.llmService.isAvailable()) ? 'ok' : 'degraded';
+          } catch {
+            return 'degraded';
+          }
+        },
+        2000,
+        'timeout',
+      ),
+      race(
+        async () => {
+          try {
+            await this.prisma.$queryRaw`SELECT 1`;
+            return 'ok';
+          } catch {
+            return 'error';
+          }
+        },
+        1500,
+        'timeout',
+      ),
+      race(
+        async () => {
+          let redis: Redis | null = null;
+          try {
+            redis = new Redis(process.env.REDIS_URL ?? 'redis://redis:6379', {
+              connectTimeout: 2000,
+              maxRetriesPerRequest: 1,
+              lazyConnect: true,
+            });
+            await redis.connect();
+            const pong = await redis.ping();
+            return pong === 'PONG' ? 'ok' : 'degraded';
+          } catch {
+            return 'unavailable';
+          } finally {
+            redis?.disconnect().catch(() => {});
+          }
+        },
+        3000,
+        'timeout',
+      ),
+    ]);
 
-    // Check DB
-    let dbStatus: 'ok' | 'error' = 'error';
-    try {
-      await this.prisma.$queryRaw`SELECT 1`;
-      dbStatus = 'ok';
-    } catch (error) {
-      this.logger.error(
-        `[${getRequestId()}] DB health check failed: ${String(error)}`,
-      );
-      dbStatus = 'error';
-    }
+    const voice = this.voiceService.getProviderType();
 
-    // Check Redis
-    const redisStatus = await this.checkRedis();
-
-    return {
-      llm: llmStatus,
-      voice: voiceStatus,
-      db: dbStatus,
-      redis: redisStatus,
-    };
-  }
-
-  private async checkRedis(): Promise<string> {
-    try {
-      const redis = new Redis(process.env.REDIS_URL ?? 'redis://redis:6379', {
-        connectTimeout: 3000,
-        maxRetriesPerRequest: 1,
-      });
-      const result = await redis.ping();
-      await redis.quit();
-      return result === 'PONG' ? 'ok' : 'degraded';
-    } catch {
-      return 'unavailable';
-    }
+    return { llm, voice, db, redis };
   }
 }
