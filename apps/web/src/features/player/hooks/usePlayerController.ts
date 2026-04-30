@@ -283,6 +283,11 @@ export function usePlayerController() {
   };
 
   const playTrack = async (track: ContentItemDto) => {
+    if (!track.audioUrl) {
+      setStatusText(`${track.title} has no playable audio source.`);
+      return;
+    }
+
     const existingIndex = queue.findIndex((item) => item.id === track.id);
     if (existingIndex >= 0) {
       setCurrentTrack(track);
@@ -480,6 +485,13 @@ export function usePlayerController() {
 
     const audio = audioRef.current;
     if (!audio) {
+      return;
+    }
+
+    // If the track has no audio source, don't hang waiting for canplay.
+    if (!currentTrack.audioUrl) {
+      setIsPlaying(false);
+      setStatusText(`${currentTrack.title} has no playable audio source.`);
       return;
     }
 

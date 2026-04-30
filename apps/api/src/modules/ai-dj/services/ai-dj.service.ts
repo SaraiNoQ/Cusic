@@ -806,7 +806,21 @@ export class AiDjService {
       };
     }
 
-    const isConversation = intent === 'conversation';
+    // Even when intent is "conversation", check if the message looks like a
+    // music request. This catches cases where the LLM is unavailable and the
+    // fallback classifier didn't detect a specific command pattern.
+    const hasMusicIntent =
+      intent !== 'conversation' ||
+      /推荐|来[首点个些]|放[首点个些]|播[首点个些]|换[首点个些]|切歌|来点|放点|换点|我想听|有什么.*(?:好听|推荐|歌|音乐)|recommend|suggest|play|surprise/i.test(
+        message,
+      );
+
+    const isConversation = !hasMusicIntent;
+    const effectiveIntent: AiDjIntent = isConversation
+      ? 'conversation'
+      : intent === 'conversation'
+        ? 'queue_replace'
+        : intent;
     const queueIds = surfaceContext?.queueContentIds ?? [];
 
     let picks: string[] = [];
@@ -891,7 +905,7 @@ export class AiDjService {
 
     const replyContext: ReplyContext = {
       message,
-      intent,
+      intent: effectiveIntent,
       contentIds: picks,
       trackDescriptions,
       tasteProfileSummary: tasteSummary,
@@ -969,7 +983,21 @@ export class AiDjService {
       };
     }
 
-    const isConversation = intent === 'conversation';
+    // Even when intent is "conversation", check if the message looks like a
+    // music request. This catches cases where the LLM is unavailable and the
+    // fallback classifier didn't detect a specific command pattern.
+    const hasMusicIntent =
+      intent !== 'conversation' ||
+      /推荐|来[首点个些]|放[首点个些]|播[首点个些]|换[首点个些]|切歌|来点|放点|换点|我想听|有什么.*(?:好听|推荐|歌|音乐)|recommend|suggest|play|surprise/i.test(
+        message,
+      );
+
+    const isConversation = !hasMusicIntent;
+    const effectiveIntent: AiDjIntent = isConversation
+      ? 'conversation'
+      : intent === 'conversation'
+        ? 'queue_replace'
+        : intent;
     const queueIds = surfaceContext?.queueContentIds ?? [];
 
     let picks: string[] = [];
