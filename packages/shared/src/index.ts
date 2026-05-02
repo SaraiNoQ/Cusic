@@ -414,6 +414,19 @@ export interface ProviderConnectionStatusDto {
   message: string;
 }
 
+export interface SystemHealthDto {
+  status: 'ok';
+  service: string;
+  version: string;
+  providers: {
+    content: 'jamendo' | 'demo';
+    llm: string;
+    voice: string;
+    db: string;
+    redis: string;
+  };
+}
+
 export interface TranscriptionRequestDto {
   audioFormat?: string;
 }

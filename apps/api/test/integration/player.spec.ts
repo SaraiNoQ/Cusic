@@ -92,6 +92,46 @@ describe('EventsController (integration)', () => {
     });
   });
 
+  // ── POST /player/queue ────────────────────────────────────────────
+  describe('updateQueue()', () => {
+    it('passes replace queue payload and user state to the service', async () => {
+      const authRequest: RequestWithUser = {
+        headers: { authorization: 'Bearer test-token' },
+        user: { id: 'user_1', email: 'a@b.com', sessionId: 'ses_1' },
+      };
+      mockService.updateQueue!.mockResolvedValue(
+        mockQueueState({
+          activeIndex: 1,
+          currentTrack: mockTrack({ id: 'cnt_b' }),
+        }),
+      );
+
+      const result = await controller.updateQueue(
+        {
+          mode: 'replace',
+          items: [{ contentId: 'cnt_a' }, { contentId: 'cnt_b' }],
+          activeIndex: 1,
+          currentContentId: 'cnt_b',
+          positionMs: 45000,
+        },
+        authRequest,
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data.activeIndex).toBe(1);
+      expect(mockService.updateQueue).toHaveBeenCalledWith(
+        'replace',
+        [{ contentId: 'cnt_a' }, { contentId: 'cnt_b' }],
+        {
+          activeIndex: 1,
+          currentContentId: 'cnt_b',
+          positionMs: 45000,
+        },
+        'user_1',
+      );
+    });
+  });
+
   // ── POST /player/events ───────────────────────────────────────────
   describe('recordPlaybackEvent()', () => {
     it('accepts a playback event and returns accepted envelope', async () => {

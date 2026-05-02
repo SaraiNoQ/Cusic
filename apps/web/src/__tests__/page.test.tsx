@@ -4,7 +4,7 @@ import '@testing-library/jest-dom';
 
 // Mock the PlayerScreen component to avoid the deep dependency chain
 // (zustand stores, API clients, custom hooks, etc.)
-jest.mock('../../features/player/components/PlayerScreen', () => ({
+jest.mock('../features/player/components/PlayerScreen', () => ({
   PlayerScreen: () =>
     React.createElement(
       'div',

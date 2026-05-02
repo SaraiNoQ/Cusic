@@ -4,8 +4,10 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useUiStore } from '../../../store/ui-store';
 import { useAuthStore } from '../../../store/auth-store';
+import { fetchSystemHealth } from '../../../lib/api/system-api';
 import { getAvailableVoices } from '../../../lib/api/voice-api';
 import type { VoiceInfo } from '../../../lib/api/voice-api';
+import type { SystemHealthDto } from '@music-ai/shared';
 import styles from './SettingsPanel.module.css';
 
 function getLlmEnabled(): boolean {
@@ -39,6 +41,9 @@ export function SettingsPanel() {
   const [llmEnabled, setLlmEnabledState] = useState(true);
   const [voices, setVoices] = useState<VoiceInfo[]>([]);
   const [provider, setProvider] = useState('');
+  const [systemHealth, setSystemHealth] = useState<SystemHealthDto | null>(
+    null,
+  );
   const [selectedVoice, setSelectedVoice] = useState('');
   const [voicesLoading, setVoicesLoading] = useState(true);
 
@@ -49,22 +54,38 @@ export function SettingsPanel() {
   }, [hydrateAuth]);
 
   useEffect(() => {
-    void getAvailableVoices()
-      .then((res) => {
-        setVoices(res.data.voices);
-        setProvider(res.data.provider);
-        if (!getStoredVoice() && res.data.voices.length > 0) {
-          setSelectedVoice(res.data.voices[0].id);
-          setStoredVoice(res.data.voices[0].id);
+    void Promise.allSettled([getAvailableVoices(), fetchSystemHealth()])
+      .then(([voicesResult, healthResult]) => {
+        if (voicesResult.status === 'fulfilled') {
+          setVoices(voicesResult.value.data.voices);
+          setProvider(voicesResult.value.data.provider);
+          if (!getStoredVoice() && voicesResult.value.data.voices.length > 0) {
+            setSelectedVoice(voicesResult.value.data.voices[0].id);
+            setStoredVoice(voicesResult.value.data.voices[0].id);
+          }
         }
-      })
-      .catch(() => {
-        // Voices endpoint may not be available
+
+        if (healthResult.status === 'fulfilled') {
+          setSystemHealth(healthResult.value.data);
+        }
       })
       .finally(() => {
         setVoicesLoading(false);
       });
   }, []);
+
+  useEffect(() => {
+    if (!provider && systemHealth?.providers.voice) {
+      setProvider(systemHealth.providers.voice);
+    }
+  }, [provider, systemHealth]);
+
+  useEffect(() => {
+    if (!getStoredVoice() && voices.length > 0) {
+      setSelectedVoice(voices[0].id);
+      setStoredVoice(voices[0].id);
+    }
+  }, [voices]);
 
   const handleLlmToggle = useCallback(() => {
     setLlmEnabledState((prev) => {
@@ -137,6 +158,40 @@ export function SettingsPanel() {
               />
               <label htmlFor="llm-toggle" />
             </div>
+          </div>
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionHeading}>Providers</h2>
+          <div className={styles.sectionLabel}>
+            <span className={styles.sectionLabelText}>Content Catalog</span>
+            <span className={styles.sectionValue}>
+              {systemHealth?.providers.content ?? 'unknown'}
+            </span>
+          </div>
+          <div className={styles.sectionLabel}>
+            <span className={styles.sectionLabelText}>LLM</span>
+            <span className={styles.sectionValue}>
+              {systemHealth?.providers.llm ?? 'unknown'}
+            </span>
+          </div>
+          <div className={styles.sectionLabel}>
+            <span className={styles.sectionLabelText}>Voice</span>
+            <span className={styles.sectionValue}>
+              {systemHealth?.providers.voice ?? (provider || 'stub')}
+            </span>
+          </div>
+          <div className={styles.sectionLabel}>
+            <span className={styles.sectionLabelText}>Database</span>
+            <span className={styles.sectionValue}>
+              {systemHealth?.providers.db ?? 'unknown'}
+            </span>
+          </div>
+          <div className={styles.sectionLabel}>
+            <span className={styles.sectionLabelText}>Redis</span>
+            <span className={styles.sectionValue}>
+              {systemHealth?.providers.redis ?? 'unknown'}
+            </span>
           </div>
         </section>
 

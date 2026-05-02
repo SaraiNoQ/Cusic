@@ -56,6 +56,47 @@ components:
           type: integer
         hasMore:
           type: boolean
+    SystemHealthDto:
+      type: object
+      required: [status, service, version, providers]
+      properties:
+        status:
+          type: string
+          const: ok
+        service:
+          type: string
+        version:
+          type: string
+        providers:
+          type: object
+          required: [content, llm, voice, db, redis]
+          properties:
+            content:
+              type: string
+              enum: [jamendo, demo]
+            llm:
+              type: string
+            voice:
+              type: string
+            db:
+              type: string
+            redis:
+              type: string
+    SystemHealthResponseDto:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/SystemHealthDto'
+        meta:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
     ContentItemDto:
       type: object
       required: [id, type, title, artists]
@@ -330,10 +371,12 @@ components:
           type: string
           enum:
             [
+              conversation,
               queue_replace,
               queue_append,
               recommend_explain,
               theme_playlist_preview,
+              knowledge_query,
             ]
         replyText:
           type: string
@@ -379,7 +422,7 @@ components:
       properties:
         mode:
           type: string
-          enum: [baseline_stub, worker_stub]
+          enum: [baseline_stub, worker_stub, provider_live]
         phase:
           type: string
           enum: [accepted, running, completed, failed]
@@ -517,10 +560,12 @@ components:
           nullable: true
           enum:
             [
+              conversation,
               queue_replace,
               queue_append,
               recommend_explain,
               theme_playlist_preview,
+              knowledge_query,
             ]
         actions:
           type: array
@@ -540,7 +585,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiSuccessEnvelope'
+                $ref: '#/components/schemas/SystemHealthResponseDto'
   /auth/email/request-code:
     post:
       summary: Request SMTP email verification code

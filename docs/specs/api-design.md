@@ -1286,11 +1286,11 @@ API 端统一启用以下安全与性能中间件：
 返回内容：
 
 1. API 状态
-2. PostgreSQL 状态
-3. Redis 状态（含连通性检查字段 `redis`）
-4. Queue 状态
-5. Provider 简要状态
-6. 版本号（读取 `APP_VERSION` 环境变量）
+2. 版本号（读取 `APP_VERSION` 环境变量）
+3. 内容源状态：`jamendo` 表示真实 Jamendo provider 已配置，`demo` 表示使用内置 demo catalog
+4. LLM Provider 状态：`ok`、`degraded` 或 `timeout`
+5. Voice Provider 类型：`mimo`、`aliyun`、`composite` 或 `stub`
+6. PostgreSQL 与 Redis 连通性状态
 
 响应示例：
 
@@ -1299,15 +1299,20 @@ API 端统一启用以下安全与性能中间件：
   "success": true,
   "data": {
     "status": "ok",
-    "version": "0.6.0",
-    "postgres": "ok",
-    "redis": "ok",
-    "queue": "ok"
+    "service": "api",
+    "version": "0.1.0",
+    "providers": {
+      "content": "jamendo",
+      "llm": "ok",
+      "voice": "mimo",
+      "db": "ok",
+      "redis": "ok"
+    }
   }
 }
 ```
 
-## 11. 运维与安全
+## 10. 运维与安全
 
 ### 11.1 环境变量校验
 
@@ -1330,7 +1335,7 @@ API 启动时通过 `validateEnv()`（`apps/api/src/common/env-validation.ts`）
 - `scripts/backup-volumes.sh` — Docker 卷备份
 - `scripts/setup-backup-cron.sh` — 配置定时备份任务
 
-## 12. 通用错误码规范
+## 11. 通用错误码规范
 
 错误码按模块分组，例如：
 
@@ -1357,7 +1362,7 @@ API 启动时通过 `validateEnv()`（`apps/api/src/common/env-validation.ts`）
 8. `IMPORT_JOB_NOT_FOUND`
 9. `SYSTEM_DEPENDENCY_UNHEALTHY`
 
-## 11. DTO 与共享类型约束
+## 12. DTO 与共享类型约束
 
 建议进入 `packages/shared` 的公共类型包括：
 
@@ -1377,14 +1382,14 @@ API 启动时通过 `validateEnv()`（`apps/api/src/common/env-validation.ts`）
 2. 不把数据库表结构直接暴露为 API DTO
 3. Provider 原始字段不得直接透传给前端
 
-## 12. 首版不纳入 API 细化范围
+## 13. 首版不纳入 API 细化范围
 
 1. 后台管理接口
 2. A/B 实验接口
 3. 灰度发布接口
 4. 公网开放平台接口
 
-## 13. 当前默认假设
+## 14. 当前默认假设
 
 1. JWT 主要用于 Web 首发的前后端联调，不在首版同时支持 cookie session。
 2. SSE 仅用于 AI DJ 流式文本回复，其他接口仍走普通 HTTP。

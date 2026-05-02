@@ -7,9 +7,18 @@
 // only named exports would receive the module namespace, so we provide both
 // a default export and allow the module itself to act as a constructor stub.
 
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 class IORedisStub {
-  // Stub constructor — never called in integration tests
+  async connect() {
+    return undefined;
+  }
+
+  async ping() {
+    return 'PONG';
+  }
+
+  disconnect() {
+    return undefined;
+  }
 }
 
 export default IORedisStub;

@@ -25,12 +25,13 @@
 
 当前未完成重点：
 
-1. 真实用户体系与真实持久化。
-2. AI DJ 的真实对话与工具编排。
+1. MVP 主链路的真实用户态验收：登录、token refresh、用户队列、收藏、歌单、播放事件和推荐结果需要以登录用户为主路径持续回归。
+2. 真实 Provider 能力验收：Jamendo、LLM、Voice 等 Provider 已有抽象和降级实现，但需要明确区分真实接入、stub fallback 与公开 demo 模式。
+3. AI DJ 工具编排稳定性验收：聊天意图、推荐解释、队列替换/追加、主题歌单保存、知识问答需要作为同一条主路径验证。
 
 当前推进中：
 
-无（Phase 7 已于 2026-04-30 完成，当前各阶段均已结束）。
+MVP 闭环校准与真实可用性加固。Phase 7 的工程加固能力已落地，但“可演示”仍需推进到“可上线 MVP”的连续验收标准。
 
 ## 2. 阶段规划总览
 
@@ -234,13 +235,13 @@
 
 ## 3. 推荐开发顺序
 
-建议严格按照以下顺序推进：
+当前阶段不再按早期 Phase 从头推进，推荐按 MVP 主链路收敛：
 
-1. 先完成 `Phase 2`，因为当前最大缺口是产品主界面不成立。
-2. 再进入 `Phase 3`，把 Demo user 替换成真实用户态。
-3. 然后做 `Phase 4`，把 AI DJ 接进主体验。
-4. 接着做 `Phase 5`，建立画像与推荐护城河。
-5. 最后扩展 `Phase 6` 与 `Phase 7`。
+1. Baseline audit：先运行 typecheck、lint、API/Web test、build、Prisma validate，记录真实失败项。
+2. Docs reconciliation：校准 roadmap、API/OpenAPI 和数据库文档中“Done / Demo / MVP-ready”的状态表述。
+3. Main path hardening：以登录用户为主路径验证搜索/导入、播放、收藏/歌单、推荐、AI DJ 队列动作和知识/语音补充。
+4. Provider validation：明确 Jamendo、LLM、Voice 的真实接入状态；缺配置时显示降级状态，不把 stub 当作真实能力验收。
+5. Release readiness：本地检查通过后，再按 `development-flow.md` 进行 PR、远端构建、Docker 更新、健康检查和 Cloudflare 验证。
 
 ## 4. 每阶段的关键依赖
 

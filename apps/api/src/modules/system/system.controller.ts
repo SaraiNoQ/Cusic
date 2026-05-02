@@ -1,6 +1,8 @@
 import { Controller, Get, Logger } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import Redis from 'ioredis';
+import type { SystemHealthDto } from '@music-ai/shared';
+import { ContentService } from '../content/services/content.service';
 import { LlmService } from '../llm/services/llm.service';
 import { VoiceService } from '../voice/voice.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -12,6 +14,7 @@ export class SystemController {
   private readonly logger = new Logger(SystemController.name);
 
   constructor(
+    private readonly contentService: ContentService,
     private readonly llmService: LlmService,
     private readonly voiceService: VoiceService,
     private readonly prisma: PrismaService,
@@ -20,7 +23,11 @@ export class SystemController {
   @Get('health')
   @ApiOperation({ summary: 'API health check' })
   @ApiResponse({ status: 200, description: 'System is healthy' })
-  async getHealth() {
+  async getHealth(): Promise<{
+    success: true;
+    data: SystemHealthDto;
+    meta: { timestamp: string };
+  }> {
     const providerStatus = await this.checkProviders();
 
     return {
@@ -38,6 +45,7 @@ export class SystemController {
   }
 
   private async checkProviders(): Promise<{
+    content: 'jamendo' | 'demo';
     llm: string;
     voice: string;
     db: string;
@@ -46,11 +54,21 @@ export class SystemController {
     // Run all checks in parallel so no single slow provider blocks the response.
     // Each check gets its own timeout to guarantee the health endpoint returns
     // within the Docker HEALTHCHECK window (< 5s).
-    const race = <T>(fn: () => Promise<T>, ms: number, fallback: T) =>
-      Promise.race([
-        fn(),
-        new Promise<T>((r) => setTimeout(() => r(fallback), ms)),
-      ]);
+    const race = async <T>(fn: () => Promise<T>, ms: number, fallback: T) => {
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          fn(),
+          new Promise<T>((resolve) => {
+            timeout = setTimeout(() => resolve(fallback), ms);
+          }),
+        ]);
+      } finally {
+        if (timeout) {
+          clearTimeout(timeout);
+        }
+      }
+    };
 
     const [llm, db, redis] = await Promise.all([
       race(
@@ -100,7 +118,10 @@ export class SystemController {
     ]);
 
     const voice = this.voiceService.getProviderType();
+    const content = this.contentService.jamendoProvider().isConfigured()
+      ? 'jamendo'
+      : 'demo';
 
-    return { llm, voice, db, redis };
+    return { content, llm, voice, db, redis };
   }
 }
