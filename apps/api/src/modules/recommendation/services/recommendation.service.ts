@@ -50,15 +50,16 @@ export class RecommendationService {
   private readonly demoNowIds = [
     'cnt_afterhours_loop',
     'cnt_canton_midnight',
-    'cnt_podcast_brief',
+    'cnt_city_rain',
   ];
   private readonly demoDailyIds = [
     'cnt_editorial_dusk',
     'cnt_focus_fm',
     'cnt_canton_midnight',
     'cnt_city_rain',
-    'cnt_podcast_brief',
+    'cnt_afterhours_loop',
   ];
+  private readonly demoProviderName = 'cusic_demo';
 
   private readonly logger = new Logger(RecommendationService.name);
 
@@ -467,11 +468,11 @@ export class RecommendationService {
   private async getDemoNowRecommendation(
     hour: number,
   ): Promise<NowRecommendationDto> {
-    const ids =
+    const fallbackIds =
       hour >= 21 || hour < 6
         ? this.demoNowIds
-        : ['cnt_morning_wire', 'cnt_editorial_dusk', 'cnt_podcast_brief'];
-    const items = await this.contentService.getByIds(ids);
+        : ['cnt_morning_wire', 'cnt_editorial_dusk', 'cnt_city_rain'];
+    const items = await this.fetchPreferredPlayableTrackDtos(3, fallbackIds);
 
     return {
       recommendationId: 'rec_demo_now',
@@ -492,7 +493,10 @@ export class RecommendationService {
   }
 
   private async getDemoDailyPlaylist(): Promise<DailyPlaylistDto> {
-    const items = await this.contentService.getByIds(this.demoDailyIds);
+    const items = await this.fetchPreferredPlayableTrackDtos(
+      5,
+      this.demoDailyIds,
+    );
 
     return {
       playlistId: 'daily_demo',
@@ -516,7 +520,7 @@ export class RecommendationService {
     hour: number,
     moodLabel?: string,
   ): Promise<{ ranked: RankedCandidate[]; vectorCandidateCount: number }> {
-    await this.contentService.ensureDemoCatalogSynced();
+    await this.contentService.search({ page: 1, pageSize: 1 });
 
     // Phase 1: Vector-based candidate recall
     let candidates: Prisma.ContentItemGetPayload<Record<string, never>>[];
@@ -529,10 +533,7 @@ export class RecommendationService {
         vectorCandidateCount = vectorCandidates.length;
         this.logger.log(`Vector recall: ${vectorCandidateCount} candidates`);
       } else {
-        candidates = await this.prisma.contentItem.findMany({
-          where: { playable: true },
-          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-        });
+        candidates = await this.fetchPreferredPlayableTrackCandidates(50);
         this.logger.log(
           'Vector recall returned too few candidates, using full catalog',
         );
@@ -541,10 +542,7 @@ export class RecommendationService {
       this.logger.warn(
         `[${getRequestId()}] Vector recall failed, falling back to full catalog: ${String(error)}`,
       );
-      candidates = await this.prisma.contentItem.findMany({
-        where: { playable: true },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      });
+      candidates = await this.fetchPreferredPlayableTrackCandidates(50);
     }
 
     const [favorites, events] = await Promise.all([
@@ -769,7 +767,11 @@ export class RecommendationService {
       // Fetch full ContentItem objects in vector order
       const ids = results.map((r) => r.id as string);
       const contentItems = await this.prisma.contentItem.findMany({
-        where: { id: { in: ids }, playable: true },
+        where: {
+          id: { in: ids },
+          playable: true,
+          contentType: ContentType.TRACK,
+        },
       });
 
       const itemMap = new Map(contentItems.map((item) => [item.id, item]));
@@ -777,7 +779,7 @@ export class RecommendationService {
         .map((id) => itemMap.get(id))
         .filter(
           (item): item is Prisma.ContentItemGetPayload<Record<string, never>> =>
-            !!item,
+            !!item && this.hasPlayableAudio(item),
         );
 
       return ordered;
@@ -787,6 +789,111 @@ export class RecommendationService {
       );
       return [];
     }
+  }
+
+  private async fetchPreferredPlayableTrackDtos(
+    limit: number,
+    fallbackIds: string[],
+  ): Promise<ContentItemDto[]> {
+    const candidates = await this.fetchPreferredPlayableTrackCandidates(
+      limit,
+      fallbackIds,
+    );
+
+    return candidates.map((content) =>
+      this.contentService.toContentItemDto(content),
+    );
+  }
+
+  private async fetchPreferredPlayableTrackCandidates(
+    limit: number,
+    fallbackIds: string[] = [],
+  ): Promise<Prisma.ContentItemGetPayload<Record<string, never>>[]> {
+    await this.contentService.search({ page: 1, pageSize: 1 });
+
+    const realItems = await this.prisma.contentItem.findMany({
+      where: {
+        playable: true,
+        contentType: ContentType.TRACK,
+        providerMappings: {
+          some: {
+            providerName: { not: this.demoProviderName },
+            syncStatus: 'READY',
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      take: Math.max(limit * 3, 20),
+    });
+
+    const picked = this.uniquePlayableTracks(realItems);
+    if (picked.length >= limit) {
+      return picked.slice(0, limit);
+    }
+
+    const fallbackItems = fallbackIds.length
+      ? await this.prisma.contentItem.findMany({
+          where: {
+            id: { in: fallbackIds },
+            playable: true,
+            contentType: ContentType.TRACK,
+          },
+        })
+      : await this.prisma.contentItem.findMany({
+          where: {
+            playable: true,
+            contentType: ContentType.TRACK,
+          },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          take: Math.max(limit * 3, 20),
+        });
+
+    const fallbackById = new Map(fallbackItems.map((item) => [item.id, item]));
+    const orderedFallback = fallbackIds.length
+      ? fallbackIds
+          .map((id) => fallbackById.get(id))
+          .filter(
+            (
+              item,
+            ): item is Prisma.ContentItemGetPayload<Record<string, never>> =>
+              Boolean(item),
+          )
+      : fallbackItems;
+
+    return this.uniquePlayableTracks([...picked, ...orderedFallback]).slice(
+      0,
+      limit,
+    );
+  }
+
+  private uniquePlayableTracks(
+    items: Prisma.ContentItemGetPayload<Record<string, never>>[],
+  ) {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      if (seen.has(item.id) || !this.hasPlayableAudio(item)) {
+        return false;
+      }
+      seen.add(item.id);
+      return true;
+    });
+  }
+
+  private hasPlayableAudio(
+    item: Prisma.ContentItemGetPayload<Record<string, never>>,
+  ) {
+    if (!item.playable || item.contentType !== ContentType.TRACK) {
+      return false;
+    }
+
+    const metadata = item.metadataJson;
+    return Boolean(
+      metadata &&
+      typeof metadata === 'object' &&
+      !Array.isArray(metadata) &&
+      typeof (metadata as Record<string, unknown>).audioUrl === 'string' &&
+      ((metadata as Record<string, unknown>).audioUrl as string).trim(),
+    );
   }
 
   private toRecommendationCardDto(

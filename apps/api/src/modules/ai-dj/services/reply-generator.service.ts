@@ -110,13 +110,13 @@ export class ReplyGeneratorService {
       conversation:
         'The user is chatting casually or asking a question. Respond helpfully as a knowledgeable music companion — answer their question, share musical insight, or offer suggestions. Do NOT act like you have already queued or changed anything. You can suggest songs or directions, but always invite the user to confirm before taking action.',
       queue_replace:
-        'The user wants to switch to new music. Suggest the selected tracks naturally.',
+        'The playback tool has already replaced the queue with the selected tracks. Say clearly that you switched the music, name the tracks, and do not ask for confirmation.',
       queue_append:
-        'The user wants to add more tracks. Mention how these complement the current queue.',
+        'The playback tool has already appended the selected tracks. Say clearly that you added them, name the tracks, and do not ask for confirmation.',
       recommend_explain:
         'The user wants to understand why something was recommended. Explain the musical reasoning.',
       theme_playlist_preview:
-        'The user wants a themed playlist. Paint a vivid picture of the mood and explain why these tracks fit together.',
+        'The playback tool has already prepared a themed queue preview. Paint a concise picture of the mood, name the selected tracks, and mention it can be saved as a playlist.',
       knowledge_query:
         "The user is asking about music knowledge — artist backgrounds, genre history, song stories, or music theory. Provide an informative, well-structured answer. Reference the tracks in the user's music library if relevant. Be conversational but factual.",
     };
@@ -161,8 +161,11 @@ Guidelines:
 
       case 'queue_append':
         return contentIds.length > 0
-          ? '我在当前队列后面补两段相近但不抢戏的内容，让这条听感线继续往前走。'
-          : '这轮我没有找到适合继续追加的内容，先保持当前队列不动。你可以再给我一点风格或语种的线索。';
+          ? this.buildActionReply(
+              '我已把这几首追加到队列后面',
+              context.trackDescriptions,
+            )
+          : '我没有找到可播放的追加曲目，所以这次没有改动当前队列。可以换一个更明确的风格、语种或艺人名再试。';
 
       case 'recommend_explain': {
         if (context.currentTrackTitle) {
@@ -180,8 +183,12 @@ Guidelines:
 
       case 'theme_playlist_preview':
         return contentIds.length > 0
-          ? '我先把这个主题压成一组可直接上机的预览队列，你先听走向，再决定要不要继续扩写。'
-          : '这轮主题还不够清晰，我先保留当前频道。你可以补一句语种、场景或时间段，我再帮你捏合。';
+          ? this.buildActionReply(
+              '我已先把这组主题预览切进播放器',
+              context.trackDescriptions,
+              '如果方向对，你可以直接把它保存成歌单。',
+            )
+          : '我没有找到足够可播放的曲目来生成这张歌单预览，所以当前队列保持不变。可以补充语种、场景或风格后再试。';
 
       case 'knowledge_query':
         return '这是一个有意思的问题。虽然我现在没法做完整的知识检索，但你可以试试用「放一首 + 风格」来调整播放，或者稍等片刻后重新问我。';
@@ -189,9 +196,26 @@ Guidelines:
       case 'queue_replace':
       default:
         return contentIds.length > 0
-          ? '收到。我把主频道切到更贴近你这句指令的航线，先用三段内容把新的听感重心立住。'
-          : '我还没锁定足够明确的方向，先不动当前队列。你可以再补一句语种、场景或风格，比如「来点粤语」「放首爵士」或者「换个安静的」。';
+          ? this.buildActionReply(
+              '我已把播放器切到这条新路线',
+              context.trackDescriptions,
+            )
+          : '我没有找到可播放的匹配曲目，所以这次没有改动当前队列。可以换一个风格、语种或艺人名再试。';
     }
+  }
+
+  private buildActionReply(
+    lead: string,
+    trackDescriptions: string,
+    suffix?: string,
+  ) {
+    const titles = trackDescriptions
+      .split('\n')
+      .map((line) => line.match(/^"([^"]+)"/)?.[1])
+      .filter((title): title is string => Boolean(title));
+    const trackText = titles.length > 0 ? `：${titles.join('、')}。` : '。';
+
+    return `${lead}${trackText}${suffix ? ` ${suffix}` : ''}`;
   }
 
   private fallbackConversation(context: ReplyContext): string {

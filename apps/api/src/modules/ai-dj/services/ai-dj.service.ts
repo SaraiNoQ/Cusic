@@ -66,6 +66,11 @@ type StreamPlan = {
   currentTrackLanguage?: string;
 };
 
+type TurnPlan = StreamPlan & {
+  replyContext: ReplyContext;
+  precomputedReplyText?: string;
+};
+
 type StreamPayload = {
   sessionId: string;
   messageId: string;
@@ -477,15 +482,20 @@ export class AiDjService {
         : null;
 
     if (replyContext) {
-      // For knowledge_query with pre-generated reply, stream the cached text
-      const isKnowledgeWithCache =
-        replyContext.intent === 'knowledge_query' &&
-        streamContext?.knowledgeReplyText;
+      const forcedReplyText =
+        streamContext?.knowledgeReplyText ??
+        streamContext?.precomputedReplyText ??
+        (payload.actions.length === 0 &&
+        (replyContext.intent === 'queue_replace' ||
+          replyContext.intent === 'queue_append' ||
+          replyContext.intent === 'theme_playlist_preview')
+          ? payload.replyText
+          : undefined);
 
       let fullText = '';
 
-      if (isKnowledgeWithCache) {
-        fullText = streamContext.knowledgeReplyText!;
+      if (forcedReplyText) {
+        fullText = forcedReplyText;
         const chars = this.chunkReplyText(fullText);
         for (const char of chars) {
           if (signal.aborted) {
@@ -501,7 +511,7 @@ export class AiDjService {
           });
         }
         this.logger.log(
-          `Streamed pre-generated knowledge reply for message ${messageId}`,
+          `Streamed pre-generated reply for message ${messageId}`,
         );
       } else {
         this.logger.log(
@@ -576,7 +586,9 @@ export class AiDjService {
         },
       });
 
-      await this.updatePersistedReply(messageId, fullText);
+      if (payload.userId) {
+        await this.updatePersistedReply(messageId, fullText);
+      }
 
       this.streamPayloads.delete(messageId);
       subscriber.complete();
@@ -670,6 +682,7 @@ export class AiDjService {
     currentTrackTitle?: string;
     currentTrackLanguage?: string;
     knowledgeReplyText?: string;
+    precomputedReplyText?: string;
   } | null> {
     if (!userId) {
       return null;
@@ -723,6 +736,10 @@ export class AiDjService {
       typeof trace.knowledgeReplyText === 'string'
         ? trace.knowledgeReplyText
         : undefined;
+    const precomputedReplyText =
+      typeof trace.precomputedReplyText === 'string'
+        ? trace.precomputedReplyText
+        : undefined;
 
     if (!intent || !userMessage) {
       return null;
@@ -738,6 +755,7 @@ export class AiDjService {
       currentTrackTitle,
       currentTrackLanguage,
       knowledgeReplyText,
+      precomputedReplyText,
     };
   }
 
@@ -763,173 +781,22 @@ export class AiDjService {
     userId?: string,
     timezoneHeader?: string,
   ): Promise<ReplyPlan> {
-    const intent = await this.intentClassifier.classify(message);
-
-    if (intent === 'knowledge_query') {
-      if (userId) {
-        try {
-          const result = await this.knowledgeService.query(
-            userId,
-            null,
-            message,
-          );
-          return {
-            intent,
-            replyText: result.summaryText,
-            actions: [],
-            trace: {
-              intent,
-              knowledgeTraceId: result.traceId,
-              relatedContentIds: result.relatedContent.map((c) => c.contentId),
-              mode: 'knowledge_query_v1',
-            },
-          };
-        } catch (error) {
-          this.logger.warn(
-            `[${getRequestId()}] Knowledge query failed, using conversational fallback: ${String(error)}`,
-          );
-        }
-      }
-
-      // Fallback to conversation-style reply
-      const fallbackText = await this.replyGenerator.generateReply({
-        message,
-        intent,
-        contentIds: [],
-        trackDescriptions: '',
-      });
-      return {
-        intent,
-        replyText: fallbackText,
-        actions: [],
-        trace: { intent, fallback: true, mode: 'knowledge_query_fallback_v1' },
-      };
-    }
-
-    // Even when intent is "conversation", check if the message looks like a
-    // music request. This catches cases where the LLM is unavailable and the
-    // fallback classifier didn't detect a specific command pattern.
-    const hasMusicIntent =
-      intent !== 'conversation' ||
-      /推荐|来[首点个些]|放[首点个些]|播[首点个些]|换[首点个些]|切歌|来点|放点|换点|我想听|有什么.*(?:好听|推荐|歌|音乐)|recommend|suggest|play|surprise/i.test(
-        message,
-      );
-
-    const isConversation = !hasMusicIntent;
-    const effectiveIntent: AiDjIntent = isConversation
-      ? 'conversation'
-      : intent === 'conversation'
-        ? 'queue_replace'
-        : intent;
-    const queueIds = surfaceContext?.queueContentIds ?? [];
-
-    let picks: string[] = [];
-    let trackDescriptions = '';
-    let actions: AiDjActionDto[] = [];
-
-    if (!isConversation) {
-      const count =
-        intent === 'queue_append'
-          ? 2
-          : intent === 'theme_playlist_preview'
-            ? 3
-            : 3;
-      const contentIds = await this.contentSelector.selectContent(
-        message,
-        count,
-      );
-
-      const filtered =
-        intent === 'queue_append'
-          ? contentIds.filter((id) => !queueIds.includes(id))
-          : contentIds;
-
-      picks = filtered.slice(0, intent === 'queue_append' ? 2 : 3);
-
-      actions =
-        picks.length > 0
-          ? [
-              {
-                type:
-                  intent === 'queue_append' ? 'queue_append' : 'queue_replace',
-                payload: { contentIds: picks },
-              },
-            ]
-          : [];
-
-      const trackItems = await this.contentService.getByIds(picks);
-      trackDescriptions = trackItems
-        .map(
-          (t) =>
-            `"${t.title}" by ${(t.artists ?? []).join(', ')} [${t.language ?? 'en'}, ${t.type}]`,
-        )
-        .join('\n');
-    }
-
-    const currentTrackTitle = surfaceContext?.currentTrackId
-      ? ((await this.contentService.getById(surfaceContext.currentTrackId))
-          ?.title ?? undefined)
-      : undefined;
-
-    const currentTrack = surfaceContext?.currentTrackId
-      ? await this.contentService.getById(surfaceContext.currentTrackId)
-      : null;
-
-    let tasteSummary: string | undefined;
-    let timeOfDay: string | undefined;
-
-    if (userId) {
-      try {
-        const recommendation =
-          await this.recommendationService.getNowRecommendation(
-            userId,
-            timezoneHeader,
-          );
-        tasteSummary = recommendation.explanation;
-
-        const hour = new Date().getHours();
-        timeOfDay =
-          hour < 6
-            ? 'late-night'
-            : hour < 11
-              ? 'morning'
-              : hour < 17
-                ? 'daytime'
-                : hour < 21
-                  ? 'evening'
-                  : 'late-night';
-      } catch {
-        // Non-critical — reply still works without taste context
-      }
-    }
-
-    const replyContext: ReplyContext = {
+    const plan = await this.composeTurnPlan(
       message,
-      intent: effectiveIntent,
-      contentIds: picks,
-      trackDescriptions,
-      tasteProfileSummary: tasteSummary,
-      timeOfDay,
-      currentTrackTitle,
-      currentTrackLanguage: currentTrack?.language ?? undefined,
-    };
-
-    const replyText = await this.replyGenerator.generateReply(replyContext);
+      surfaceContext,
+      userId,
+      timezoneHeader,
+      'sync',
+    );
+    const replyText =
+      plan.precomputedReplyText ??
+      (await this.replyGenerator.generateReply(plan.replyContext));
 
     return {
-      intent,
+      intent: plan.intent,
       replyText,
-      actions,
-      trace: {
-        intent,
-        matchedContentIds: picks,
-        mode: 'llm_v1',
-        ...(intent === 'theme_playlist_preview'
-          ? {
-              playlistDraft: this.buildPlaylistDraft(message, picks),
-            }
-          : {}),
-      },
+      actions: plan.actions,
+      trace: plan.trace,
     };
   }
 
@@ -939,6 +806,22 @@ export class AiDjService {
     userId?: string,
     timezoneHeader?: string,
   ): Promise<StreamPlan> {
+    return this.composeTurnPlan(
+      message,
+      surfaceContext,
+      userId,
+      timezoneHeader,
+      'stream',
+    );
+  }
+
+  private async composeTurnPlan(
+    message: string,
+    surfaceContext: ChatSurfaceContextDto | undefined,
+    userId: string | undefined,
+    timezoneHeader: string | undefined,
+    mode: 'sync' | 'stream',
+  ): Promise<TurnPlan> {
     const intent = await this.intentClassifier.classify(message);
 
     if (intent === 'knowledge_query') {
@@ -949,68 +832,74 @@ export class AiDjService {
             null,
             message,
           );
+          const relatedContentIds = result.relatedContent.map(
+            (c) => c.contentId,
+          );
+          const replyContext: ReplyContext = {
+            message,
+            intent,
+            contentIds: relatedContentIds,
+            trackDescriptions: '',
+          };
+
           return {
             intent,
             actions: [],
-            contentIds: result.relatedContent.map((c) => c.contentId),
+            contentIds: relatedContentIds,
             trackDescriptions: '',
+            replyContext,
+            precomputedReplyText: result.summaryText,
             trace: {
               intent,
               knowledgeTraceId: result.traceId,
               knowledgeReplyText: result.summaryText,
-              relatedContentIds: result.relatedContent.map((c) => c.contentId),
-              mode: 'knowledge_query_stream_v1',
+              relatedContentIds,
+              mode: `knowledge_query_${mode}_v1`,
             },
           };
         } catch (error) {
           this.logger.warn(
-            `[${getRequestId()}] Knowledge query (stream) failed, using conversational fallback: ${String(error)}`,
+            `[${getRequestId()}] Knowledge query failed, using conversational fallback: ${String(error)}`,
           );
         }
       }
 
-      // Fallback to conversation-style stream
+      const replyContext: ReplyContext = {
+        message,
+        intent,
+        contentIds: [],
+        trackDescriptions: '',
+      };
+      const fallbackText = this.replyGenerator.fallbackGenerate(replyContext);
+
       return {
         intent,
         actions: [],
         contentIds: [],
         trackDescriptions: '',
+        replyContext,
+        precomputedReplyText: fallbackText,
         trace: {
           intent,
           fallback: true,
-          mode: 'knowledge_query_stream_fallback_v1',
+          precomputedReplyText: fallbackText,
+          mode: `knowledge_query_${mode}_fallback_v1`,
         },
       };
     }
 
-    // Even when intent is "conversation", check if the message looks like a
-    // music request. This catches cases where the LLM is unavailable and the
-    // fallback classifier didn't detect a specific command pattern.
-    const hasMusicIntent =
-      intent !== 'conversation' ||
-      /推荐|来[首点个些]|放[首点个些]|播[首点个些]|换[首点个些]|切歌|来点|放点|换点|我想听|有什么.*(?:好听|推荐|歌|音乐)|recommend|suggest|play|surprise/i.test(
-        message,
-      );
-
-    const isConversation = !hasMusicIntent;
-    const effectiveIntent: AiDjIntent = isConversation
-      ? 'conversation'
-      : intent === 'conversation'
-        ? 'queue_replace'
-        : intent;
+    const isQueueIntent =
+      intent === 'queue_replace' ||
+      intent === 'queue_append' ||
+      intent === 'theme_playlist_preview';
     const queueIds = surfaceContext?.queueContentIds ?? [];
 
     let picks: string[] = [];
     let trackDescriptions = '';
     let actions: AiDjActionDto[] = [];
 
-    if (!isConversation) {
-      const count =
-        intent === 'queue_append'
-          ? 2
-          : intent === 'theme_playlist_preview'
-            ? 3
-            : 3;
+    if (isQueueIntent) {
+      const count = this.inferPickCount(message, intent);
       const contentIds = await this.contentSelector.selectContent(
         message,
         count,
@@ -1021,7 +910,7 @@ export class AiDjService {
           ? contentIds.filter((id) => !queueIds.includes(id))
           : contentIds;
 
-      picks = filtered.slice(0, intent === 'queue_append' ? 2 : 3);
+      picks = filtered.slice(0, count);
 
       actions =
         picks.length > 0
@@ -1058,22 +947,26 @@ export class AiDjService {
             timezoneHeader,
           );
         tasteSummary = recommendation.explanation;
-
-        const hour = new Date().getHours();
-        timeOfDay =
-          hour < 6
-            ? 'late-night'
-            : hour < 11
-              ? 'morning'
-              : hour < 17
-                ? 'daytime'
-                : hour < 21
-                  ? 'evening'
-                  : 'late-night';
+        timeOfDay = this.resolveTimeOfDay();
       } catch {
-        // Non-critical
+        // Non-critical — reply still works without taste context.
       }
     }
+
+    const replyContext: ReplyContext = {
+      message,
+      intent,
+      contentIds: picks,
+      trackDescriptions,
+      tasteProfileSummary: tasteSummary,
+      timeOfDay,
+      currentTrackTitle: currentTrack?.title ?? undefined,
+      currentTrackLanguage: currentTrack?.language ?? undefined,
+    };
+    const precomputedReplyText =
+      isQueueIntent && picks.length === 0
+        ? this.replyGenerator.fallbackGenerate(replyContext)
+        : undefined;
 
     return {
       intent,
@@ -1084,10 +977,13 @@ export class AiDjService {
       timeOfDay,
       currentTrackTitle: currentTrack?.title ?? undefined,
       currentTrackLanguage: currentTrack?.language ?? undefined,
+      replyContext,
+      precomputedReplyText,
       trace: {
         intent,
         matchedContentIds: picks,
-        mode: 'llm_stream_v1',
+        precomputedReplyText,
+        mode: `tool_${mode}_v1`,
         ...(intent === 'theme_playlist_preview' && picks.length > 0
           ? {
               playlistDraft: this.buildPlaylistDraft(message, picks),
@@ -1197,6 +1093,50 @@ export class AiDjService {
 
   private buildSessionTitle(message: string) {
     return message.trim().slice(0, 48);
+  }
+
+  private inferPickCount(message: string, intent: AiDjIntent) {
+    const normalized = message.toLowerCase();
+    const explicitCount = /(?:一|1|one)\s*(?:首|个|段|曲|song|track)/i.test(
+      normalized,
+    )
+      ? 1
+      : /(?:两|二|2|two|couple)\s*(?:首|个|段|曲|song|track)?/i.test(normalized)
+        ? 2
+        : /(?:三|3|three)\s*(?:首|个|段|曲|song|track)?/i.test(normalized)
+          ? 3
+          : /(?:四|4|four)\s*(?:首|个|段|曲|song|track)?/i.test(normalized)
+            ? 4
+            : /(?:五|5|five)\s*(?:首|个|段|曲|song|track)?/i.test(normalized)
+              ? 5
+              : null;
+
+    if (explicitCount) {
+      return explicitCount;
+    }
+
+    if (intent === 'queue_append') {
+      return 2;
+    }
+
+    return intent === 'theme_playlist_preview' ? 5 : 3;
+  }
+
+  private resolveTimeOfDay() {
+    const hour = new Date().getHours();
+    if (hour < 6) {
+      return 'late-night';
+    }
+    if (hour < 11) {
+      return 'morning';
+    }
+    if (hour < 17) {
+      return 'daytime';
+    }
+    if (hour < 21) {
+      return 'evening';
+    }
+    return 'late-night';
   }
 
   private registerStreamPayload(payload: StreamPayload) {

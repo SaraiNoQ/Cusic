@@ -11,6 +11,11 @@ interface TrackCandidate {
   type: string;
 }
 
+type ParsedMusicRequest = {
+  searchTerms: string[];
+  originalKeywords: string[];
+};
+
 @Injectable()
 export class ContentSelectorService {
   private readonly logger = new Logger(ContentSelectorService.name);
@@ -21,6 +26,11 @@ export class ContentSelectorService {
   ) {}
 
   async selectContent(message: string, count: number): Promise<string[]> {
+    const deterministic = await this.deterministicSelect(message, count);
+    if (deterministic.length > 0) {
+      return deterministic;
+    }
+
     const llmAvailable = await this.llmService.isAvailable();
 
     if (llmAvailable) {
@@ -37,6 +47,74 @@ export class ContentSelectorService {
     }
 
     return this.fallbackSelect(message, count);
+  }
+
+  private async deterministicSelect(
+    message: string,
+    count: number,
+  ): Promise<string[]> {
+    const request = this.parseMusicRequest(message);
+    const selectedIds: string[] = [];
+
+    const addIds = (ids: string[]) => {
+      for (const id of ids) {
+        if (!selectedIds.includes(id)) {
+          selectedIds.push(id);
+        }
+      }
+    };
+
+    const externalQuery = request.searchTerms.join(' ').trim();
+    if (externalQuery && this.contentService.jamendoProvider().isConfigured()) {
+      try {
+        const externalItems = await this.contentService.searchExternalTracks(
+          externalQuery,
+          Math.max(count * 2, 5),
+        );
+        addIds(
+          externalItems
+            .filter((item) => item.playable && item.audioUrl)
+            .map((item) => item.id),
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Jamendo content selection failed, using local catalog: ${String(error)}`,
+        );
+      }
+    }
+
+    for (const term of [
+      ...request.originalKeywords,
+      ...request.searchTerms,
+    ].filter(Boolean)) {
+      if (selectedIds.length >= count) {
+        break;
+      }
+
+      const searchResult = await this.contentService.search({
+        q: term,
+        type: 'track',
+        page: 1,
+        pageSize: Math.max(count * 2, 5),
+      });
+      addIds(
+        searchResult.items
+          .filter((item) => item.playable && item.audioUrl)
+          .map((item) => item.id),
+      );
+    }
+
+    if (selectedIds.length < count) {
+      const pool = this.resolveMoodPool(message);
+      const poolItems = await this.contentService.getByIds(pool);
+      addIds(
+        poolItems
+          .filter((item) => item.playable && item.audioUrl)
+          .map((item) => item.id),
+      );
+    }
+
+    return selectedIds.slice(0, count);
   }
 
   private async llmSelect(message: string, count: number): Promise<string[]> {
@@ -149,11 +227,65 @@ Return ONLY a valid JSON object: {"contentIds": ["id1", "id2"], "reasoning": "Br
     return validIds.slice(0, count);
   }
 
+  private parseMusicRequest(message: string): ParsedMusicRequest {
+    const originalKeywords = this.extractSearchKeywords(message);
+    const lower = message.toLowerCase();
+    const terms = new Set<string>();
+
+    const add = (...values: string[]) => {
+      for (const value of values) {
+        if (value.trim()) {
+          terms.add(value.trim());
+        }
+      }
+    };
+
+    if (/粤语|广东话|cantopop|cantonese|港乐|港/.test(lower)) {
+      add('cantonese', 'cantopop');
+    }
+    if (/爵士|jazz/.test(lower)) {
+      add('jazz');
+    }
+    if (/摇滚|rock|吉他|guitar/.test(lower)) {
+      add('rock', 'guitar');
+    }
+    if (/电子|electronic|edm|舞曲|dance/.test(lower)) {
+      add('electronic');
+    }
+    if (/古典|classical|钢琴|piano/.test(lower)) {
+      add('classical', 'piano');
+    }
+    if (/放松|安静|舒缓|chill|relax|calm|quiet/.test(lower)) {
+      add('chill', 'calm');
+    }
+    if (/通勤|早高峰|morning|commute/.test(lower)) {
+      add('morning', 'commute');
+    }
+    if (/夜|深夜|晚上|midnight|night|late/.test(lower)) {
+      add('night', 'midnight');
+    }
+    if (/专注|工作|学习|写代码|focus|work|study|code/.test(lower)) {
+      add('focus');
+    }
+
+    for (const keyword of originalKeywords) {
+      const hasCjk = /[\u4e00-\u9fff]/.test(keyword);
+      if (!hasCjk || terms.size === 0) {
+        add(keyword);
+      }
+    }
+
+    return {
+      originalKeywords,
+      searchTerms: [...terms],
+    };
+  }
+
   private extractSearchKeywords(message: string): string[] {
     // Strip out command/action words to leave just the content description.
     const stripped = message
       .replace(
-        /[来放播换切听给帮]一?[首点个些首歌]|我想|给我|帮我|推荐|有什么|来点|放点|换点|换一种|切歌|换歌|歌单|playlist|play|put on|switch|change.*(?:music|song|track)|give me|i want|can you/gi,
+        /(?:[来放播换切听给帮](?:一|几|两|三|四|五|些|点|个)?(?:首|点|个|些|段|曲|歌|音乐)?|我想|想听|给我|帮我|推荐|有什么|来点|放点|换点|换一种|切歌|换歌|歌单|playlist|play|put on|switch|change.*(?:music|song|track)|give me|i want|can you)/gi,
         ' ',
       )
       .replace(/[，。！？,.!?]+/g, ' ')

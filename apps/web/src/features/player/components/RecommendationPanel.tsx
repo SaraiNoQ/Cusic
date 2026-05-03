@@ -46,50 +46,78 @@ export function RecommendationPanel({
         </div>
 
         <div className={styles.recommendationList}>
-          {items.map((item) => (
-            <div key={item.contentId} className={styles.recommendationItem}>
-              <div className={styles.recommendationCopy}>
-                <strong>{item.title}</strong>
-                <span>{item.reason}</span>
+          {items.map((item) => {
+            const canPlay = Boolean(
+              item.content.playable && item.content.audioUrl,
+            );
+
+            return (
+              <div key={item.contentId} className={styles.recommendationItem}>
+                <div className={styles.recommendationCopy}>
+                  <strong>{item.title}</strong>
+                  <span>
+                    {canPlay
+                      ? item.reason
+                      : `${item.reason} This signal has no playable audio source yet.`}
+                  </span>
+                </div>
+                <div className={styles.recommendationActions}>
+                  <button
+                    type="button"
+                    onClick={() => onPlay(item.content)}
+                    disabled={!canPlay}
+                    title={
+                      canPlay ? 'Play recommendation' : 'No playable audio'
+                    }
+                  >
+                    PLAY
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onQueue(item.content)}
+                    disabled={!canPlay}
+                    title={
+                      canPlay ? 'Queue recommendation' : 'No playable audio'
+                    }
+                  >
+                    QUEUE
+                  </button>
+                  {onFeedback ? (
+                    <>
+                      <button
+                        type="button"
+                        className={
+                          feedbackState[item.contentId] === 'liked'
+                            ? styles.feedbackButtonActive
+                            : undefined
+                        }
+                        onClick={() => handleFeedback(item.contentId, 'like')}
+                        title="Like this recommendation"
+                      >
+                        {feedbackState[item.contentId] === 'liked' ? '★' : '☆'}
+                      </button>
+                      <button
+                        type="button"
+                        className={
+                          feedbackState[item.contentId] === 'disliked'
+                            ? styles.feedbackButtonActive
+                            : undefined
+                        }
+                        onClick={() =>
+                          handleFeedback(item.contentId, 'dislike')
+                        }
+                        title="Not interested"
+                      >
+                        {feedbackState[item.contentId] === 'disliked'
+                          ? '✕'
+                          : '×'}
+                      </button>
+                    </>
+                  ) : null}
+                </div>
               </div>
-              <div className={styles.recommendationActions}>
-                <button type="button" onClick={() => onPlay(item.content)}>
-                  PLAY
-                </button>
-                <button type="button" onClick={() => onQueue(item.content)}>
-                  QUEUE
-                </button>
-                {onFeedback ? (
-                  <>
-                    <button
-                      type="button"
-                      className={
-                        feedbackState[item.contentId] === 'liked'
-                          ? styles.feedbackButtonActive
-                          : undefined
-                      }
-                      onClick={() => handleFeedback(item.contentId, 'like')}
-                      title="Like this recommendation"
-                    >
-                      {feedbackState[item.contentId] === 'liked' ? '★' : '☆'}
-                    </button>
-                    <button
-                      type="button"
-                      className={
-                        feedbackState[item.contentId] === 'disliked'
-                          ? styles.feedbackButtonActive
-                          : undefined
-                      }
-                      onClick={() => handleFeedback(item.contentId, 'dislike')}
-                      title="Not interested"
-                    >
-                      {feedbackState[item.contentId] === 'disliked' ? '✕' : '×'}
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </article>
 

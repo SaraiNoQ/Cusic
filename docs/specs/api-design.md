@@ -648,7 +648,8 @@ API 端统一启用以下安全与性能中间件：
 2. 已登录用户会创建一条 `context_snapshots`，随后把推荐结果写入 `recommendation_results` 与 `recommendation_items`。
 3. 未登录用户返回 demo fallback，不写数据库。
 4. 浏览器端可通过 `X-Cusic-Timezone` 传入时区；首版上下文只保证 `timezone` 与 `local_time` 真实。
-5. 首版排序采用规则排序，不接天气、日历、外部导入，也不做向量召回。
+5. Radar 主播放路径只返回 canonical playable track，`content.audioUrl` 必须非空；存在 Jamendo/导入等真实 provider 内容时优先返回真实 provider 内容，只有无真实可播放内容时才回退 demo catalog。
+6. 首版排序采用规则排序，不接天气、日历、外部导入，也不做向量召回。
 
 响应 DTO：
 
@@ -685,6 +686,7 @@ API 端统一启用以下安全与性能中间件：
 2. 已登录用户按“每用户每天一份”同步生成或复用 daily playlist，并写入 `daily_playlist_jobs`。
 3. 首次生成时同时落一条 `DAILY` 类型 `recommendation_results`，并把 `recommendationResultId` 写入歌单 `generated_context_json`。
 4. 未登录用户返回 demo fallback。
+5. Daily items 与 radar 一样必须是 canonical playable track，`audioUrl` 为空的内容不会进入 LOAD 主路径。
 
 响应 DTO：
 
@@ -760,19 +762,20 @@ API 端统一启用以下安全与性能中间件：
 2. `responseMode=stream` 仍先返回完整 `sessionId/messageId/replyText/actions`，随后前端再通过 `GET /dj/chat/stream` 消费增量 token。
 3. 已登录用户会创建或续写 `chat_sessions/chat_messages`，匿名用户只返回临时 `sessionId`，不落库。
 4. `surfaceContext` 由前端附带当前曲目和当前队列，用于解释当前播放和编排队列动作。
-5. LLM 驱动的意图识别（`IntentClassifierService`），支持以下意图：
+5. 工具优先的意图识别（`IntentClassifierService`），支持以下意图：
    - `conversation`：一般性对话、音乐知识提问、推荐咨询（不触发自动操作，仅文本回复）
    - `recommend_explain`：解释当前推荐的理由
    - `queue_append`：显式要求向当前队列追加曲目
    - `queue_replace`：显式要求替换整个播放队列
    - `theme_playlist_preview`：显式要求生成主题歌单
    - `knowledge_query`：用户询问音乐知识、艺人背景、流派历史、歌曲故事等
-     意图分类器优先使用 LLM 分类（DeepSeek V4 Flash），LLM 不可用时回退到规则型关键词匹配。另设 `mapToValidIntent()` 方法将 LLM 可能产出的非标准意图名称（如 `play_music`）映射到以上 6 个标准枚举值，防止因 LLM 输出格式偏差导致所有请求落入 `conversation` 兜底。
+     意图分类器先用确定性规则锁定播放、追加、歌单和知识类高置信指令；只有无法确定时才使用 LLM 分类。另设 `mapToValidIntent()` 方法将 LLM 可能产出的非标准意图名称（如 `play_music`）映射到以上 6 个标准枚举值，防止因 LLM 输出格式偏差导致所有请求落入 `conversation` 兜底。
 6. 匿名用户也可获得 LLM 流式回复：`replyStreamMode()` 将 stream plan（intent、contentIds、trackDescriptions 等）缓存到 in-memory `StreamPayload`，`executeStreamReply()` 在 `buildStreamContext()` 返回 `null`（匿名用户无 DB 记录）时从缓存重建 `ReplyContext`，继续调用 LLM 流式生成。
 7. 当前支持动作（仅 `queue_append` / `queue_replace` / `theme_playlist_preview` 意图触发）：
    - `queue_replace`
    - `queue_append`
-8. 当 `intent=theme_playlist_preview` 且用户已登录时，前端可调用 `POST /dj/playlists` 把本轮主题预览保存为 `ai_generated` 歌单。
+8. 播放类自然语言请求（例如“来一首爵士”“放点粤语”“换首安静的”）必须返回 `queue_replace` 或 `queue_append` action；若没有找到可播放内容，`actions=[]` 且 `replyText` 必须说明未改动队列的原因。
+9. 当 `intent=theme_playlist_preview` 且用户已登录时，前端可调用 `POST /dj/playlists` 把本轮主题预览保存为 `ai_generated` 歌单。
 
 请求 DTO：
 

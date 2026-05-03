@@ -192,7 +192,8 @@ export class ContentService implements OnModuleInit {
         item.language?.toLowerCase().includes(query) ||
         item.primaryArtistNames.some((artist) =>
           artist.toLowerCase().includes(query),
-        );
+        ) ||
+        this.metadataMatchesQuery(item.metadataJson, query);
 
       return matchesQuery;
     });
@@ -254,6 +255,25 @@ export class ContentService implements OnModuleInit {
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       take: 4,
     });
+
+    return items.map((item) => this.toContentItemDto(item));
+  }
+
+  async searchExternalTracks(query: string, limit = 10) {
+    await this.ensureCatalogSynced();
+    const cleaned = query.trim();
+    if (!cleaned || !this.jamendoContentProvider.isConfigured()) {
+      return [];
+    }
+
+    const tracks = await this.jamendoContentProvider.searchTracks(
+      cleaned,
+      limit,
+      0,
+    );
+    const items = await Promise.all(
+      tracks.map((track) => this.upsertJamendoTrack(track)),
+    );
 
     return items.map((item) => this.toContentItemDto(item));
   }
@@ -409,6 +429,28 @@ export class ContentService implements OnModuleInit {
       audioUrl: item.audioUrl ?? null,
       playable: item.playable ?? true,
     };
+  }
+
+  private metadataMatchesQuery(
+    metadata: Prisma.JsonValue | null,
+    query: string,
+  ) {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      return false;
+    }
+
+    return Object.values(metadata).some((value) => {
+      if (typeof value === 'string') {
+        return value.toLowerCase().includes(query);
+      }
+      if (Array.isArray(value)) {
+        return value.some(
+          (entry) =>
+            typeof entry === 'string' && entry.toLowerCase().includes(query),
+        );
+      }
+      return false;
+    });
   }
 
   private toPrismaContentType(type: ContentCatalogItem['type']) {

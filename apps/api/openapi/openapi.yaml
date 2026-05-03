@@ -361,6 +361,12 @@ components:
                     type: string
     ChatTurnResponseDto:
       type: object
+      description: >
+        AI DJ turn response. Music playback requests such as "来一首爵士",
+        "放点粤语", or "换首安静的" must resolve to queue_replace or
+        queue_append actions when playable content is available. If no playable
+        content is found, actions is empty and replyText explains that the queue
+        was not changed.
       required: [sessionId, messageId, intent, replyText, actions]
       properties:
         sessionId:

@@ -73,6 +73,10 @@ function clearPersistedChatSession() {
   window.localStorage.removeItem(chatSessionStorageKey);
 }
 
+function getActionExecutionKey(action: AiDjActionDto) {
+  return `${action.type}:${action.payload.contentIds.join(',')}`;
+}
+
 export function useChatController(playerController: PlayerController) {
   const authUser = useAuthStore((state) => state.user);
   const sessionId = useChatStore((state) => state.sessionId);
@@ -164,26 +168,31 @@ export function useChatController(playerController: PlayerController) {
   };
 
   const applyActions = async (actions: AiDjActionDto[]) => {
-    for (const action of actions) {
-      const items = await Promise.all(
-        action.payload.contentIds.map(fetchContentById),
-      );
-
-      if (items.length === 0) {
-        continue;
-      }
-
-      if (action.type === 'queue_replace') {
-        await playerController.replaceQueue(
-          items,
-          'AI DJ rewired the active queue.',
+    try {
+      for (const action of actions) {
+        const items = await Promise.all(
+          action.payload.contentIds.map(fetchContentById),
         );
-      } else if (action.type === 'queue_append') {
-        await playerController.appendTracks(
-          items,
-          'AI DJ extended the active queue.',
-        );
+
+        if (items.length === 0) {
+          continue;
+        }
+
+        if (action.type === 'queue_replace') {
+          await playerController.replaceQueue(
+            items,
+            'AI DJ rewired the active queue.',
+          );
+        } else if (action.type === 'queue_append') {
+          await playerController.appendTracks(
+            items,
+            'AI DJ extended the active queue.',
+          );
+        }
       }
+    } catch {
+      setChatError('AI DJ 已生成动作，但播放器执行失败，请稍后重试。');
+      setStatusText('AI DJ action could not be applied to the player.');
     }
   };
 
@@ -213,6 +222,8 @@ export function useChatController(playerController: PlayerController) {
       let streamedReply = '';
       let streamedActions = response.data.actions;
       let streamedIntent = response.data.intent;
+      const executedActionKeys = new Set<string>();
+      let actionExecution = Promise.resolve();
 
       setStreamingMessageId(assistantMsgId);
 
@@ -227,6 +238,26 @@ export function useChatController(playerController: PlayerController) {
             actions: streamedActions,
           });
         }
+      };
+      const applyUniqueActions = (actions: AiDjActionDto[]) => {
+        const freshActions = actions.filter((action) => {
+          const key = getActionExecutionKey(action);
+          if (executedActionKeys.has(key)) {
+            return false;
+          }
+          executedActionKeys.add(key);
+          return true;
+        });
+
+        if (freshActions.length === 0) {
+          return actionExecution;
+        }
+
+        actionExecution = actionExecution.then(() =>
+          applyActions(freshActions),
+        );
+        void actionExecution.catch(() => undefined);
+        return actionExecution;
       };
 
       try {
@@ -252,7 +283,7 @@ export function useChatController(playerController: PlayerController) {
                 intent: streamedIntent,
                 actions: streamedActions,
               });
-              applyActions(event.actions);
+              void applyUniqueActions(event.actions);
               return;
             }
 
@@ -300,7 +331,7 @@ export function useChatController(playerController: PlayerController) {
       }
 
       if (streamedActions.length > 0) {
-        await applyActions(streamedActions);
+        await applyUniqueActions(streamedActions);
       }
     } catch {
       appendMessage({

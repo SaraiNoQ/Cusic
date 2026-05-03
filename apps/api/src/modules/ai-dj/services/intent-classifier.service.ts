@@ -10,11 +10,17 @@ export class IntentClassifierService {
   constructor(private readonly llmService: LlmService) {}
 
   async classify(message: string, contextHint?: string): Promise<AiDjIntent> {
+    const deterministicIntent = this.fallbackClassify(message);
+    if (deterministicIntent !== 'conversation') {
+      return deterministicIntent;
+    }
+
     const llmAvailable = await this.llmService.isAvailable();
 
     if (llmAvailable) {
       try {
-        return await this.llmClassify(message, contextHint);
+        const llmIntent = await this.llmClassify(message, contextHint);
+        return llmIntent === 'conversation' ? deterministicIntent : llmIntent;
       } catch (error) {
         this.logger.warn(
           `[${getRequestId()}] LLM intent classification failed, using fallback: ${String(error)}`,
@@ -22,7 +28,7 @@ export class IntentClassifierService {
       }
     }
 
-    return this.fallbackClassify(message);
+    return deterministicIntent;
   }
 
   private async llmClassify(
@@ -124,16 +130,8 @@ Output ONLY a single line of JSON, no markdown, no code fences, no extra comment
       return normalized;
     }
 
-    // Map common LLM-invented intents to valid ones.
-    // Priority: recommend → replace, since most LLM "recommend" intents
-    // actually mean the user wants music played.
-    if (
-      /play|来|放|播|切换|切|change|switch|推荐|recommend|suggest/i.test(
-        normalized,
-      )
-    ) {
-      return 'queue_replace';
-    }
+    // Map common LLM-invented intents to valid ones. Specific tool intents
+    // must win over broad "recommend/play" language.
     if (/歌单|playlist|curate|build|合集/i.test(normalized)) {
       return 'theme_playlist_preview';
     }
@@ -149,6 +147,13 @@ Output ONLY a single line of JSON, no markdown, no code fences, no extra comment
       )
     ) {
       return 'knowledge_query';
+    }
+    if (
+      /play|来|放|播|切换|切|change|switch|推荐|recommend|suggest/i.test(
+        normalized,
+      )
+    ) {
+      return 'queue_replace';
     }
 
     return null;
@@ -189,7 +194,7 @@ Output ONLY a single line of JSON, no markdown, no code fences, no extra comment
     }
 
     if (
-      /(?:加|补|追加|再来|多来|再.*(?:来|放|播)|append|more.*like.*this|another.*(?:one|song|track))/i.test(
+      /(?:加|补|追加|再来|多来|继续来|再.*(?:来|放|播|听)|append|add.*(?:more|song|track)|more.*like.*this|another.*(?:one|song|track))/i.test(
         normalizedMessage,
       )
     ) {
@@ -197,7 +202,7 @@ Output ONLY a single line of JSON, no markdown, no code fences, no extra comment
     }
 
     if (
-      /(?:[换切].*[首歌]|[换切].*曲|换一?点|放一?点|来一?点|来[首点个些]|放[首点个些]|播[首点个些]|换[首点个些]|切[首歌]|[给帮]我.*(?:放|播|来|换|切|推荐|选)|推荐.*(?:首|歌|曲|音乐|一?下)|有什么.*(?:好听的|推荐|歌|音乐)|play|put on|switch|change.*(?:music|song|track)|我想听|听.*[首歌曲]|给我.*(?:歌|曲|音乐)|suggest|recommend)/i.test(
+      /(?:[换切](?:一)?(?:首|个|曲|歌|下)?|换一?点|放一?点|来一?点|(?:来|放|播|听|唱|换)(?:一|几|两|三|四|五|些|点|个)?(?:首|个|段|曲|歌|音乐)?|[给帮]我.*(?:放|播|来|换|切|推荐|选|点)|推荐.*(?:首|歌|曲|音乐|一下|一?个)|有什么.*(?:好听的|推荐|歌|音乐)|play|put on|switch|change.*(?:music|song|track)|我想听|想听.*(?:歌|曲|音乐)|听.*[首歌曲]|给我.*(?:歌|曲|音乐)|suggest|recommend|surprise)/i.test(
         normalizedMessage,
       )
     ) {

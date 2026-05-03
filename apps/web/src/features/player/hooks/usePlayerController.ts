@@ -10,6 +10,7 @@ import type {
 import { useEffect, useMemo, useRef } from 'react';
 import type { SyntheticEvent } from 'react';
 import {
+  fetchContentById,
   fetchRelatedContent,
   searchContent,
 } from '../../../lib/api/content-api';
@@ -234,6 +235,28 @@ export function usePlayerController() {
     });
   };
 
+  const hydratePlayableTrack = async (track: ContentItemDto) => {
+    const canonical = await fetchContentById(track.id).catch(() => track);
+    if (!canonical.audioUrl || !canonical.playable) {
+      setStatusText(`${canonical.title} has no playable audio source.`);
+      return null;
+    }
+    return canonical;
+  };
+
+  const hydratePlayableTracks = async (tracks: ContentItemDto[]) => {
+    const hydrated = await Promise.all(
+      tracks.map((track) => hydratePlayableTrack(track)),
+    );
+    return hydrated.filter((track): track is ContentItemDto => Boolean(track));
+  };
+
+  const replaceQueueItem = (
+    items: ContentItemDto[],
+    index: number,
+    track: ContentItemDto,
+  ) => items.map((item, itemIndex) => (itemIndex === index ? track : item));
+
   const recordEvent = async (
     contentId: string,
     eventType: PlaybackEventPayloadDto['eventType'],
@@ -254,14 +277,20 @@ export function usePlayerController() {
   };
 
   const replaceQueue = async (items: ContentItemDto[], message?: string) => {
-    setQueue(items);
-    setCurrentTrack(items[0] ?? null);
-    setActiveIndex(items.length > 0 ? 0 : -1);
+    const playableItems = await hydratePlayableTracks(items);
+    if (playableItems.length === 0) {
+      setStatusText('No playable audio source was found for that queue.');
+      return;
+    }
+
+    setQueue(playableItems);
+    setCurrentTrack(playableItems[0] ?? null);
+    setActiveIndex(playableItems.length > 0 ? 0 : -1);
     setProgressSeconds(0);
-    if (items.length > 0) {
-      await syncQueueState('replace', items, {
+    if (playableItems.length > 0) {
+      await syncQueueState('replace', playableItems, {
         activeIndex: 0,
-        currentContentId: items[0]?.id ?? null,
+        currentContentId: playableItems[0]?.id ?? null,
         positionMs: 0,
       });
     }
@@ -283,70 +312,119 @@ export function usePlayerController() {
   };
 
   const playTrack = async (track: ContentItemDto) => {
-    if (!track.audioUrl) {
-      setStatusText(`${track.title} has no playable audio source.`);
+    const playableTrack = await hydratePlayableTrack(track);
+    if (!playableTrack) {
       return;
     }
 
-    const existingIndex = queue.findIndex((item) => item.id === track.id);
+    const existingIndex = queue.findIndex(
+      (item) => item.id === playableTrack.id,
+    );
     if (existingIndex >= 0) {
-      setCurrentTrack(track);
+      const nextQueue = replaceQueueItem(queue, existingIndex, playableTrack);
+      setQueue(nextQueue);
+      setCurrentTrack(playableTrack);
       setActiveIndex(existingIndex);
       setProgressSeconds(0);
-      await syncQueueState('replace', queue, {
+      await syncQueueState('replace', nextQueue, {
         activeIndex: existingIndex,
-        currentContentId: track.id,
+        currentContentId: playableTrack.id,
         positionMs: 0,
       });
-      setStatusText(`Locked on ${track.title}.`);
+      setStatusText(`Locked on ${playableTrack.title}.`);
       return;
     }
 
-    const nextQueue = [...queue, track];
+    const nextQueue = [...queue, playableTrack];
     setQueue(nextQueue);
-    setCurrentTrack(track);
+    setCurrentTrack(playableTrack);
     setActiveIndex(nextQueue.length - 1);
     setProgressSeconds(0);
     await syncQueueState('replace', nextQueue, {
       activeIndex: nextQueue.length - 1,
-      currentContentId: track.id,
+      currentContentId: playableTrack.id,
       positionMs: 0,
     });
-    setStatusText(`Queued ${track.title} into the active listening lane.`);
+    setStatusText(
+      `Queued ${playableTrack.title} into the active listening lane.`,
+    );
   };
 
   const addToQueue = async (track: ContentItemDto) => {
-    if (queue.some((item) => item.id === track.id)) {
-      setStatusText(`${track.title} is already inside the queue ring.`);
+    const playableTrack = await hydratePlayableTrack(track);
+    if (!playableTrack) {
       return;
     }
 
-    const nextQueue = [...queue, track];
+    const existingIndex = queue.findIndex(
+      (item) => item.id === playableTrack.id,
+    );
+    if (existingIndex >= 0) {
+      const nextQueue = replaceQueueItem(queue, existingIndex, playableTrack);
+      setQueue(nextQueue);
+      if (!currentTrack || currentTrack.id === playableTrack.id) {
+        setCurrentTrack(playableTrack);
+        setActiveIndex(!currentTrack ? existingIndex : activeIndex);
+      }
+      await syncQueueState('replace', nextQueue, {
+        activeIndex: !currentTrack ? existingIndex : activeIndex,
+        currentContentId: currentTrack?.id ?? playableTrack.id,
+        positionMs: Math.floor(progressSeconds * 1000),
+      });
+      setStatusText(`${playableTrack.title} is already inside the queue ring.`);
+      return;
+    }
+
+    const nextQueue = [...queue, playableTrack];
     setQueue(nextQueue);
     if (!currentTrack) {
-      setCurrentTrack(track);
+      setCurrentTrack(playableTrack);
       setActiveIndex(0);
       setProgressSeconds(0);
     }
     await syncQueueState('replace', nextQueue, {
       activeIndex: !currentTrack ? 0 : activeIndex,
-      currentContentId: currentTrack?.id ?? track.id,
+      currentContentId: currentTrack?.id ?? playableTrack.id,
       positionMs: Math.floor(progressSeconds * 1000),
     });
-    setStatusText(`Added ${track.title} to the queue ring.`);
+    setStatusText(`Added ${playableTrack.title} to the queue ring.`);
   };
 
   const appendTracks = async (tracks: ContentItemDto[], message?: string) => {
     const existingIds = new Set(queue.map((item) => item.id));
-    const nextTracks = tracks.filter((track) => !existingIds.has(track.id));
+    const playableTracks = await hydratePlayableTracks(tracks);
+    let baseQueue = queue;
+    for (const track of playableTracks) {
+      const existingIndex = baseQueue.findIndex((item) => item.id === track.id);
+      if (existingIndex >= 0) {
+        baseQueue = replaceQueueItem(baseQueue, existingIndex, track);
+      }
+    }
+    const nextTracks = playableTracks.filter(
+      (track) => !existingIds.has(track.id),
+    );
     if (nextTracks.length === 0) {
+      setQueue(baseQueue);
+      if (currentTrack) {
+        const hydratedCurrent = baseQueue.find(
+          (item) => item.id === currentTrack.id,
+        );
+        if (hydratedCurrent) {
+          setCurrentTrack(hydratedCurrent);
+        }
+      }
+      await syncQueueState('replace', baseQueue, {
+        activeIndex,
+        currentContentId: currentTrack?.id ?? baseQueue[0]?.id ?? null,
+        positionMs: Math.floor(progressSeconds * 1000),
+      });
       setStatusText(
         message ?? 'Those tracks are already inside the queue ring.',
       );
       return;
     }
 
-    const nextQueue = [...queue, ...nextTracks];
+    const nextQueue = [...baseQueue, ...nextTracks];
     setQueue(nextQueue);
     if (!currentTrack) {
       setCurrentTrack(nextTracks[0] ?? null);
@@ -370,16 +448,22 @@ export function usePlayerController() {
     if (!target) {
       return;
     }
+    const playableTarget = await hydratePlayableTrack(target);
+    if (!playableTarget) {
+      return;
+    }
 
-    setCurrentTrack(target);
+    const nextQueue = replaceQueueItem(queue, index, playableTarget);
+    setQueue(nextQueue);
+    setCurrentTrack(playableTarget);
     setActiveIndex(index);
     setProgressSeconds(0);
-    await syncQueueState('replace', queue, {
+    await syncQueueState('replace', nextQueue, {
       activeIndex: index,
-      currentContentId: target.id,
+      currentContentId: playableTarget.id,
       positionMs: 0,
     });
-    setStatusText(`Switched to ${target.title}.`);
+    setStatusText(`Switched to ${playableTarget.title}.`);
   };
 
   const playPrevious = async () => {
@@ -512,19 +596,16 @@ export function usePlayerController() {
         });
     };
 
-    // If the audio is already ready (same track re-render), play immediately.
-    // Otherwise wait for the canplay event so the new source is loaded.
-    if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
-      onCanPlay();
-    } else {
-      audio.addEventListener('canplay', onCanPlay, { once: true });
-    }
+    audio.addEventListener('canplay', onCanPlay, { once: true });
+    audio.addEventListener('loadedmetadata', onCanPlay, { once: true });
+    audio.load();
 
     return () => {
       cancelled = true;
       audio.removeEventListener('canplay', onCanPlay);
+      audio.removeEventListener('loadedmetadata', onCanPlay);
     };
-  }, [currentTrack, setIsPlaying, setStatusText]);
+  }, [currentTrack?.id, currentTrack?.audioUrl, setIsPlaying, setStatusText]);
 
   const audioHandlers = useMemo(
     () => ({
